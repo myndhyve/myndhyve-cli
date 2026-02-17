@@ -77,7 +77,11 @@ async function refreshIdToken(
     );
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as {
+    id_token: string;
+    refresh_token: string;
+    expires_in: string;
+  };
   return {
     idToken: data.id_token,
     refreshToken: data.refresh_token,

@@ -67,6 +67,7 @@ export async function browserLogin(): Promise<BrowserLoginResult> {
     // Dynamic import of 'open' package (may not be installed)
     let openBrowser: (url: string) => Promise<unknown>;
     try {
+      // @ts-expect-error — 'open' is an optional dependency with a fallback below
       const open = await import('open');
       openBrowser = open.default;
     } catch {

@@ -229,7 +229,7 @@ export async function getDocument(
 
   try {
     const response = await firestoreRequest(url, { method: 'GET' });
-    const doc: FirestoreDocument = await response.json();
+    const doc = (await response.json()) as FirestoreDocument;
 
     if (!doc.fields) return null;
 
@@ -263,11 +263,14 @@ export async function listDocuments(
   const url = `${FIRESTORE_BASE}/${collectionPath}?${params.toString()}`;
 
   const response = await firestoreRequest(url, { method: 'GET' });
-  const body = await response.json();
+  const body = (await response.json()) as {
+    documents?: FirestoreDocument[];
+    nextPageToken?: string;
+  };
 
   const documents: Record<string, unknown>[] = [];
   if (body.documents) {
-    for (const doc of body.documents as FirestoreDocument[]) {
+    for (const doc of body.documents) {
       if (doc.fields) {
         const data = fromFirestoreFields(doc.fields);
         data.id = extractDocId(doc.name);
@@ -306,7 +309,7 @@ export async function createDocument(
     body: JSON.stringify(body),
   });
 
-  const doc: FirestoreDocument = await response.json();
+  const doc = (await response.json()) as FirestoreDocument;
   const result = doc.fields ? fromFirestoreFields(doc.fields) : data;
   result.id = extractDocId(doc.name);
   return result;
@@ -344,7 +347,7 @@ export async function updateDocument(
     body: JSON.stringify(body),
   });
 
-  const doc: FirestoreDocument = await response.json();
+  const doc = (await response.json()) as FirestoreDocument;
   const result = doc.fields ? fromFirestoreFields(doc.fields) : data;
   result.id = extractDocId(doc.name);
   return result;
@@ -411,7 +414,7 @@ export async function runQuery(
     }
   );
 
-  const results = await response.json();
+  const results = (await response.json()) as Array<{ document?: FirestoreDocument }>;
   const documents: Record<string, unknown>[] = [];
 
   if (Array.isArray(results)) {
