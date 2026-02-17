@@ -40,7 +40,7 @@ describe('formatTimeSince()', () => {
 
 describe('formatTimeUntil()', () => {
   it('returns minutes for near-future dates', () => {
-    const date = new Date(Date.now() + 10 * 60_000); // 10 minutes from now
+    const date = new Date(Date.now() + 10 * 60_000 + 500); // 10 minutes from now (with buffer)
     expect(formatTimeUntil(date)).toBe('10 minutes');
   });
 

@@ -17,6 +17,11 @@ const {
   mockConstants,
   capturedRegistration,
 } = vi.hoisted(() => {
+  // Ensure IS_MACOS evaluates to true when the plugin module loads on CI (Linux)
+  if (process.platform !== 'darwin') {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+  }
+
   const capturedRegistration: { plugin: unknown } = { plugin: null };
 
   return {
