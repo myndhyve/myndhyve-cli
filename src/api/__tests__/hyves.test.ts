@@ -26,7 +26,7 @@ import {
   listHyveDocuments,
   getHyveDocument,
 } from '../hyves.js';
-import type { HyveDocumentSummary, HyveDocumentDetail as _HyveDocumentDetail } from '../hyves.js';
+import type { HyveDocumentSummary, } from '../hyves.js';
 
 // ── Cast mocks ──────────────────────────────────────────────────────────────
 
@@ -94,6 +94,7 @@ describe('listSystemHyves()', () => {
       expect(hyve.name).toBeTruthy();
       expect(hyve.description).toBeTruthy();
       expect(hyve.icon).toBeTruthy();
+      expect(hyve.tier).toMatch(/^(user|team|platform)$/);
       expect(hyve.primaryColor).toMatch(/^#[0-9a-f]{6}$/);
       expect(hyve.visibility).toMatch(/^(public|internal)$/);
       expect(Array.isArray(hyve.tags)).toBe(true);
@@ -133,8 +134,9 @@ describe('getSystemHyve()', () => {
       { id: 'slides', name: 'Slides' },
       { id: 'drawings', name: 'Drawings' },
       { id: 'hyve-maker', name: 'Hyve Maker' },
+      { id: 'hyve-builder', name: 'Hyve Builder' },
       { id: 'cad', name: 'CAD Designer' },
-      { id: 'landing-page', name: 'Landing Page Canvas' },
+      { id: 'landing-page', name: 'LandingPage Canvas' },
     ];
 
     for (const { id, name } of expected) {
@@ -151,6 +153,7 @@ describe('isValidSystemHyveId()', () => {
     expect(isValidSystemHyveId('slides')).toBe(true);
     expect(isValidSystemHyveId('drawings')).toBe(true);
     expect(isValidSystemHyveId('hyve-maker')).toBe(true);
+    expect(isValidSystemHyveId('hyve-builder')).toBe(true);
     expect(isValidSystemHyveId('cad')).toBe(true);
     expect(isValidSystemHyveId('landing-page')).toBe(true);
   });

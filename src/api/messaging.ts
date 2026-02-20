@@ -24,6 +24,7 @@ import {
   runQuery,
   type QueryFilter,
 } from './firestore.js';
+import { getAPIClient } from './client.js';
 import { createLogger } from '../utils/logger.js';
 
 const log = createLogger('MessagingAPI');
@@ -259,6 +260,62 @@ export async function getConnector(
   return toConnectorDetail(doc, userId);
 }
 
+/**
+ * Enable a messaging connector.
+ */
+export async function enableConnector(
+  userId: string,
+  connectorId: string
+): Promise<ConnectorSummary> {
+  const collectionPath = `users/${userId}/messagingConnectors`;
+  log.debug('Enabling connector', { userId, connectorId });
+  const result = await updateDocument(collectionPath, connectorId, {
+    enabled: true,
+    updatedAt: new Date().toISOString(),
+  }, ['enabled', 'updatedAt']);
+  return toConnectorSummary(result);
+}
+
+/**
+ * Disable a messaging connector.
+ */
+export async function disableConnector(
+  userId: string,
+  connectorId: string
+): Promise<ConnectorSummary> {
+  const collectionPath = `users/${userId}/messagingConnectors`;
+  log.debug('Disabling connector', { userId, connectorId });
+  const result = await updateDocument(collectionPath, connectorId, {
+    enabled: false,
+    updatedAt: new Date().toISOString(),
+  }, ['enabled', 'updatedAt']);
+  return toConnectorSummary(result);
+}
+
+/**
+ * Test result from a connector health check.
+ */
+export interface ConnectorTestResult {
+  success: boolean;
+  message: string;
+  latencyMs?: number;
+  error?: string;
+}
+
+/**
+ * Send a test message through a connector to verify connectivity.
+ */
+export async function testConnector(
+  userId: string,
+  connectorId: string
+): Promise<ConnectorTestResult> {
+  log.debug('Testing connector', { userId, connectorId });
+  const client = getAPIClient();
+  return client.post<ConnectorTestResult>(
+    `/messaging/connectors/${connectorId}/test`
+  );
+}
+
 // ============================================================================
 // POLICY OPERATIONS
 // ============================================================================
@@ -445,6 +502,18 @@ export async function getSession(
   return toSessionSummary(doc);
 }
 
+/**
+ * Close and delete a messaging session.
+ */
+export async function deleteSession(
+  userId: string,
+  sessionKey: string
+): Promise<void> {
+  const collectionPath = `users/${userId}/messagingSessions`;
+  log.debug('Deleting session', { userId, sessionKey });
+  await deleteDocument(collectionPath, sessionKey);
+}
+
 // ============================================================================
 // IDENTITY OPERATIONS
 // ============================================================================
@@ -520,6 +589,40 @@ export async function linkPeerToIdentity(
 
   const result = await updateDocument(collectionPath, identityId, {
     linkedPeers: allPeers,
+    peerKeys,
+    updatedAt: now,
+  }, ['linkedPeers', 'peerKeys', 'updatedAt']);
+
+  return toIdentitySummary(result);
+}
+
+/**
+ * Remove peers from an identity's linked peers list.
+ */
+export async function unlinkPeersFromIdentity(
+  userId: string,
+  identityId: string,
+  peers: Array<{ channel: MessagingChannel; peerId: string }>
+): Promise<IdentitySummary> {
+  const collectionPath = `users/${userId}/messagingIdentities`;
+  log.debug('Unlinking peers from identity', { userId, identityId, peerCount: peers.length });
+
+  const doc = await getDocument(collectionPath, identityId);
+  if (!doc) {
+    throw new Error(`Identity "${identityId}" not found`);
+  }
+
+  const existing = (doc.linkedPeers || []) as Array<Record<string, unknown>>;
+  const removeKeys = new Set(peers.map((p) => `${p.channel}:${p.peerId}`));
+  const remaining = existing.filter(
+    (p) => !removeKeys.has(`${p.channel}:${p.peerId}`)
+  );
+
+  const peerKeys = remaining.map((p) => `${p.channel}:${p.peerId}`);
+  const now = new Date().toISOString();
+
+  const result = await updateDocument(collectionPath, identityId, {
+    linkedPeers: remaining,
     peerKeys,
     updatedAt: now,
   }, ['linkedPeers', 'peerKeys', 'updatedAt']);

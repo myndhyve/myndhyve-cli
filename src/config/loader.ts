@@ -122,6 +122,7 @@ export interface ConfiguredRelay extends RelayConfig {
   channel: RelayChannel;
   relayId: string;
   deviceToken: string;
+  tokenExpiresAt?: string;
 }
 
 /**

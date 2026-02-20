@@ -1,10 +1,10 @@
 /**
  * MyndHyve CLI — SSE Stream Parser
  *
- * Parses Server-Sent Events from the `aiProxyStream` Cloud Function.
+ * Parses Server-Sent Events from the `aiProxyStreamV2` Cloud Function.
  * Uses native Node.js fetch + ReadableStream for zero-dependency streaming.
  *
- * SSE format from aiProxyStream:
+ * SSE format from aiProxyStreamV2:
  *   data: {"content":"Hello","delta":"Hello"}
  *   data: {"content":"Hello world","delta":" world"}
  *   data: {"done":true,"content":"Hello world"}
@@ -91,7 +91,7 @@ export interface StreamRequest {
  * @example
  * ```typescript
  * const abort = await streamChat({
- *   url: 'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStream',
+ *   url: 'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStreamV2',
  *   token: 'firebase-id-token',
  *   body: {
  *     provider: 'anthropic',
@@ -329,4 +329,4 @@ function processSSELine(
 
 /** Default AI Proxy endpoint URL. */
 export const AI_PROXY_URL =
-  'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStream';
+  'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStreamV2';

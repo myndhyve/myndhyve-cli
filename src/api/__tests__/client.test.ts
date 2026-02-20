@@ -153,7 +153,7 @@ describe('Error Handling', () => {
     await expect(client.get('/failing')).rejects.toThrow(/Internal server error/);
   });
 
-  it('throws specific error for 401 Unauthorized', async () => {
+  it('retries once with force-refreshed token on 401, then throws if retry also 401', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 401,
@@ -168,6 +168,44 @@ describe('Error Handling', () => {
       expect((err as APIClientError).code).toBe('UNAUTHORIZED');
       expect((err as APIClientError).statusCode).toBe(401);
     }
+
+    // getToken called twice: first normal, then with forceRefresh=true
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+    expect(mockGetToken).toHaveBeenNthCalledWith(1, false);
+    expect(mockGetToken).toHaveBeenNthCalledWith(2, true);
+
+    // fetch called twice (original + retry)
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('succeeds on retry when 401 is followed by 200', async () => {
+    // First call: 401, second call: 200
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve('Unauthorized'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ data: 'success' }),
+      });
+
+    // On retry, return a fresh token
+    mockGetToken
+      .mockResolvedValueOnce('stale-token')
+      .mockResolvedValueOnce('fresh-token');
+
+    const result = await client.get<{ data: string }>('/protected');
+
+    expect(result.data).toBe('success');
+    expect(mockGetToken).toHaveBeenCalledTimes(2);
+    expect(mockGetToken).toHaveBeenNthCalledWith(2, true);
+
+    // Retry request uses the fresh token
+    expect(mockFetch.mock.calls[1][1].headers.Authorization).toBe('Bearer fresh-token');
   });
 
   it('throws specific error for 403 Forbidden', async () => {

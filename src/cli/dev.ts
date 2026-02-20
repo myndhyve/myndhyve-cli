@@ -12,14 +12,14 @@
  *   myndhyve-cli dev config validate
  */
 
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig, saveConfig, getConfigPath, getCliDir } from '../config/loader.js';
 import { RelayConfigSchema } from '../config/types.js';
 import { loadCredentials, getCredentialsPath } from '../auth/credentials.js';
 import { getActiveContext } from '../context.js';
-import { runDoctorChecks, type CheckResult as _CheckResult } from '../dev/doctor.js';
+import { runDoctorChecks, } from '../dev/doctor.js';
 import { createTestEnvelope, validateEnvelope } from '../dev/envelope.js';
 import {
   generateWebhookEvent,
@@ -27,6 +27,7 @@ import {
   type WebhookEventType,
 } from '../dev/webhook.js';
 import { printError } from './helpers.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 import type { RelayChannel } from '../relay/types.js';
 
 // ============================================================================
@@ -206,8 +207,11 @@ function registerEnvelopeCommands(dev: Command): void {
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action((file: string, opts) => {
       if (!existsSync(file)) {
-        console.error(`\n  Error: File not found: ${file}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'NOT_FOUND',
+          message: `File not found: ${file}`,
+        });
+        process.exitCode = ExitCode.NOT_FOUND;
         return;
       }
 
@@ -216,9 +220,11 @@ function registerEnvelopeCommands(dev: Command): void {
         const raw = readFileSync(file, 'utf-8');
         data = JSON.parse(raw);
       } catch (error) {
-        console.error(`\n  Error: Invalid JSON in ${file}`);
-        console.error(`  ${error instanceof Error ? error.message : 'parse error'}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_JSON',
+          message: `Invalid JSON in ${file}: ${error instanceof Error ? error.message : 'parse error'}`,
+        });
+        process.exitCode = ExitCode.GENERAL_ERROR;
         return;
       }
 
@@ -268,9 +274,12 @@ function registerWebhookCommands(dev: Command): void {
 
       const validTypes = getAvailableEventTypes(channel as RelayChannel);
       if (!validTypes.includes(opts.event as WebhookEventType)) {
-        console.error(`\n  Error: Event type "${opts.event}" not available for ${channel}.`);
-        console.error(`  Available: ${validTypes.join(', ')}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_EVENT_TYPE',
+          message: `Event type "${opts.event}" not available for ${channel}.`,
+          suggestion: `Available: ${validTypes.join(', ')}`,
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
@@ -281,8 +290,11 @@ function registerWebhookCommands(dev: Command): void {
           : opts.payload;
 
         if (!existsSync(payloadFile)) {
-          console.error(`\n  Error: Payload file not found: ${payloadFile}\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Payload file not found: ${payloadFile}`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -292,9 +304,11 @@ function registerWebhookCommands(dev: Command): void {
           console.log(JSON.stringify({ channel, payload, source: payloadFile }, null, 2));
           return;
         } catch (error) {
-          console.error(`\n  Error: Invalid JSON in payload file.`);
-          console.error(`  ${error instanceof Error ? error.message : 'parse error'}\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'INVALID_JSON',
+            message: `Invalid JSON in payload file: ${error instanceof Error ? error.message : 'parse error'}`,
+          });
+          process.exitCode = ExitCode.GENERAL_ERROR;
           return;
         }
       }
@@ -390,8 +404,11 @@ function registerConfigCommands(dev: Command): void {
     .description('Import CLI configuration from a file')
     .action((file: string) => {
       if (!existsSync(file)) {
-        console.error(`\n  Error: File not found: ${file}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'NOT_FOUND',
+          message: `File not found: ${file}`,
+        });
+        process.exitCode = ExitCode.NOT_FOUND;
         return;
       }
 
@@ -400,16 +417,21 @@ function registerConfigCommands(dev: Command): void {
         const raw = readFileSync(file, 'utf-8');
         data = JSON.parse(raw);
       } catch (error) {
-        console.error(`\n  Error: Invalid JSON in ${file}`);
-        console.error(`  ${error instanceof Error ? error.message : 'parse error'}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_JSON',
+          message: `Invalid JSON in ${file}: ${error instanceof Error ? error.message : 'parse error'}`,
+        });
+        process.exitCode = ExitCode.GENERAL_ERROR;
         return;
       }
 
       // Validate config section
       if (!data.config) {
-        console.error('\n  Error: Export file missing "config" section.\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_FORMAT',
+          message: 'Export file missing "config" section.',
+        });
+        process.exitCode = ExitCode.GENERAL_ERROR;
         return;
       }
 
@@ -427,9 +449,11 @@ function registerConfigCommands(dev: Command): void {
 
         console.log('');
       } catch (error) {
-        console.error('\n  Error: Invalid configuration in export file.');
-        console.error(`  ${error instanceof Error ? error.message : 'validation error'}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_CONFIG',
+          message: `Invalid configuration in export file: ${error instanceof Error ? error.message : 'validation error'}`,
+        });
+        process.exitCode = ExitCode.GENERAL_ERROR;
       }
     });
 
@@ -534,9 +558,12 @@ interface ConfigCheck {
  */
 function validateChannel(channel: string): channel is RelayChannel {
   if (!VALID_CHANNELS.includes(channel as RelayChannel)) {
-    console.error(`\n  Error: Unknown channel "${channel}".`);
-    console.error(`  Valid channels: ${VALID_CHANNELS.join(', ')}\n`);
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'INVALID_CHANNEL',
+      message: `Unknown channel "${channel}".`,
+      suggestion: `Valid channels: ${VALID_CHANNELS.join(', ')}`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
     return false;
   }
   return true;

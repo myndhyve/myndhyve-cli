@@ -21,7 +21,7 @@ function createMockEv() {
     },
     /** Test-only: fire an event */
     __emit(event: string, ...args: unknown[]) {
-      handlers.get(event)?.forEach((h) => h(...args));
+      handlers.get(event)?.forEach((h) => { h(...args); });
     },
     /** Test-only: get handler count */
     __handlerCount(event: string) {

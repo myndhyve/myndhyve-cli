@@ -50,6 +50,11 @@ vi.mock('../../relay/outbound-poller.js', () => ({
 
 vi.mock('../../channels/registry.js', () => ({
   getChannel: (...args: unknown[]) => mockGetChannel(...args),
+  ensureChannelsLoaded: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../utils/output.js', () => ({
+  ExitCode: { SUCCESS: 0, GENERAL_ERROR: 1, USAGE_ERROR: 2, NOT_FOUND: 3, UNAUTHORIZED: 4, SIGINT: 130 },
 }));
 
 vi.mock('../../utils/backoff.js', () => ({

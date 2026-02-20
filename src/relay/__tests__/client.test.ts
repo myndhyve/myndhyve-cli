@@ -114,7 +114,7 @@ describe('RelayClient.register()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/register`);
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer firebase-id-token-xyz');
+    expect(init.headers.Authorization).toBe('Bearer firebase-id-token-xyz');
     expect(init.headers['Content-Type']).toBe('application/json');
     expect(JSON.parse(init.body)).toEqual({ channel: 'whatsapp', label: 'My Laptop' });
     expect(result).toEqual(expected);
@@ -130,7 +130,7 @@ describe('RelayClient.activate()', () => {
     const client = new RelayClient(BASE_URL);
     const activateResp = {
       deviceToken: 'dt-secret-456',
-      tokenExpiresAt: '2025-12-31T23:59:59Z',
+      tokenExpiresAt: '2099-12-31T23:59:59Z',
       heartbeatIntervalSeconds: 30,
       outboundPollIntervalSeconds: 5,
     };
@@ -147,7 +147,7 @@ describe('RelayClient.activate()', () => {
     expect(url).toBe(`${BASE_URL}/activate`);
     expect(init.method).toBe('POST');
     // No Authorization header for activate — activation code is in body
-    expect(init.headers['Authorization']).toBeUndefined();
+    expect(init.headers.Authorization).toBeUndefined();
     const body = JSON.parse(init.body);
     expect(body.relayId).toBe('relay-123');
     expect(body.activationCode).toBe('ABC123');
@@ -160,7 +160,7 @@ describe('RelayClient.activate()', () => {
     );
     await client.heartbeat('relay-123');
     const [, hbInit] = fetchMock.mock.calls[1];
-    expect(hbInit.headers['Authorization']).toBe('Bearer dt-secret-456');
+    expect(hbInit.headers.Authorization).toBe('Bearer dt-secret-456');
   });
 });
 
@@ -178,7 +178,7 @@ describe('RelayClient.revoke()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/revoke`);
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer firebase-id-token');
+    expect(init.headers.Authorization).toBe('Bearer firebase-id-token');
     const body = JSON.parse(init.body);
     expect(body.relayId).toBe('relay-123');
     expect(body.reason).toBe('user requested');
@@ -219,7 +219,7 @@ describe('RelayClient.heartbeat()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/heartbeat`);
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer dt-token');
+    expect(init.headers.Authorization).toBe('Bearer dt-token');
     const body = JSON.parse(init.body);
     expect(body.relayId).toBe('relay-123');
     expect(body.version).toBe('0.1.0');
@@ -267,7 +267,7 @@ describe('RelayClient.sendInbound()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/inbound`);
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer dt-token');
+    expect(init.headers.Authorization).toBe('Bearer dt-token');
     const body = JSON.parse(init.body);
     expect(body.relayId).toBe('relay-123');
     expect(body.envelope).toEqual(envelope);
@@ -336,7 +336,7 @@ describe('RelayClient.pollOutbound()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/outbound?relayId=relay-123`);
     expect(init.method).toBe('GET');
-    expect(init.headers['Authorization']).toBe('Bearer dt-token');
+    expect(init.headers.Authorization).toBe('Bearer dt-token');
   });
 
   it('returns empty array when no messages', async () => {
@@ -380,7 +380,7 @@ describe('RelayClient.ackOutbound()', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE_URL}/ack`);
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer dt-token');
+    expect(init.headers.Authorization).toBe('Bearer dt-token');
     expect(JSON.parse(init.body)).toEqual(ack);
   });
 
@@ -638,14 +638,14 @@ describe('RelayClient.setDeviceToken()', () => {
 
     // First request with old token
     await client.heartbeat('relay-123');
-    expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer old-token');
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer old-token');
 
     // Update token
     client.setDeviceToken('new-token');
 
     // Second request with new token
     await client.heartbeat('relay-123');
-    expect(fetchMock.mock.calls[1][1].headers['Authorization']).toBe('Bearer new-token');
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer new-token');
   });
 
   it('allows previously-blocked methods to succeed after setting token', async () => {
@@ -658,7 +658,60 @@ describe('RelayClient.setDeviceToken()', () => {
 
     await client.heartbeat('relay-123');
 
-    expect(fetchMock.mock.calls[0][1].headers['Authorization']).toBe('Bearer fresh-token');
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer fresh-token');
+  });
+});
+
+// ============================================================================
+// isDeviceTokenExpired()
+// ============================================================================
+
+describe('RelayClient.isDeviceTokenExpired()', () => {
+  it('returns false when no expiry info is available', () => {
+    const client = new RelayClient(BASE_URL, 'dt-token');
+    expect(client.isDeviceTokenExpired()).toBe(false);
+  });
+
+  it('returns false when token expiry is in the future', () => {
+    const client = new RelayClient(BASE_URL, 'dt-token', '2099-12-31T23:59:59Z');
+    expect(client.isDeviceTokenExpired()).toBe(false);
+  });
+
+  it('returns true when token has expired', () => {
+    const client = new RelayClient(BASE_URL, 'dt-token', '2020-01-01T00:00:00Z');
+    expect(client.isDeviceTokenExpired()).toBe(true);
+  });
+
+  it('returns true when token is within 5-minute buffer of expiry', () => {
+    // Token expires 2 minutes from now — within the 5-minute buffer
+    const nearExpiry = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    const client = new RelayClient(BASE_URL, 'dt-token', nearExpiry);
+    expect(client.isDeviceTokenExpired()).toBe(true);
+  });
+
+  it('throws DEVICE_TOKEN_EXPIRED on heartbeat when token is expired', async () => {
+    const client = new RelayClient(BASE_URL, 'dt-token', '2020-01-01T00:00:00Z');
+
+    const err = await client.heartbeat('relay-123').catch((e) => e);
+
+    expect(err).toBeInstanceOf(RelayClientError);
+    expect(err.code).toBe('DEVICE_TOKEN_EXPIRED');
+    expect(err.message).toContain('expired');
+  });
+
+  it('tracks expiry from activate response', async () => {
+    const client = new RelayClient(BASE_URL);
+    const activateResp = {
+      deviceToken: 'dt-new',
+      tokenExpiresAt: '2020-01-01T00:00:00Z', // Already expired
+      heartbeatIntervalSeconds: 30,
+      outboundPollIntervalSeconds: 5,
+    };
+    fetchMock.mockResolvedValueOnce(mockResponse(activateResp));
+
+    await client.activate('relay-123', 'CODE');
+
+    expect(client.isDeviceTokenExpired()).toBe(true);
   });
 });
 

@@ -12,21 +12,30 @@ vi.mock('../../auth/index.js', () => ({
   getAuthStatus: (...args: unknown[]) => mockGetAuthStatus(...args),
 }));
 
+vi.mock('../../utils/output.js', () => ({
+  ExitCode: { SUCCESS: 0, GENERAL_ERROR: 1, USAGE_ERROR: 2, NOT_FOUND: 3, UNAUTHORIZED: 4, SIGINT: 130 },
+  printErrorResult: vi.fn((error: { message: string; suggestion?: string }) => {
+    process.stderr.write(`\n  Error: ${error.message}\n`);
+    if (error.suggestion) process.stderr.write(`  ${error.suggestion}\n`);
+    process.stderr.write('\n');
+  }),
+}));
+
 import { requireAuth, truncate, formatRelativeTime, printError } from '../helpers.js';
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('requireAuth', () => {
-  let consoleErrorSpy: MockInstance;
+  let stderrSpy: MockInstance;
 
   beforeEach(() => {
     mockGetAuthStatus.mockReset();
     process.exitCode = undefined;
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    stderrSpy.mockRestore();
     process.exitCode = undefined;
   });
 
@@ -42,10 +51,10 @@ describe('requireAuth', () => {
 
     expect(result).toEqual({ uid: 'user-123', email: 'test@example.com' });
     expect(process.exitCode).toBeUndefined();
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('returns null and sets exitCode = 1 when not authenticated', () => {
+  it('returns null and sets exitCode = 4 (UNAUTHORIZED) when not authenticated', () => {
     mockGetAuthStatus.mockReturnValue({
       authenticated: false,
       source: 'none',
@@ -54,7 +63,7 @@ describe('requireAuth', () => {
     const result = requireAuth();
 
     expect(result).toBeNull();
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(4);
   });
 
   it('prints "Not authenticated" error when not authenticated', () => {
@@ -65,15 +74,12 @@ describe('requireAuth', () => {
 
     requireAuth();
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Not authenticated')
-    );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('myndhyve-cli auth login')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('Not authenticated');
+    expect(output).toContain('myndhyve-cli auth login');
   });
 
-  it('returns null and sets exitCode = 1 when authenticated but no uid', () => {
+  it('returns null and sets exitCode = 4 when authenticated but no uid', () => {
     mockGetAuthStatus.mockReturnValue({
       authenticated: true,
       uid: undefined,
@@ -84,7 +90,7 @@ describe('requireAuth', () => {
     const result = requireAuth();
 
     expect(result).toBeNull();
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(4);
   });
 
   it('prints "User ID not available" error when authenticated but no uid', () => {
@@ -97,9 +103,8 @@ describe('requireAuth', () => {
 
     requireAuth();
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('User ID not available')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('User ID not available');
   });
 
   it('returns null and sets exitCode when uid is empty string', () => {
@@ -113,7 +118,7 @@ describe('requireAuth', () => {
     const result = requireAuth();
 
     expect(result).toBeNull();
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(4);
   });
 
   it('uses "unknown" as email fallback when email is missing', () => {
@@ -297,15 +302,15 @@ describe('formatRelativeTime', () => {
 // ── printError ────────────────────────────────────────────────────────────────
 
 describe('printError', () => {
-  let consoleErrorSpy: MockInstance;
+  let stderrSpy: MockInstance;
 
   beforeEach(() => {
     process.exitCode = undefined;
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    stderrSpy.mockRestore();
     process.exitCode = undefined;
   });
 
@@ -314,69 +319,62 @@ describe('printError', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('prints context to console.error', () => {
+  it('prints context to stderr', () => {
     printError('Loading config', new Error('file not found'));
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Loading config')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('Loading config');
   });
 
-  it('prints Error .message to console.error', () => {
+  it('prints Error .message to stderr', () => {
     printError('Upload failed', new Error('network timeout'));
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('network timeout')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('network timeout');
   });
 
   it('handles string errors directly', () => {
     printError('Parse failed', 'unexpected token');
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('unexpected token')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('unexpected token');
     expect(process.exitCode).toBe(1);
   });
 
   it('handles number errors via String()', () => {
     printError('Exit code', 42);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('42')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('42');
     expect(process.exitCode).toBe(1);
   });
 
   it('handles null errors via String()', () => {
     printError('Null error', null);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('null')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('null');
   });
 
   it('handles undefined errors via String()', () => {
     printError('Undefined error', undefined);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('undefined')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('undefined');
   });
 
   it('handles object errors via String()', () => {
     printError('Object error', { code: 'ERR' });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[object Object]')
-    );
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('[object Object]');
   });
 
-  it('calls console.error exactly twice (context line + message line)', () => {
+  it('writes error output to stderr', () => {
     printError('ctx', new Error('msg'));
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-    expect(consoleErrorSpy.mock.calls[0][0]).toContain('ctx');
-    expect(consoleErrorSpy.mock.calls[1][0]).toContain('msg');
+    const output = stderrSpy.mock.calls.map(c => c[0]).join('');
+    expect(output).toContain('ctx');
+    expect(output).toContain('msg');
   });
 });

@@ -132,7 +132,7 @@ export function spawnDaemon(verbose?: boolean): number {
   const logFile = ensureLogFile();
   const outFd = openSync(logFile, 'a');
 
-  let child;
+  let child: ReturnType<typeof spawn>;
   try {
     child = spawn(process.execPath, [entryPoint, ...args], {
       detached: true,

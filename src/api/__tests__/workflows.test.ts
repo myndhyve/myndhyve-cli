@@ -45,9 +45,7 @@ import {
 
 import type {
   WorkflowSummary,
-  WorkflowDetail as _WorkflowDetail,
   RunSummary,
-  RunDetail as _RunDetail,
   RunLogEntry,
   ArtifactSummary,
   ArtifactDetail,
@@ -108,6 +106,8 @@ const mockWorkflowDoc: Record<string, unknown> = {
 
 const mockRunDoc: Record<string, unknown> = {
   id: 'run_abc123',
+  userId: USER_ID,
+  hyveId: HYVE_ID,
   workflowId: 'wf-1',
   workflowName: 'App Builder Workflow',
   status: 'running',
@@ -129,14 +129,16 @@ const mockRunDoc: Record<string, unknown> = {
 
 const mockWaitingRunDoc: Record<string, unknown> = {
   id: 'run_waiting123',
+  userId: USER_ID,
+  hyveId: HYVE_ID,
   workflowId: 'wf-1',
-  status: 'waiting-approval',
+  status: 'awaiting_approval',
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
   nodeStates: {
     'node-1': { status: 'completed', label: 'Generate PRD' },
-    'node-2': { status: 'waiting-approval', label: 'Review Plan', approval: { requestedAt: '2025-01-15T10:01:00Z' } },
+    'node-2': { status: 'awaiting_approval', label: 'Review Plan', approval: { requestedAt: '2025-01-15T10:01:00Z' } },
   },
   startedAt: '2025-01-15T10:00:00Z',
 };
@@ -325,29 +327,17 @@ describe('getWorkflow()', () => {
 // ============================================================================
 
 describe('listRuns()', () => {
-  it('uses listDocuments with correct collection path when no filters', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [] });
+  it('always uses runQuery with userId+hyveId base filters', async () => {
+    mockRunQuery.mockResolvedValue([]);
 
     await listRuns(USER_ID, HYVE_ID);
 
-    expect(mockListDocuments).toHaveBeenCalledOnce();
-    expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/runs`,
-      { pageSize: 50 }
-    );
-    expect(mockRunQuery).not.toHaveBeenCalled();
-  });
-
-  it('uses runQuery with status filter', async () => {
-    mockRunQuery.mockResolvedValue([]);
-
-    await listRuns(USER_ID, HYVE_ID, { status: 'running' });
-
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${USER_ID}/hyves/${HYVE_ID}/runs`);
+    expect(collectionPath).toBe('runs');
     expect(filters).toEqual([
-      { field: 'status', op: 'EQUAL', value: 'running' },
+      { field: 'userId', op: 'EQUAL', value: USER_ID },
+      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
     ]);
     expect(options).toEqual({
       orderBy: 'startedAt',
@@ -357,7 +347,21 @@ describe('listRuns()', () => {
     expect(mockListDocuments).not.toHaveBeenCalled();
   });
 
-  it('uses runQuery with workflowId filter', async () => {
+  it('adds status filter to base filters', async () => {
+    mockRunQuery.mockResolvedValue([]);
+
+    await listRuns(USER_ID, HYVE_ID, { status: 'running' });
+
+    expect(mockRunQuery).toHaveBeenCalledOnce();
+    const [, filters] = mockRunQuery.mock.calls[0];
+    expect(filters).toEqual([
+      { field: 'userId', op: 'EQUAL', value: USER_ID },
+      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
+      { field: 'status', op: 'EQUAL', value: 'running' },
+    ]);
+  });
+
+  it('adds workflowId filter to base filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
     await listRuns(USER_ID, HYVE_ID, { workflowId: 'wf-1' });
@@ -365,6 +369,8 @@ describe('listRuns()', () => {
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
+      { field: 'userId', op: 'EQUAL', value: USER_ID },
+      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
   });
@@ -375,8 +381,10 @@ describe('listRuns()', () => {
     await listRuns(USER_ID, HYVE_ID, { status: 'completed', workflowId: 'wf-1' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
-    expect(filters).toHaveLength(2);
+    expect(filters).toHaveLength(4);
     expect(filters).toEqual([
+      { field: 'userId', op: 'EQUAL', value: USER_ID },
+      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
       { field: 'status', op: 'EQUAL', value: 'completed' },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
@@ -391,19 +399,17 @@ describe('listRuns()', () => {
     expect(options.limit).toBe(10);
   });
 
-  it('passes custom limit to listDocuments when no filters', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [] });
+  it('passes custom limit when no extra filters', async () => {
+    mockRunQuery.mockResolvedValue([]);
 
     await listRuns(USER_ID, HYVE_ID, { limit: 25 });
 
-    expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/runs`,
-      { pageSize: 25 }
-    );
+    const [, , options] = mockRunQuery.mock.calls[0];
+    expect(options.limit).toBe(25);
   });
 
   it('maps results to RunSummary[]', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [mockRunDoc] });
+    mockRunQuery.mockResolvedValue([mockRunDoc]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -425,20 +431,21 @@ describe('listRuns()', () => {
   });
 
   it('returns empty array when no runs exist', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [] });
+    mockRunQuery.mockResolvedValue([]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
     expect(results).toEqual([]);
   });
 
-  it('uses empty options without triggering query', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [] });
+  it('uses empty options with base filters only', async () => {
+    mockRunQuery.mockResolvedValue([]);
 
     await listRuns(USER_ID, HYVE_ID, {});
 
-    expect(mockListDocuments).toHaveBeenCalledOnce();
-    expect(mockRunQuery).not.toHaveBeenCalled();
+    expect(mockRunQuery).toHaveBeenCalledOnce();
+    const [, filters] = mockRunQuery.mock.calls[0];
+    expect(filters).toHaveLength(2); // userId + hyveId only
   });
 });
 
@@ -450,7 +457,7 @@ describe('getRun()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/runs`,
+      'runs',
       'run_abc123'
     );
   });
@@ -525,7 +532,7 @@ describe('createRun()', () => {
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
     const [collectionPath] = mockCreateDocument.mock.calls[0];
-    expect(collectionPath).toBe(`users/${USER_ID}/hyves/${HYVE_ID}/runs`);
+    expect(collectionPath).toBe('runs');
   });
 
   it('generates a run ID with run_ prefix', async () => {
@@ -541,6 +548,8 @@ describe('createRun()', () => {
     await createRun(USER_ID, HYVE_ID, 'wf-1');
 
     const [, , data] = mockCreateDocument.mock.calls[0];
+    expect(data.userId).toBe(USER_ID);
+    expect(data.hyveId).toBe(HYVE_ID);
     expect(data.workflowId).toBe('wf-1');
     expect(data.status).toBe('pending');
     expect(data.triggerType).toBe('manual');
@@ -606,7 +615,7 @@ describe('getRunLogs()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/runs`,
+      'runs',
       'run_abc123'
     );
   });
@@ -696,7 +705,7 @@ describe('getRunLogs()', () => {
 // ============================================================================
 
 describe('approveRun()', () => {
-  it('verifies run is waiting-approval, finds waiting node, and updates with approved decision', async () => {
+  it('verifies run is awaiting_approval, finds waiting node, and updates with approved decision', async () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({
       ...mockWaitingRunDoc,
@@ -720,14 +729,14 @@ describe('approveRun()', () => {
 
     // Verify getDocument call
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/runs`,
+      'runs',
       'run_waiting123'
     );
 
     // Verify updateDocument call
     expect(mockUpdateDocument).toHaveBeenCalledOnce();
     const [collectionPath, runId, payload, fieldPaths] = mockUpdateDocument.mock.calls[0];
-    expect(collectionPath).toBe(`users/${USER_ID}/hyves/${HYVE_ID}/runs`);
+    expect(collectionPath).toBe('runs');
     expect(runId).toBe('run_waiting123');
 
     // Verify payload fields
@@ -735,8 +744,8 @@ describe('approveRun()', () => {
     expect(payload['nodeStates.node-2.approval.decidedBy']).toBe(USER_ID);
     expect(payload['nodeStates.node-2.approval.decidedAt']).toBeDefined();
     expect(payload['nodeStates.node-2.status']).toBe('completed');
-    expect(payload['status']).toBe('running');
-    expect(payload['updatedAt']).toBeDefined();
+    expect(payload.status).toBe('running');
+    expect(payload.updatedAt).toBeDefined();
 
     // Verify field paths
     expect(fieldPaths).toContain('nodeStates.node-2.approval.decision');
@@ -775,20 +784,20 @@ describe('approveRun()', () => {
     expect(mockUpdateDocument).not.toHaveBeenCalled();
   });
 
-  it('throws if run is not waiting-approval', async () => {
+  it('throws if run is not awaiting_approval', async () => {
     mockGetDocument.mockResolvedValue({ ...mockRunDoc, status: 'running' });
 
     await expect(approveRun(USER_ID, HYVE_ID, 'run_abc123')).rejects.toThrow(
-      'Run "run_abc123" is not waiting for approval (status: running)'
+      'Run "run_abc123" is not awaiting approval (status: running)'
     );
 
     expect(mockUpdateDocument).not.toHaveBeenCalled();
   });
 
-  it('throws if no node is waiting for approval', async () => {
+  it('throws if no node is awaiting approval', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'run_no_waiting',
-      status: 'waiting-approval',
+      status: 'awaiting_approval',
       nodeStates: {
         'node-1': { status: 'completed' },
         'node-2': { status: 'completed' },
@@ -796,7 +805,7 @@ describe('approveRun()', () => {
     });
 
     await expect(approveRun(USER_ID, HYVE_ID, 'run_no_waiting')).rejects.toThrow(
-      'No node found waiting for approval in run "run_no_waiting"'
+      'No node found awaiting approval in run "run_no_waiting"'
     );
 
     expect(mockUpdateDocument).not.toHaveBeenCalled();
@@ -805,12 +814,12 @@ describe('approveRun()', () => {
   it('throws if nodeStates is empty', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'run_empty_nodes',
-      status: 'waiting-approval',
+      status: 'awaiting_approval',
       nodeStates: {},
     });
 
     await expect(approveRun(USER_ID, HYVE_ID, 'run_empty_nodes')).rejects.toThrow(
-      'No node found waiting for approval'
+      'No node found awaiting approval'
     );
   });
 });
@@ -825,7 +834,7 @@ describe('rejectRun()', () => {
     const [, , payload] = mockUpdateDocument.mock.calls[0];
     expect(payload['nodeStates.node-2.approval.decision']).toBe('rejected');
     expect(payload['nodeStates.node-2.status']).toBe('failed');
-    expect(payload['status']).toBe('failed');
+    expect(payload.status).toBe('failed');
     expect(payload['nodeStates.node-2.approval.feedback']).toBe('Needs more detail');
   });
 
@@ -860,7 +869,7 @@ describe('reviseRun()', () => {
     expect(payload['nodeStates.node-2.approval.decision']).toBe('rejected');
     expect(payload['nodeStates.node-2.approval.feedback']).toBe('Please add more features to the plan');
     expect(payload['nodeStates.node-2.status']).toBe('failed');
-    expect(payload['status']).toBe('failed');
+    expect(payload.status).toBe('failed');
   });
 
   it('returns RunDetail', async () => {
@@ -883,50 +892,27 @@ describe('reviseRun()', () => {
 // ============================================================================
 
 describe('listArtifacts()', () => {
-  it('uses listDocuments with correct collection path when no filters', async () => {
+  const RUN_ID = 'run_abc123';
+
+  it('uses listDocuments with correct collection path', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listArtifacts(USER_ID, HYVE_ID);
+    await listArtifacts(RUN_ID);
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/artifacts`,
+      `runs/${RUN_ID}/artifacts`,
       { pageSize: 50 }
     );
-    expect(mockRunQuery).not.toHaveBeenCalled();
   });
 
-  it('uses runQuery with runId filter', async () => {
-    mockRunQuery.mockResolvedValue([]);
-
-    await listArtifacts(USER_ID, HYVE_ID, { runId: 'run_abc123' });
-
-    expect(mockRunQuery).toHaveBeenCalledOnce();
-    const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${USER_ID}/hyves/${HYVE_ID}/artifacts`);
-    expect(filters).toEqual([
-      { field: 'runId', op: 'EQUAL', value: 'run_abc123' },
-    ]);
-    expect(options).toEqual({ limit: 50 });
-    expect(mockListDocuments).not.toHaveBeenCalled();
-  });
-
-  it('passes custom limit to runQuery', async () => {
-    mockRunQuery.mockResolvedValue([]);
-
-    await listArtifacts(USER_ID, HYVE_ID, { runId: 'run_abc123', limit: 10 });
-
-    const [, , options] = mockRunQuery.mock.calls[0];
-    expect(options.limit).toBe(10);
-  });
-
-  it('passes custom limit to listDocuments when no filters', async () => {
+  it('passes custom limit', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listArtifacts(USER_ID, HYVE_ID, { limit: 20 });
+    await listArtifacts(RUN_ID, { limit: 20 });
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/artifacts`,
+      `runs/${RUN_ID}/artifacts`,
       { pageSize: 20 }
     );
   });
@@ -934,7 +920,7 @@ describe('listArtifacts()', () => {
   it('maps results to ArtifactSummary[]', async () => {
     mockListDocuments.mockResolvedValue({ documents: [mockArtifactDoc] });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts(RUN_ID);
 
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual<ArtifactSummary>({
@@ -953,7 +939,7 @@ describe('listArtifacts()', () => {
   it('summary does not include content or metadata', async () => {
     mockListDocuments.mockResolvedValue({ documents: [mockArtifactDoc] });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts(RUN_ID);
 
     expect(results[0]).not.toHaveProperty('content');
     expect(results[0]).not.toHaveProperty('metadata');
@@ -962,30 +948,31 @@ describe('listArtifacts()', () => {
   it('returns empty array when no artifacts exist', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts(RUN_ID);
 
     expect(results).toEqual([]);
   });
 
-  it('uses empty options without triggering query', async () => {
+  it('uses empty options without error', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listArtifacts(USER_ID, HYVE_ID, {});
+    await listArtifacts(RUN_ID, {});
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
-    expect(mockRunQuery).not.toHaveBeenCalled();
   });
 });
 
 describe('getArtifact()', () => {
+  const RUN_ID = 'run_abc123';
+
   it('queries the correct collection path and document ID', async () => {
     mockGetDocument.mockResolvedValue(mockArtifactDoc);
 
-    await getArtifact(USER_ID, HYVE_ID, 'art-1');
+    await getArtifact(RUN_ID, 'art-1');
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${USER_ID}/hyves/${HYVE_ID}/artifacts`,
+      `runs/${RUN_ID}/artifacts`,
       'art-1'
     );
   });
@@ -993,7 +980,7 @@ describe('getArtifact()', () => {
   it('returns ArtifactDetail with content and metadata', async () => {
     mockGetDocument.mockResolvedValue(mockArtifactDoc);
 
-    const result = await getArtifact(USER_ID, HYVE_ID, 'art-1');
+    const result = await getArtifact(RUN_ID, 'art-1');
 
     expect(result).not.toBeNull();
     expect(result!).toEqual<ArtifactDetail>({
@@ -1014,7 +1001,7 @@ describe('getArtifact()', () => {
   it('returns null when artifact not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    const result = await getArtifact(USER_ID, HYVE_ID, 'nonexistent');
+    const result = await getArtifact(RUN_ID, 'nonexistent');
 
     expect(result).toBeNull();
   });
@@ -1022,7 +1009,7 @@ describe('getArtifact()', () => {
   it('includes summary fields in detail', async () => {
     mockGetDocument.mockResolvedValue(mockArtifactDoc);
 
-    const result = await getArtifact(USER_ID, HYVE_ID, 'art-1');
+    const result = await getArtifact(RUN_ID, 'art-1');
 
     // Summary fields present
     expect(result!.id).toBe('art-1');
@@ -1213,7 +1200,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
 
 describe('toRunSummary (tested via listRuns)', () => {
   it('finds currentNodeId from running node', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [mockRunDoc] });
+    mockRunQuery.mockResolvedValue([mockRunDoc]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -1221,8 +1208,8 @@ describe('toRunSummary (tested via listRuns)', () => {
     expect(results[0].currentNodeLabel).toBe('Generate Plan');
   });
 
-  it('finds currentNodeId from waiting-approval node', async () => {
-    mockListDocuments.mockResolvedValue({ documents: [mockWaitingRunDoc] });
+  it('finds currentNodeId from awaiting_approval node', async () => {
+    mockRunQuery.mockResolvedValue([mockWaitingRunDoc]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -1231,16 +1218,14 @@ describe('toRunSummary (tested via listRuns)', () => {
   });
 
   it('has no currentNodeId when all nodes are completed', async () => {
-    mockListDocuments.mockResolvedValue({
-      documents: [{
-        id: 'run-done',
-        status: 'completed',
-        nodeStates: {
-          'node-1': { status: 'completed' },
-          'node-2': { status: 'completed' },
-        },
-      }],
-    });
+    mockRunQuery.mockResolvedValue([{
+      id: 'run-done',
+      status: 'completed',
+      nodeStates: {
+        'node-1': { status: 'completed' },
+        'node-2': { status: 'completed' },
+      },
+    }]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -1249,9 +1234,7 @@ describe('toRunSummary (tested via listRuns)', () => {
   });
 
   it('handles missing fields with defaults', async () => {
-    mockListDocuments.mockResolvedValue({
-      documents: [{ id: 'run-sparse' }],
-    });
+    mockRunQuery.mockResolvedValue([{ id: 'run-sparse' }]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -1270,15 +1253,13 @@ describe('toRunSummary (tested via listRuns)', () => {
   });
 
   it('preserves durationMs and completedAt when present', async () => {
-    mockListDocuments.mockResolvedValue({
-      documents: [{
-        id: 'run-finished',
-        status: 'completed',
-        completedAt: '2025-01-15T10:05:00Z',
-        durationMs: 300000,
-        nodeStates: {},
-      }],
-    });
+    mockRunQuery.mockResolvedValue([{
+      id: 'run-finished',
+      status: 'completed',
+      completedAt: '2025-01-15T10:05:00Z',
+      durationMs: 300000,
+      nodeStates: {},
+    }]);
 
     const results = await listRuns(USER_ID, HYVE_ID);
 
@@ -1449,7 +1430,7 @@ describe('toArtifactSummary (tested via listArtifacts)', () => {
       documents: [{ id: 'art-sparse', runId: 'run-1' }],
     });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts('run_abc123');
 
     expect(results[0].id).toBe('art-sparse');
     expect(results[0].runId).toBe('run-1');
@@ -1467,7 +1448,7 @@ describe('toArtifactSummary (tested via listArtifacts)', () => {
       documents: [{ id: 'art-no-run' }],
     });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts('run_abc123');
 
     expect(results[0].runId).toBe('');
   });
@@ -1477,7 +1458,7 @@ describe('toArtifactSummary (tested via listArtifacts)', () => {
       documents: [{ id: 'art-minimal' }],
     });
 
-    const results = await listArtifacts(USER_ID, HYVE_ID);
+    const results = await listArtifacts('run_abc123');
 
     expect(results[0].type).toBe('unknown');
     expect(results[0].name).toBe('Unnamed');
@@ -1488,7 +1469,7 @@ describe('toArtifactDetail (tested via getArtifact)', () => {
   it('includes content and metadata in detail', async () => {
     mockGetDocument.mockResolvedValue(mockArtifactDoc);
 
-    const result = await getArtifact(USER_ID, HYVE_ID, 'art-1');
+    const result = await getArtifact('run_abc123','art-1');
 
     expect(result!.content).toEqual({ title: 'Task Manager', features: ['kanban', 'tasks'] });
     expect(result!.metadata).toEqual({ version: 1 });
@@ -1502,7 +1483,7 @@ describe('toArtifactDetail (tested via getArtifact)', () => {
       name: 'Simple',
     });
 
-    const result = await getArtifact(USER_ID, HYVE_ID, 'art-no-content');
+    const result = await getArtifact('run_abc123','art-no-content');
 
     expect(result!.content).toBeUndefined();
     expect(result!.metadata).toBeUndefined();
@@ -1542,6 +1523,6 @@ describe('error propagation', () => {
   it('getArtifact propagates errors from getDocument', async () => {
     mockGetDocument.mockRejectedValue(new Error('Not found'));
 
-    await expect(getArtifact(USER_ID, HYVE_ID, 'art-1')).rejects.toThrow('Not found');
+    await expect(getArtifact('run_abc123', 'art-1')).rejects.toThrow('Not found');
   });
 });

@@ -2,18 +2,21 @@
  * MyndHyve CLI — Messaging Commands
  *
  * Commander subcommand group for messaging gateway operations:
- *   myndhyve-cli messaging connectors list|status
+ *   myndhyve-cli messaging connectors list|status|test|enable|disable
  *   myndhyve-cli messaging policies get|set
  *   myndhyve-cli messaging routing list|add|remove
  *   myndhyve-cli messaging logs
- *   myndhyve-cli messaging sessions list|inspect
- *   myndhyve-cli messaging identity list|link
+ *   myndhyve-cli messaging sessions list|inspect|close
+ *   myndhyve-cli messaging identity list|link|unlink
  */
 
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import {
   listConnectors,
   getConnector,
+  enableConnector,
+  disableConnector,
+  testConnector,
   getPolicy,
   updatePolicy,
   listRoutingRules,
@@ -21,9 +24,10 @@ import {
   deleteRoutingRule,
   listSessions,
   getSession,
+  deleteSession,
   listIdentities,
-  getIdentity as _getIdentity,
   linkPeerToIdentity,
+  unlinkPeersFromIdentity,
   queryDeliveryLogs,
   CLOUD_CHANNELS,
   RELAY_CHANNELS,
@@ -32,7 +36,6 @@ import {
   type RoutingCondition,
   type RoutingConditionType,
   type RoutingTarget,
-  type RoutingTargetType as _RoutingTargetType,
   type DmPolicyType,
   type GroupPolicyType,
   type UpdatePolicyOptions,
@@ -43,6 +46,7 @@ import {
   formatRelativeTime,
   printError,
 } from './helpers.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // REGISTER
@@ -51,7 +55,13 @@ import {
 export function registerMessagingCommands(program: Command): void {
   const messaging = program
     .command('messaging')
-    .description('Manage messaging gateway — connectors, policies, routing, and observability');
+    .description('Manage messaging gateway — connectors, policies, routing, and observability')
+    .addHelpText('after', `
+Examples:
+  $ myndhyve-cli messaging connectors list
+  $ myndhyve-cli messaging policies get <connector-id>
+  $ myndhyve-cli messaging routing list
+  $ myndhyve-cli messaging logs --since=1h --status=error`);
 
   registerConnectorCommands(messaging);
   registerPolicyCommands(messaging);
@@ -137,8 +147,11 @@ function registerConnectorCommands(messaging: Command): void {
         const connector = await getConnector(auth.uid, connectorId);
 
         if (!connector) {
-          console.error(`\n  Error: Connector "${connectorId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Connector "${connectorId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -173,6 +186,98 @@ function registerConnectorCommands(messaging: Command): void {
         printError('Failed to get connector status', error);
       }
     });
+
+  // ── Enable ─────────────────────────────────────────────────────────────
+
+  connectors
+    .command('enable <connector-id>')
+    .description('Enable a messaging connector')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (connectorId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      try {
+        const result = await enableConnector(auth.uid, connectorId);
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        console.log(`\n  Connector "${connectorId}" enabled.\n`);
+      } catch (error) {
+        printError('Failed to enable connector', error);
+      }
+    });
+
+  // ── Disable ────────────────────────────────────────────────────────────
+
+  connectors
+    .command('disable <connector-id>')
+    .description('Disable a messaging connector')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (connectorId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      try {
+        const result = await disableConnector(auth.uid, connectorId);
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        console.log(`\n  Connector "${connectorId}" disabled.\n`);
+      } catch (error) {
+        printError('Failed to disable connector', error);
+      }
+    });
+
+  // ── Test ───────────────────────────────────────────────────────────────
+
+  connectors
+    .command('test <connector-id>')
+    .description('Send a test message through a connector')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (connectorId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      const ora = (await import('ora')).default;
+      const spinner = ora({ text: 'Testing connector...', stream: process.stderr }).start();
+
+      try {
+        const result = await testConnector(auth.uid, connectorId);
+
+        spinner.stop();
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        if (result.success) {
+          console.log(`\n  Connector "${connectorId}" — test passed.`);
+          if (result.latencyMs !== undefined) {
+            console.log(`  Latency: ${result.latencyMs}ms`);
+          }
+          console.log(`  Message: ${result.message}\n`);
+        } else {
+          console.log(`\n  Connector "${connectorId}" — test failed.`);
+          console.log(`  Message: ${result.message}`);
+          if (result.error) {
+            console.log(`  Error:   ${result.error}`);
+          }
+          console.log('');
+          process.exitCode = ExitCode.GENERAL_ERROR;
+        }
+      } catch (error) {
+        spinner.stop();
+        printError('Failed to test connector', error);
+      }
+    });
 }
 
 // ============================================================================
@@ -198,8 +303,11 @@ function registerPolicyCommands(messaging: Command): void {
         const policy = await getPolicy(auth.uid, connectorId);
 
         if (!policy) {
-          console.error(`\n  Error: No policy found for connector "${connectorId}".\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `No policy found for connector "${connectorId}".`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -265,23 +373,32 @@ function registerPolicyCommands(messaging: Command): void {
       const groupPolicies: GroupPolicyType[] = ['allowlist', 'open', 'disabled'];
 
       if (opts.dm && !dmPolicies.includes(opts.dm)) {
-        console.error(`\n  Error: Invalid DM policy "${opts.dm}".`);
-        console.error(`  Valid options: ${dmPolicies.join(', ')}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_OPTION',
+          message: `Invalid DM policy "${opts.dm}".`,
+          suggestion: `Valid options: ${dmPolicies.join(', ')}`,
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
       if (opts.group && !groupPolicies.includes(opts.group)) {
-        console.error(`\n  Error: Invalid group policy "${opts.group}".`);
-        console.error(`  Valid options: ${groupPolicies.join(', ')}\n`);
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_OPTION',
+          message: `Invalid group policy "${opts.group}".`,
+          suggestion: `Valid options: ${groupPolicies.join(', ')}`,
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
       if (!opts.dm && !opts.group && !opts.mention) {
-        console.error('\n  Error: No policy changes specified.');
-        console.error('  Use --dm, --group, or --mention to update settings.\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'MISSING_OPTION',
+          message: 'No policy changes specified.',
+          suggestion: 'Use --dm, --group, or --mention to update settings.',
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
@@ -396,24 +513,24 @@ function registerRoutingCommands(messaging: Command): void {
       // Parse condition
       const condition = parseCondition(opts.condition);
       if (!condition) {
-        console.error(`\n  Error: Invalid condition format "${opts.condition}".`);
-        console.error('  Format: type:operator:value  or  type:field:operator:value');
-        console.error('  Examples:');
-        console.error('    channel:equals:slack');
-        console.error('    identity-property:tier:equals:vip');
-        console.error('    conversation-kind:equals:dm\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_FORMAT',
+          message: `Invalid condition format "${opts.condition}".`,
+          suggestion: 'Format: type:operator:value or type:field:operator:value. Examples: channel:equals:slack, identity-property:tier:equals:vip',
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
       // Parse target
       const target = parseTarget(opts.target);
       if (!target) {
-        console.error(`\n  Error: Invalid target format "${opts.target}".`);
-        console.error('  Format: type:targetId');
-        console.error('  Types: hyve, workflow, agent, escalation');
-        console.error('  Example: workflow:my-workflow-id\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_FORMAT',
+          message: `Invalid target format "${opts.target}".`,
+          suggestion: 'Format: type:targetId. Types: hyve, workflow, agent, escalation. Example: workflow:my-workflow-id',
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
         return;
       }
 
@@ -644,8 +761,11 @@ function registerSessionCommands(messaging: Command): void {
         const session = await getSession(auth.uid, sessionKey);
 
         if (!session) {
-          console.error(`\n  Error: Session "${sessionKey}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Session "${sessionKey}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -682,6 +802,43 @@ function registerSessionCommands(messaging: Command): void {
         console.log('');
       } catch (error) {
         printError('Failed to inspect session', error);
+      }
+    });
+
+  // ── Close ──────────────────────────────────────────────────────────────
+
+  sessions
+    .command('close <session-key>')
+    .description('Close and delete a messaging session')
+    .option('--force', 'Skip confirmation prompt')
+    .action(async (sessionKey: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      if (!opts.force) {
+        const readline = await import('node:readline');
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(`\n  Close session "${sessionKey}"? This cannot be undone. [y/N] `, resolve);
+        });
+
+        rl.close();
+
+        if (answer.toLowerCase() !== 'y') {
+          console.log('  Cancelled.\n');
+          return;
+        }
+      }
+
+      try {
+        await deleteSession(auth.uid, sessionKey);
+        console.log(`\n  Session "${sessionKey}" closed.\n`);
+      } catch (error) {
+        printError('Failed to close session', error);
       }
     });
 }
@@ -769,8 +926,12 @@ function registerIdentityCommands(messaging: Command): void {
       for (const peerStr of opts.peer) {
         const colonIdx = peerStr.indexOf(':');
         if (colonIdx === -1) {
-          console.error(`\n  Error: Invalid peer format "${peerStr}". Expected channel:peerId\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'INVALID_FORMAT',
+            message: `Invalid peer format "${peerStr}".`,
+            suggestion: 'Expected format: channel:peerId (e.g., slack:U12345)',
+          });
+          process.exitCode = ExitCode.USAGE_ERROR;
           return;
         }
 
@@ -798,6 +959,63 @@ function registerIdentityCommands(messaging: Command): void {
         console.log('');
       } catch (error) {
         printError('Failed to link peer', error);
+      }
+    });
+
+  // ── Unlink ─────────────────────────────────────────────────────────────
+
+  identity
+    .command('unlink <identity-id>')
+    .description('Remove linked peers from an identity')
+    .requiredOption('--peer <peer...>', 'Peer to unlink (format: channel:peerId, e.g., slack:U12345)')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (identityId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      // Parse peers (same logic as link)
+      const peers: Array<{ channel: MessagingChannel; peerId: string }> = [];
+
+      for (const peerStr of opts.peer) {
+        const colonIdx = peerStr.indexOf(':');
+        if (colonIdx === -1) {
+          printErrorResult({
+            code: 'INVALID_FORMAT',
+            message: `Invalid peer format "${peerStr}".`,
+            suggestion: 'Expected format: channel:peerId (e.g., slack:U12345)',
+          });
+          process.exitCode = ExitCode.USAGE_ERROR;
+          return;
+        }
+
+        const channel = peerStr.substring(0, colonIdx);
+        const peerId = peerStr.substring(colonIdx + 1);
+
+        if (!validateChannel(channel)) return;
+
+        peers.push({ channel: channel as MessagingChannel, peerId });
+      }
+
+      try {
+        const result = await unlinkPeersFromIdentity(auth.uid, identityId, peers);
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        console.log(`\n  Peers unlinked from identity "${result.displayName}".`);
+        if (result.linkedPeers.length > 0) {
+          console.log('  Remaining peers:');
+          for (const peer of result.linkedPeers) {
+            console.log(`    ${peer.channel}:${peer.peerId}${peer.displayName ? ` (${peer.displayName})` : ''}`);
+          }
+        } else {
+          console.log('  No linked peers remaining.');
+        }
+        console.log('');
+      } catch (error) {
+        printError('Failed to unlink peer', error);
       }
     });
 }
@@ -916,9 +1134,12 @@ const ALL_CHANNELS: readonly string[] = [...CLOUD_CHANNELS, ...RELAY_CHANNELS];
  */
 function validateChannel(channel: string): boolean {
   if (!ALL_CHANNELS.includes(channel)) {
-    console.error(`\n  Error: Unknown channel "${channel}".`);
-    console.error(`  Valid channels: ${ALL_CHANNELS.join(', ')}\n`);
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'INVALID_CHANNEL',
+      message: `Unknown channel "${channel}".`,
+      suggestion: `Valid channels: ${ALL_CHANNELS.join(', ')}`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
     return false;
   }
   return true;

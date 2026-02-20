@@ -92,23 +92,23 @@ export async function sendMessage(
   };
 
   if (params.groupId) {
-    rpcParams['groupId'] = params.groupId;
+    rpcParams.groupId = params.groupId;
   } else if (params.recipient) {
-    rpcParams['recipient'] = [params.recipient];
+    rpcParams.recipient = [params.recipient];
   }
 
   if (params.attachments && params.attachments.length > 0) {
-    rpcParams['attachments'] = params.attachments;
+    rpcParams.attachments = params.attachments;
   }
 
   if (params.quoteTimestamp) {
-    rpcParams['quoteTimestamp'] = params.quoteTimestamp;
-    if (params.quoteAuthor) rpcParams['quoteAuthor'] = params.quoteAuthor;
-    if (params.quoteMessage) rpcParams['quoteMessage'] = params.quoteMessage;
+    rpcParams.quoteTimestamp = params.quoteTimestamp;
+    if (params.quoteAuthor) rpcParams.quoteAuthor = params.quoteAuthor;
+    if (params.quoteMessage) rpcParams.quoteMessage = params.quoteMessage;
   }
 
   if (params.mentions && params.mentions.length > 0) {
-    rpcParams['mentions'] = params.mentions;
+    rpcParams.mentions = params.mentions;
   }
 
   return signalRpcCall<SignalSendResult[]>(baseUrl, 'send', rpcParams);

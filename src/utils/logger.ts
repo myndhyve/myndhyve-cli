@@ -2,6 +2,7 @@
  * MyndHyve CLI — Logger
  *
  * Lightweight structured logger for CLI output.
+ * Respects NO_COLOR env var and non-TTY environments.
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -21,6 +22,7 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
 };
 
 const RESET = '\x1b[0m';
+const DIM = '\x1b[90m';
 
 let globalLevel: LogLevel = 'info';
 
@@ -30,6 +32,17 @@ export function setLogLevel(level: LogLevel): void {
 
 export function getLogLevel(): LogLevel {
   return globalLevel;
+}
+
+/**
+ * Check if ANSI color output should be suppressed.
+ */
+function isColorless(): boolean {
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') return true;
+  if (process.env.TERM === 'dumb') return true;
+  // Logger writes to stderr — check stderr TTY status
+  if (!process.stderr.isTTY) return true;
+  return false;
 }
 
 export interface Logger {
@@ -44,14 +57,25 @@ export function createLogger(scope: string): Logger {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[globalLevel]) return;
 
     const timestamp = new Date().toISOString().slice(11, 23);
-    const color = LEVEL_COLORS[level];
     const levelTag = level.toUpperCase().padEnd(5);
+    const noColor = isColorless();
 
-    let line = `${RESET}\x1b[90m${timestamp}${RESET} ${color}${levelTag}${RESET} \x1b[90m[${scope}]${RESET} ${message}`;
+    let line: string;
+
+    if (noColor) {
+      line = `${timestamp} ${levelTag} [${scope}] ${message}`;
+    } else {
+      const color = LEVEL_COLORS[level];
+      line = `${RESET}${DIM}${timestamp}${RESET} ${color}${levelTag}${RESET} ${DIM}[${scope}]${RESET} ${message}`;
+    }
 
     if (data) {
       if (data instanceof Error) {
-        line += ` ${LEVEL_COLORS.error}${data.message}${RESET}`;
+        if (noColor) {
+          line += ` ${data.message}`;
+        } else {
+          line += ` ${LEVEL_COLORS.error}${data.message}${RESET}`;
+        }
         if (data.stack && globalLevel === 'debug') {
           line += `\n${data.stack}`;
         }
@@ -59,15 +83,16 @@ export function createLogger(scope: string): Logger {
         const formatted = Object.entries(data)
           .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
           .join(' ');
-        line += ` \x1b[90m${formatted}${RESET}`;
+        if (noColor) {
+          line += ` ${formatted}`;
+        } else {
+          line += ` ${DIM}${formatted}${RESET}`;
+        }
       }
     }
 
-    if (level === 'error') {
-      process.stderr.write(line + '\n');
-    } else {
-      process.stdout.write(line + '\n');
-    }
+    // All log output goes to stderr to keep stdout clean for data/pipe output
+    process.stderr.write(line + '\n');
   };
 
   return {

@@ -13,7 +13,7 @@ import makeWASocket, {
   type WASocket,
   type ConnectionState,
 } from '@whiskeysockets/baileys';
-import { Boom } from '@hapi/boom';
+import type { Boom } from '@hapi/boom';
 import pino from 'pino';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

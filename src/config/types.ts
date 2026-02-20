@@ -38,6 +38,7 @@ export const RelayConfigSchema = z.object({
   channel: z.enum(['whatsapp', 'signal', 'imessage']).optional(),
   relayId: z.string().optional(),
   deviceToken: z.string().optional(),
+  tokenExpiresAt: z.string().optional(),
   userId: z.string().optional(),
   reconnect: ReconnectConfigSchema.default({}),
   heartbeat: HeartbeatConfigSchema.default({}),

@@ -8,7 +8,6 @@
 import { z } from 'zod';
 import type {
   ChatIngressEnvelope,
-  ChatEgressEnvelope as _ChatEgressEnvelope,
   RelayChannel,
 } from '../relay/types.js';
 

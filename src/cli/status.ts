@@ -5,7 +5,7 @@
  */
 
 import { loadConfig, isConfigured, getCliDir } from '../config/loader.js';
-import { getChannel } from '../channels/registry.js';
+import { getChannel, ensureChannelsLoaded } from '../channels/registry.js';
 import { getDaemonPid, getLogFilePath } from './daemon.js';
 
 export async function statusCommand(): Promise<void> {
@@ -42,6 +42,7 @@ export async function statusCommand(): Promise<void> {
   console.log();
 
   // Channel plugin info
+  await ensureChannelsLoaded();
   const plugin = config.channel ? getChannel(config.channel) : undefined;
 
   if (plugin) {

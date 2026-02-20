@@ -3,11 +3,6 @@ import {
   generateWebhookEvent,
   getAvailableEventTypes,
 } from '../webhook.js';
-import type {
-  WebhookEventType as _WebhookEventType,
-  WebhookEventOptions as _WebhookEventOptions,
-  WebhookTestEvent as _WebhookTestEvent,
-} from '../webhook.js';
 
 // ============================================================================
 // generateWebhookEvent — basic channel routing

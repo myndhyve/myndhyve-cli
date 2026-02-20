@@ -46,7 +46,7 @@ function mockErrorResponse(
 /** Create a default StreamRequest for testing. */
 function makeRequest(overrides?: Partial<StreamRequest>): StreamRequest {
   return {
-    url: 'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStream',
+    url: 'https://us-central1-myndhyve.cloudfunctions.net/aiProxyStreamV2',
     token: 'test-firebase-token',
     body: {
       provider: 'anthropic',
@@ -156,9 +156,9 @@ describe('streamChat — successful streaming', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://us-central1-myndhyve.cloudfunctions.net/aiProxyStream');
+    expect(url).toBe('https://us-central1-myndhyve.cloudfunctions.net/aiProxyStreamV2');
     expect(init.method).toBe('POST');
-    expect(init.headers['Authorization']).toBe('Bearer my-firebase-token');
+    expect(init.headers.Authorization).toBe('Bearer my-firebase-token');
     expect(init.headers['Content-Type']).toBe('application/json');
     const body = JSON.parse(init.body);
     expect(body.provider).toBe('openai');

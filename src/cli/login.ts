@@ -7,7 +7,7 @@
 
 import { createLogger } from '../utils/logger.js';
 import { loadConfiguredRelay } from '../config/loader.js';
-import { getChannel } from '../channels/registry.js';
+import { getChannel, ensureChannelsLoaded } from '../channels/registry.js';
 
 const log = createLogger('Login');
 
@@ -22,6 +22,7 @@ export async function loginCommand(): Promise<void> {
   }
 
   const { channel } = config;
+  await ensureChannelsLoaded();
   const plugin = getChannel(channel);
 
   if (!plugin) {

@@ -7,14 +7,14 @@
  *   myndhyve-cli workflows run <workflow-id>
  *   myndhyve-cli workflows status <run-id>
  *   myndhyve-cli workflows logs <run-id>
- *   myndhyve-cli workflows artifacts list [--run=<runId>]
- *   myndhyve-cli workflows artifacts get <artifact-id>
+ *   myndhyve-cli workflows artifacts list --run=<runId>
+ *   myndhyve-cli workflows artifacts get <artifact-id> --run=<runId>
  *   myndhyve-cli workflows approve <run-id>
  *   myndhyve-cli workflows reject <run-id>
  *   myndhyve-cli workflows revise <run-id>
  */
 
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import { writeFileSync } from 'node:fs';
 import {
   listWorkflows,
@@ -37,14 +37,15 @@ import {
   formatRelativeTime,
   printError,
 } from './helpers.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
-  'pending', 'running', 'paused', 'waiting-approval',
-  'completed', 'failed', 'cancelled', 'timed-out',
+  'pending', 'running', 'awaiting_approval',
+  'completed', 'failed', 'cancelled',
 ];
 
 // ============================================================================
@@ -54,7 +55,13 @@ const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
 export function registerWorkflowCommands(program: Command): void {
   const workflows = program
     .command('workflows')
-    .description('Manage and run hyve workflows');
+    .description('Manage and run hyve workflows')
+    .addHelpText('after', `
+Examples:
+  $ myndhyve-cli workflows list --hyve=app-builder
+  $ myndhyve-cli workflows run <workflow-id> --hyve=app-builder
+  $ myndhyve-cli workflows status <run-id> --hyve=app-builder
+  $ myndhyve-cli workflows approve <run-id> --hyve=app-builder`);
 
   registerListCommand(workflows);
   registerInfoCommand(workflows);
@@ -150,8 +157,11 @@ function registerInfoCommand(workflows: Command): void {
         const workflow = await getWorkflow(hyveId, workflowId);
 
         if (!workflow) {
-          console.error(`\n  Error: Workflow "${workflowId}" not found in hyve "${hyveId}".\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Workflow "${workflowId}" not found in hyve "${hyveId}".`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -234,16 +244,22 @@ function registerRunCommand(workflows: Command): void {
         try {
           const parsed = JSON.parse(opts.input);
           if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-            console.error('\n  Error: --input must be a JSON object, not a string, array, or primitive.');
-            console.error('  Example: --input \'{"topic":"AI chatbots"}\'\n');
-            process.exitCode = 1;
+            printErrorResult({
+              code: 'INVALID_INPUT',
+              message: '--input must be a JSON object, not a string, array, or primitive.',
+              suggestion: 'Example: --input \'{"topic":"AI chatbots"}\'',
+            });
+            process.exitCode = ExitCode.USAGE_ERROR;
             return;
           }
           inputData = parsed;
         } catch {
-          console.error('\n  Error: Invalid JSON for --input flag.');
-          console.error('  Example: --input \'{"topic":"AI chatbots"}\'\n');
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'INVALID_JSON',
+            message: 'Invalid JSON for --input flag.',
+            suggestion: 'Example: --input \'{"topic":"AI chatbots"}\'',
+          });
+          process.exitCode = ExitCode.USAGE_ERROR;
           return;
         }
       }
@@ -252,14 +268,20 @@ function registerRunCommand(workflows: Command): void {
         // Verify workflow exists
         const workflow = await getWorkflow(hyveId, workflowId);
         if (!workflow) {
-          console.error(`\n  Error: Workflow "${workflowId}" not found in hyve "${hyveId}".\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Workflow "${workflowId}" not found in hyve "${hyveId}".`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
         if (!workflow.enabled) {
-          console.error(`\n  Error: Workflow "${workflowId}" is disabled.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'WORKFLOW_DISABLED',
+            message: `Workflow "${workflowId}" is disabled.`,
+          });
+          process.exitCode = ExitCode.GENERAL_ERROR;
           return;
         }
 
@@ -308,8 +330,11 @@ function registerStatusCommand(workflows: Command): void {
         const run = await getRun(auth.uid, hyveId, runId);
 
         if (!run) {
-          console.error(`\n  Error: Run "${runId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Run "${runId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -365,7 +390,7 @@ function registerStatusCommand(workflows: Command): void {
         }
 
         // Show approval hint if waiting
-        if (run.status === 'waiting-approval') {
+        if (run.status === 'awaiting_approval') {
           console.log('');
           console.log(`  Approve: myndhyve-cli workflows approve ${run.id} --hyve=${hyveId}`);
           console.log(`  Reject:  myndhyve-cli workflows reject ${run.id} --hyve=${hyveId}`);
@@ -390,6 +415,7 @@ function registerLogsCommand(workflows: Command): void {
     .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
     .option('--limit <n>', 'Max log entries to show', '100')
     .option('--format <format>', 'Output format (table, json)', 'table')
+    .option('-f, --follow', 'Follow log output in real-time (polls every 2.5s)')
     .action(async (runId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
@@ -404,8 +430,65 @@ function registerLogsCommand(workflows: Command): void {
         const logs = await getRunLogs(auth.uid, hyveId, runId);
 
         if (logs === null) {
-          console.error(`\n  Error: Run "${runId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Run "${runId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
+          return;
+        }
+
+        // ── Follow mode ──────────────────────────────────────────────
+        if (opts.follow) {
+          const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
+          const POLL_INTERVAL_MS = 2500;
+          let lastLogCount = 0;
+
+          console.log(`\n  Following logs for run "${runId}" (Ctrl+C to stop)\n`);
+
+          // Show any existing logs first
+          if (logs.length > 0) {
+            for (const entry of logs) {
+              const time = formatLogTimestamp(entry.timestamp);
+              const level = formatLogLevel(entry.level);
+              const node = entry.nodeLabel || entry.nodeId || '';
+              const nodePrefix = node ? `[${truncate(node, 20)}] ` : '';
+              console.log(`  ${time}  ${level}  ${nodePrefix}${entry.message}`);
+            }
+            lastLogCount = logs.length;
+          }
+
+          // Check initial run status
+          const initialRun = await getRun(auth.uid, hyveId, runId);
+          if (initialRun && TERMINAL_STATUSES.has(initialRun.status)) {
+            console.log(`\n  Run reached terminal state: ${initialRun.status}\n`);
+            return;
+          }
+
+          // Poll loop
+          while (true) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+            const freshLogs = await getRunLogs(auth.uid, hyveId, runId);
+            if (freshLogs && freshLogs.length > lastLogCount) {
+              const newEntries = freshLogs.slice(lastLogCount);
+              for (const entry of newEntries) {
+                const time = formatLogTimestamp(entry.timestamp);
+                const level = formatLogLevel(entry.level);
+                const node = entry.nodeLabel || entry.nodeId || '';
+                const nodePrefix = node ? `[${truncate(node, 20)}] ` : '';
+                console.log(`  ${time}  ${level}  ${nodePrefix}${entry.message}`);
+              }
+              lastLogCount = freshLogs.length;
+            }
+
+            // Check run status
+            const run = await getRun(auth.uid, hyveId, runId);
+            if (run && TERMINAL_STATUSES.has(run.status)) {
+              console.log(`\n  Run reached terminal state: ${run.status}\n`);
+              break;
+            }
+          }
           return;
         }
 
@@ -456,24 +539,19 @@ function registerArtifactCommands(workflows: Command): void {
 
   artifacts
     .command('list')
-    .description('List artifacts from workflow runs')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
-    .option('--run <runId>', 'Filter by run ID')
+    .description('List artifacts from a workflow run')
+    .requiredOption('--run <runId>', 'Run ID (required — artifacts are scoped to runs)')
     .option('--limit <n>', 'Max artifacts to show', '50')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
-
       const limit = parseLimit(opts.limit);
       if (limit === null) return;
 
       try {
-        const results = await listArtifacts(auth.uid, hyveId, {
-          runId: opts.run,
+        const results = await listArtifacts(opts.run, {
           limit,
         });
 
@@ -523,22 +601,22 @@ function registerArtifactCommands(workflows: Command): void {
   artifacts
     .command('get <artifact-id>')
     .description('Download an artifact\'s content')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .requiredOption('--run <runId>', 'Run ID (required — artifacts are scoped to runs)')
     .option('--output <path>', 'Write to file instead of stdout')
     .option('--format <format>', 'Output format (json, raw)', 'json')
     .action(async (artifactId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
-
       try {
-        const artifact = await getArtifact(auth.uid, hyveId, artifactId);
+        const artifact = await getArtifact(opts.run, artifactId);
 
         if (!artifact) {
-          console.error(`\n  Error: Artifact "${artifactId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Artifact "${artifactId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -763,9 +841,12 @@ function resolveHyveId(flagValue?: string): string | null {
   const ctx = getActiveContext();
   if (ctx?.hyveId) return ctx.hyveId;
 
-  console.error('\n  Error: No hyve ID specified.');
-  console.error('  Use --hyve=<hyveId> or set an active project with `myndhyve-cli use <project-id>`.\n');
-  process.exitCode = 1;
+  printErrorResult({
+    code: 'MISSING_HYVE_ID',
+    message: 'No hyve ID specified.',
+    suggestion: 'Use --hyve=<hyveId> or set an active project with `myndhyve-cli use <project-id>`.',
+  });
+  process.exitCode = ExitCode.USAGE_ERROR;
   return null;
 }
 
@@ -774,9 +855,12 @@ function resolveHyveId(flagValue?: string): string | null {
  */
 function validateRunStatus(status: string): boolean {
   if (!VALID_RUN_STATUSES.includes(status as WorkflowRunStatus)) {
-    console.error(`\n  Error: Unknown run status "${status}".`);
-    console.error(`  Valid statuses: ${VALID_RUN_STATUSES.join(', ')}\n`);
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'INVALID_STATUS',
+      message: `Unknown run status "${status}".`,
+      suggestion: `Valid statuses: ${VALID_RUN_STATUSES.join(', ')}`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
     return false;
   }
   return true;
@@ -789,12 +873,10 @@ function formatRunStatus(status: string): string {
   const icons: Record<string, string> = {
     'pending': '\u25cb pending',
     'running': '\u25cf running',
-    'paused': '\u25a0 paused',
-    'waiting-approval': '\u2691 approval',
+    'awaiting_approval': '\u2691 approval',
     'completed': '\u2713 completed',
     'failed': '\u2717 failed',
     'cancelled': '\u2014 cancelled',
-    'timed-out': '\u29d6 timed-out',
   };
   return icons[status] || status;
 }
@@ -809,7 +891,7 @@ function getStatusIcon(status: string): string {
     'completed': '\u2713',
     'failed': '\u2717',
     'skipped': '\u2014',
-    'waiting-approval': '\u2691',
+    'awaiting_approval': '\u2691',
   };
   return icons[status] || '\u25cb';
 }
@@ -866,9 +948,12 @@ function formatLogTimestamp(isoDate: string): string {
  */
 function parseLimit(value: string, flagName = '--limit'): number | null {
   const n = parseInt(value, 10);
-  if (isNaN(n) || n <= 0) {
-    console.error(`\n  Error: ${flagName} must be a positive integer, got "${value}".\n`);
-    process.exitCode = 1;
+  if (Number.isNaN(n) || n <= 0) {
+    printErrorResult({
+      code: 'INVALID_OPTION',
+      message: `${flagName} must be a positive integer, got "${value}".`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
     return null;
   }
   return n;

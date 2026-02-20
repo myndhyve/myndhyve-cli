@@ -117,7 +117,7 @@ myndhyve-cli
 
 | Option | Description |
 |--------|-------------|
-| `--format json` | Machine-readable JSON output (scriptable) |
+| `--json` | Machine-readable JSON output (scriptable) |
 | `--verbose` | Show debug-level logging |
 | `--help` | Show help for any command |
 | `--version` | Show CLI version |

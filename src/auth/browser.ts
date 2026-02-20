@@ -64,10 +64,9 @@ export async function browserLogin(): Promise<BrowserLoginResult> {
     const authUrl = `${AUTH_BASE_URL}?port=${port}&callback=http://localhost:${port}/callback`;
     log.info('Opening browser for authentication', { url: authUrl });
 
-    // Dynamic import of 'open' package (may not be installed)
+    // Dynamic import of 'open' package (optional — may not be installed)
     let openBrowser: (url: string) => Promise<unknown>;
     try {
-      // @ts-expect-error — 'open' is an optional dependency with a fallback below
       const open = await import('open');
       openBrowser = open.default;
     } catch {
@@ -268,13 +267,25 @@ function corsHeaders(): Record<string, string> {
 function sendSuccess(res: import('node:http').ServerResponse, email: string): void {
   const html = `<!DOCTYPE html>
 <html>
-<head><title>MyndHyve CLI - Authenticated</title></head>
-<body style="font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0f0f23; color: #e2e8f0;">
+<head>
+<title>MyndHyve CLI - Authenticated</title>
+<style>
+  body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0f0f23; color: #e2e8f0; }
+  .subtitle { color: #94a3b8; }
+  .hint { color: #64748b; font-size: 0.875rem; margin-top: 1.5rem; }
+  @media (prefers-color-scheme: light) {
+    body { background: #f8fafc; color: #1e293b; }
+    .subtitle { color: #475569; }
+    .hint { color: #94a3b8; }
+  }
+</style>
+</head>
+<body>
   <div style="text-align: center; max-width: 400px; padding: 2rem;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">&#10003;</div>
     <h1 style="margin: 0 0 0.5rem; font-size: 1.5rem;">Authenticated!</h1>
-    <p style="color: #94a3b8;">Logged in as <strong>${escapeHtml(email)}</strong></p>
-    <p style="color: #64748b; font-size: 0.875rem; margin-top: 1.5rem;">You can close this window and return to the terminal.</p>
+    <p class="subtitle">Logged in as <strong>${escapeHtml(email)}</strong></p>
+    <p class="hint">You can close this window and return to the terminal.</p>
   </div>
 </body>
 </html>`;
@@ -289,13 +300,25 @@ function sendSuccess(res: import('node:http').ServerResponse, email: string): vo
 function sendError(res: import('node:http').ServerResponse, message: string): void {
   const html = `<!DOCTYPE html>
 <html>
-<head><title>MyndHyve CLI - Error</title></head>
-<body style="font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0f0f23; color: #e2e8f0;">
+<head>
+<title>MyndHyve CLI - Error</title>
+<style>
+  body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0f0f23; color: #e2e8f0; }
+  .error-msg { color: #f87171; }
+  .hint { color: #64748b; font-size: 0.875rem; margin-top: 1.5rem; }
+  @media (prefers-color-scheme: light) {
+    body { background: #f8fafc; color: #1e293b; }
+    .error-msg { color: #dc2626; }
+    .hint { color: #94a3b8; }
+  }
+</style>
+</head>
+<body>
   <div style="text-align: center; max-width: 400px; padding: 2rem;">
     <div style="font-size: 3rem; margin-bottom: 1rem;">&#10007;</div>
     <h1 style="margin: 0 0 0.5rem; font-size: 1.5rem;">Authentication Failed</h1>
-    <p style="color: #f87171;">${escapeHtml(message)}</p>
-    <p style="color: #64748b; font-size: 0.875rem; margin-top: 1.5rem;">Please try again in the terminal.</p>
+    <p class="error-msg">${escapeHtml(message)}</p>
+    <p class="hint">Please try again in the terminal.</p>
   </div>
 </body>
 </html>`;

@@ -276,6 +276,55 @@ describe('startOutboundPoller', () => {
     await promise;
   });
 
+  it('skips duplicate message on re-poll after ack failure', async () => {
+    const client = makeMockRelayClient();
+    const msg = makeOutboundMessage({ id: 'msg-dup' });
+
+    // First poll: message delivered successfully, but ack throws
+    (client.pollOutbound as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([msg])   // poll 1: deliver + ack fails
+      .mockResolvedValueOnce([msg]);  // poll 2: same message re-queued by server
+
+    const deliver: DeliverFunction = vi.fn().mockResolvedValue({
+      success: true,
+      platformMessageId: 'p-dup',
+    });
+
+    // First ack throws (simulating network blip), subsequent acks succeed
+    (client.ackOutbound as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValue(undefined);
+
+    const options: OutboundPollerOptions = {
+      relayClient: client,
+      relayId: 'relay-001',
+      config: makeConfig({ pollIntervalSeconds: 5 }),
+      deliver,
+      signal: controller.signal,
+    };
+
+    const promise = startOutboundPoller(options);
+
+    // Poll 1: deliver succeeds, ack fails (message tracked as delivered)
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deliver).toHaveBeenCalledTimes(1);
+
+    // Poll 2: same message re-appears — should be SKIPPED (no second deliver)
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(deliver).toHaveBeenCalledTimes(1); // Still 1 — not called again
+    expect(client.pollOutbound).toHaveBeenCalledTimes(2);
+
+    // ackOutbound calls:
+    //   1st: success ack (throws — simulated network blip)
+    //   2nd: catch-block error ack (from processOutboundMessage error handler)
+    //   3rd: re-ack for duplicate on second poll
+    expect(client.ackOutbound).toHaveBeenCalledTimes(3);
+
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+  });
+
   it('delivers multiple messages in sequence', async () => {
     const client = makeMockRelayClient();
     const msg1 = makeOutboundMessage({ id: 'msg-1', envelope: { channel: 'whatsapp', conversationId: 'c1', text: 'First' } });

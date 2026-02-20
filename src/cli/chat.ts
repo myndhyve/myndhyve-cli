@@ -346,7 +346,9 @@ async function showHistory(chalk: ChalkInstance): Promise<void> {
     return;
   }
 
-  for (const conv of conversations.slice(0, 20)) {
+  const maxDisplay = 20;
+  const displayed = conversations.slice(0, maxDisplay);
+  for (const conv of displayed) {
     const ago = formatTimeSince(new Date(conv.updatedAt));
     const hyveLabel = conv.hyveId ? chalk.dim(` [${conv.hyveId}]`) : '';
     const msgCount = chalk.dim(`${conv.messageCount} msgs`);
@@ -357,6 +359,11 @@ async function showHistory(chalk: ChalkInstance): Promise<void> {
     console.log(
       `  ${chalk.dim(conv.sessionId)} · ${msgCount} · ${chalk.dim(ago + ' ago')}`
     );
+    console.log();
+  }
+
+  if (conversations.length > maxDisplay) {
+    console.log(chalk.dim(`  Showing ${maxDisplay} of ${conversations.length} conversations.`));
     console.log();
   }
 
@@ -512,5 +519,12 @@ export function registerChatCommand(program: Command): void {
     .option('--history', 'Show conversation history')
     .option('--pipe', 'Pipe mode: read stdin, write to stdout')
     .option('--system <prompt>', 'Custom system prompt')
+    .addHelpText('after', `
+Examples:
+  $ myndhyve-cli chat                         Interactive chat
+  $ myndhyve-cli chat "Explain Docker"        One-shot question
+  $ echo "Hi" | myndhyve-cli chat --pipe      Pipe mode
+  $ myndhyve-cli chat --hyve=app-builder      Chat with a specific hyve
+  $ myndhyve-cli chat --resume                Resume last conversation`)
     .action(chatCommand);
 }

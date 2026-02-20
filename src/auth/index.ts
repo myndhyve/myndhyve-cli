@@ -44,6 +44,16 @@ const log = createLogger('Auth');
 let cachedApiKey: string | undefined;
 
 /**
+ * In-flight refresh promise for deduplication.
+ *
+ * When multiple async API calls fire simultaneously while the token is
+ * expired, each would independently call refreshIdToken(). This promise
+ * ensures only one refresh is in-flight at a time — subsequent callers
+ * await the same promise instead of starting a second refresh.
+ */
+let refreshPromise: Promise<string> | undefined;
+
+/**
  * Refresh an expired ID token using the Firebase Auth REST API.
  * Requires the Firebase API key (public, safe to store/embed).
  *
@@ -177,9 +187,12 @@ export function logout(): void {
  * 1. MYNDHYVE_TOKEN environment variable (always wins)
  * 2. Stored credentials (refreshed if expired)
  *
+ * @param forceRefresh - Force a token refresh even if the stored token
+ *   appears valid. Used by the API client when a request returns 401
+ *   (token revoked server-side but not yet expired by timestamp).
  * @throws {AuthError} if not authenticated or refresh fails
  */
-export async function getToken(): Promise<string> {
+export async function getToken(forceRefresh = false): Promise<string> {
   // Check environment variable first
   const envToken = process.env.MYNDHYVE_TOKEN;
   if (envToken) {
@@ -196,53 +209,65 @@ export async function getToken(): Promise<string> {
     );
   }
 
-  // Check if token is expired
-  if (isExpired(creds)) {
-    log.debug('Token expired, attempting refresh');
+  // Check if token is expired or force refresh requested
+  if (forceRefresh || isExpired(creds)) {
+    log.debug(forceRefresh ? 'Forced token refresh requested' : 'Token expired, attempting refresh');
 
-    // Try to refresh
-    if (creds.refreshToken) {
-      const apiKey = cachedApiKey || loadApiKey();
-      if (apiKey) {
-        try {
-          const refreshed = await refreshIdToken(creds.refreshToken, apiKey);
-
-          const expiresAt = new Date(
-            Date.now() + refreshed.expiresIn * 1000
-          ).toISOString();
-
-          const updatedCreds: Credentials = {
-            ...creds,
-            idToken: refreshed.idToken,
-            refreshToken: refreshed.refreshToken,
-            expiresAt,
-            savedAt: new Date().toISOString(),
-          };
-
-          saveCredentials(updatedCreds);
-          log.info('Token refreshed successfully');
-          return refreshed.idToken;
-        } catch (err) {
-          log.warn('Token refresh failed', {
-            reason: err instanceof Error ? err.message : 'unknown',
-          });
-          throw new AuthError(
-            'Session expired and refresh failed. Run `myndhyve-cli auth login` to sign in again.',
-            'REFRESH_FAILED'
-          );
-        }
-      }
+    // Deduplicate concurrent refresh calls — only one in-flight at a time
+    if (!refreshPromise) {
+      refreshPromise = performTokenRefresh(creds).finally(() => {
+        refreshPromise = undefined;
+      });
     }
-
-    // No refresh token or no API key — require re-login
-    const expiredAgo = formatTimeSince(new Date(creds.expiresAt));
-    throw new AuthError(
-      `Token expired ${expiredAgo} ago. Run \`myndhyve-cli auth login\` to refresh.`,
-      'TOKEN_EXPIRED'
-    );
+    return refreshPromise;
   }
 
   return creds.idToken;
+}
+
+/**
+ * Perform token refresh. Extracted to enable deduplication via refreshPromise.
+ */
+async function performTokenRefresh(creds: Credentials): Promise<string> {
+  if (creds.refreshToken) {
+    const apiKey = cachedApiKey || loadApiKey();
+    if (apiKey) {
+      try {
+        const refreshed = await refreshIdToken(creds.refreshToken, apiKey);
+
+        const expiresAt = new Date(
+          Date.now() + refreshed.expiresIn * 1000
+        ).toISOString();
+
+        const updatedCreds: Credentials = {
+          ...creds,
+          idToken: refreshed.idToken,
+          refreshToken: refreshed.refreshToken,
+          expiresAt,
+          savedAt: new Date().toISOString(),
+        };
+
+        saveCredentials(updatedCreds);
+        log.info('Token refreshed successfully');
+        return refreshed.idToken;
+      } catch (err) {
+        log.warn('Token refresh failed', {
+          reason: err instanceof Error ? err.message : 'unknown',
+        });
+        throw new AuthError(
+          'Session expired and refresh failed. Run `myndhyve-cli auth login` to sign in again.',
+          'REFRESH_FAILED'
+        );
+      }
+    }
+  }
+
+  // No refresh token or no API key — require re-login
+  const expiredAgo = formatTimeSince(new Date(creds.expiresAt));
+  throw new AuthError(
+    `Token expired ${expiredAgo} ago. Run \`myndhyve-cli auth login\` to refresh.`,
+    'TOKEN_EXPIRED'
+  );
 }
 
 // ============================================================================
@@ -341,7 +366,19 @@ function decodeIdToken(
     if (parts.length !== 3) return null;
 
     const payload = Buffer.from(parts[1], 'base64url').toString('utf-8');
-    return JSON.parse(payload);
+    const parsed: unknown = JSON.parse(payload);
+
+    // Validate that parsed result is an object
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const obj = parsed as Record<string, unknown>;
+    return {
+      email: typeof obj.email === 'string' ? obj.email : undefined,
+      sub: typeof obj.sub === 'string' ? obj.sub : undefined,
+      exp: typeof obj.exp === 'number' ? obj.exp : undefined,
+    };
   } catch {
     return null;
   }
@@ -357,6 +394,7 @@ function decodeIdToken(
  */
 export function _resetForTests(): void {
   cachedApiKey = undefined;
+  refreshPromise = undefined;
 }
 
 // ============================================================================

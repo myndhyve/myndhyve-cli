@@ -5,7 +5,7 @@
  * Server marks device as 'disconnected' if heartbeats stop.
  */
 
-import type { RelayClient } from './client.js';
+import { type RelayClient, RelayClientError } from './client.js';
 import type { HeartbeatConfig } from '../config/types.js';
 import { createLogger } from '../utils/logger.js';
 import { CLI_VERSION } from '../config/defaults.js';
@@ -42,6 +42,10 @@ export async function startHeartbeatLoop(options: HeartbeatLoopOptions): Promise
         log.debug('Server indicates pending outbound messages');
       }
     } catch (error) {
+      // Device token expiry is fatal — propagate to trigger re-setup
+      if (error instanceof RelayClientError && error.code === 'DEVICE_TOKEN_EXPIRED') {
+        throw error;
+      }
       log.warn('Heartbeat failed', {
         error: error instanceof Error ? error.message : String(error),
       });

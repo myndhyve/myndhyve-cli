@@ -28,9 +28,11 @@ export interface SystemHyve {
   name: string;
   description: string;
   icon: string;
+  tier: 'user' | 'team' | 'platform';
   visibility: 'public' | 'internal';
   primaryColor: string;
   tags: string[];
+  helpTopicId?: string;
 }
 
 /**
@@ -41,56 +43,79 @@ export const SYSTEM_HYVES: SystemHyve[] = [
   {
     hyveId: 'app-builder',
     name: 'App Builder',
-    description: 'AI-assisted application development — from idea to code.',
+    description: 'AI-assisted application development - from idea to code. Generate PRDs, design screens, and build complete applications.',
     icon: 'Layers',
+    tier: 'platform',
     visibility: 'public',
     primaryColor: '#8b5cf6',
-    tags: ['app-development', 'code-generation', 'ai-assisted'],
+    tags: ['app-development', 'code-generation', 'ai-assisted', 'full-stack'],
+    helpTopicId: 'hyve-app-builder',
   },
   {
     hyveId: 'slides',
     name: 'Slides',
-    description: 'AI-assisted presentation creation — from outline to polished deck.',
+    description: 'AI-assisted presentation creation - from outline to polished deck. Generate slides, apply themes, and create compelling presentations.',
     icon: 'Presentation',
+    tier: 'platform',
     visibility: 'public',
     primaryColor: '#3b82f6',
-    tags: ['presentations', 'slides', 'design'],
+    tags: ['presentations', 'slides', 'ai-assisted', 'design'],
+    helpTopicId: 'hyve-slides',
   },
   {
     hyveId: 'drawings',
     name: 'Drawings',
-    description: 'AI-assisted digital illustration — from sketch to finished artwork.',
+    description: 'AI-assisted digital illustration - from sketch to finished artwork. Create drawings with intelligent brush tools and color suggestions.',
     icon: 'PenTool',
+    tier: 'platform',
     visibility: 'public',
     primaryColor: '#10b981',
-    tags: ['illustration', 'drawing', 'art'],
+    tags: ['illustration', 'drawing', 'ai-assisted', 'art'],
+    helpTopicId: 'hyve-drawings',
   },
   {
     hyveId: 'hyve-maker',
     name: 'Hyve Maker',
-    description: 'Build custom Hyves through AI-assisted design.',
+    description: 'Build custom Hyves through AI-assisted design. Create PRDs, design workflows, and generate prompts through conversational interaction.',
     icon: 'Puzzle',
+    tier: 'platform',
     visibility: 'internal',
     primaryColor: '#f59e0b',
-    tags: ['meta-hyve', 'hyve-builder'],
+    tags: ['meta-hyve', 'hyve-builder', 'ai-assisted', 'workflow-design'],
+    helpTopicId: 'hyve-hyve-maker',
+  },
+  {
+    hyveId: 'hyve-builder',
+    name: 'Hyve Builder',
+    description: 'AI-assisted Hyve creation using the workflow engine. Create PRDs, prompts, workflows, schemas, and integrations through step-by-step approval.',
+    icon: 'Puzzle',
+    tier: 'platform',
+    visibility: 'internal',
+    primaryColor: '#f59e0b',
+    tags: ['meta-hyve', 'hyve-builder', 'ai-assisted', 'workflow-design', 'envelope-protocol'],
+    helpTopicId: 'hyve-hyve-builder',
   },
   {
     hyveId: 'cad',
     name: 'CAD Designer',
-    description: '3D CAD design with parametric dimensions and constraints.',
+    description: '3D CAD design with parametric dimensions and constraints. Create 3D models with precision using primitives, transforms, and constraints.',
     icon: 'Box',
+    tier: 'platform',
     visibility: 'public',
     primaryColor: '#22d3ee',
-    tags: ['3d-design', 'cad', 'parametric'],
+    tags: ['3d-design', 'cad', 'parametric', 'modeling', 'webgl'],
+    helpTopicId: 'hyve-cad',
   },
   {
     hyveId: 'landing-page',
-    name: 'Landing Page Canvas',
-    description: 'Create marketing landing pages with drag-and-drop sections and AI content.',
+    name: 'LandingPage Canvas',
+    description: 'Create marketing landing pages with drag-and-drop sections, AI-assisted content, responsive design, and lead capture forms.',
     icon: 'Globe',
+    tier: 'platform',
     visibility: 'public',
     primaryColor: '#0ea5e9',
-    tags: ['landing-page', 'marketing', 'lead-generation'],
+    tags: ['landing-page', 'marketing', 'lead-generation', 'conversion', 'responsive', 'seo'],
+    helpTopicId: 'hyve-landing-page',
   },
 ];
 

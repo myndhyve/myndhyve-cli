@@ -114,7 +114,7 @@ export async function pollIMessages(
       // Exponential backoff for repeated failures, capped at 60s
       if (!signal.aborted) {
         const backoffMs = Math.min(
-          IMESSAGE_POLL_INTERVAL_MS * Math.pow(2, consecutiveFailures - 1),
+          IMESSAGE_POLL_INTERVAL_MS * 2 ** (consecutiveFailures - 1),
           60_000
         );
         await sleep(backoffMs);

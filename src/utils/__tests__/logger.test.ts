@@ -42,7 +42,7 @@ describe('logger', () => {
       const log = createLogger('TestScope');
 
       log.debug('This should appear');
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
     });
 
     it('shows info messages when level=info', () => {
@@ -50,7 +50,7 @@ describe('logger', () => {
       const log = createLogger('TestScope');
 
       log.info('Info message');
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
     });
 
     it('shows warn messages when level=warn', () => {
@@ -59,7 +59,7 @@ describe('logger', () => {
 
       log.info('This should be skipped');
       log.warn('This should appear');
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
     });
 
     it('shows only error messages when level=error', () => {
@@ -93,37 +93,25 @@ describe('logger', () => {
   });
 
   describe('output destination', () => {
-    it('error-level messages written to stderr', () => {
+    it('all log levels write to stderr (keeps stdout clean for data)', () => {
       const log = createLogger('TestScope');
-      log.error('An error occurred');
 
-      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      log.error('An error occurred');
+      log.info('An info message');
+      log.warn('A warning message');
+
+      // All output goes to stderr to keep stdout clean for piped data
+      expect(stderrSpy).toHaveBeenCalledTimes(3);
       expect(stdoutSpy).not.toHaveBeenCalled();
     });
 
-    it('info messages written to stdout', () => {
-      const log = createLogger('TestScope');
-      log.info('An info message');
-
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
-      expect(stderrSpy).not.toHaveBeenCalled();
-    });
-
-    it('debug messages written to stdout', () => {
+    it('debug messages also go to stderr', () => {
       setLogLevel('debug');
       const log = createLogger('TestScope');
       log.debug('A debug message');
 
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
-      expect(stderrSpy).not.toHaveBeenCalled();
-    });
-
-    it('warn messages written to stdout', () => {
-      const log = createLogger('TestScope');
-      log.warn('A warning message');
-
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
-      expect(stderrSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      expect(stdoutSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -132,7 +120,7 @@ describe('logger', () => {
       const log = createLogger('MyModule');
       log.info('Test message');
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('[MyModule]');
     });
 
@@ -140,7 +128,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Hello world');
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('Hello world');
     });
 
@@ -148,7 +136,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Test');
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('INFO');
     });
 
@@ -156,7 +144,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Test', { key: 'value', count: 42 });
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('key=value');
       expect(output).toContain('count=42');
     });
@@ -165,7 +153,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Test', { nested: { a: 1 } });
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('nested={"a":1}');
     });
 
@@ -173,7 +161,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Test', {});
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toContain('Test');
     });
 
@@ -181,7 +169,7 @@ describe('logger', () => {
       const log = createLogger('Scope');
       log.info('Test');
 
-      const output = stdoutSpy.mock.calls[0][0] as string;
+      const output = stderrSpy.mock.calls[0][0] as string;
       expect(output).toMatch(/\n$/);
     });
   });

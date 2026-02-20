@@ -8,7 +8,6 @@
 import { existsSync } from 'node:fs';
 import { createLogger } from '../utils/logger.js';
 import { loadConfig, isConfigured, getCliDir, getConfigPath } from '../config/loader.js';
-import { RelayConfigSchema as _RelayConfigSchema } from '../config/types.js';
 import { loadCredentials, isExpired, getCredentialsPath } from '../auth/credentials.js';
 import { getAuthStatus } from '../auth/index.js';
 import { getActiveContext } from '../context.js';

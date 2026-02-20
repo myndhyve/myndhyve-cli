@@ -6,7 +6,7 @@
  */
 
 import { Command } from 'commander';
-import { CLI_VERSION } from '../config/defaults.js';
+import { VERSION_STRING } from '../config/defaults.js';
 import { setupCommand } from './setup.js';
 import { startCommand } from './start.js';
 import { stopCommand } from './stop.js';
@@ -22,6 +22,12 @@ import { registerHyveCommands, registerContextCommands } from './hyves.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerDevCommands } from './dev.js';
+import { registerBridgeCommands } from './bridge.js';
+import { registerCompletionCommand } from './completion.js';
+import { registerUpdateCommand } from './update.js';
+import { applyGlobalOptions } from './global-options.js';
+import { didYouMean } from './helpers.js';
+import { ExitCode } from '../utils/output.js';
 
 export function createProgram(): Command {
   const program = new Command();
@@ -29,7 +35,11 @@ export function createProgram(): Command {
   program
     .name('myndhyve-cli')
     .description('MyndHyve CLI — Connect messaging platforms, manage agents, and automate workflows')
-    .version(CLI_VERSION);
+    .version(VERSION_STRING, '-V, --version', 'Show version information');
+
+  // ── Global Options ────────────────────────────────────────────────────
+
+  applyGlobalOptions(program);
 
   // ── Top-Level Commands ──────────────────────────────────────────────────
 
@@ -69,6 +79,18 @@ export function createProgram(): Command {
   // ── Developer Tools ──────────────────────────────────────────────────────
 
   registerDevCommands(program);
+
+  // ── Shell Completions ─────────────────────────────────────────────────
+
+  registerCompletionCommand(program);
+
+  // ── Self-Update ───────────────────────────────────────────────────────
+
+  registerUpdateCommand(program);
+
+  // ── IDE Bridge ────────────────────────────────────────────────────────
+
+  registerBridgeCommands(program);
 
   // ── Relay Subcommand Group ──────────────────────────────────────────────
 
@@ -119,6 +141,28 @@ export function createProgram(): Command {
     .command('uninstall')
     .description('Remove all relay data, credentials, and daemon')
     .action(uninstallCommand);
+
+  // ── Unknown Command Handler (did you mean?) ─────────────────────────────
+
+  program.on('command:*', (operands: string[]) => {
+    const unknown = operands[0];
+    const commands = program.commands.map((c) => c.name());
+    const suggestion = didYouMean(unknown, commands);
+
+    process.stderr.write(`\n  Error: Unknown command "${unknown}".`);
+    if (suggestion) {
+      process.stderr.write(` Did you mean "${suggestion}"?`);
+    }
+    process.stderr.write(`\n  Run \`myndhyve-cli --help\` for available commands.\n\n`);
+    process.exitCode = ExitCode.USAGE_ERROR;
+  });
+
+  // ── SIGINT Handler ──────────────────────────────────────────────────────
+
+  process.on('SIGINT', () => {
+    process.stderr.write('\n');
+    process.exit(ExitCode.SIGINT);
+  });
 
   return program;
 }

@@ -47,7 +47,7 @@ describe('computeBackoff', () => {
   it('adds 0-25% random jitter (result >= base, result <= base * 1.25)', () => {
     const config = makeConfig({ initialDelayMs: 1_000, maxDelayMs: 300_000 });
     const attempt = 3;
-    const base = 1_000 * Math.pow(2, attempt); // 8000
+    const base = 1_000 * 2 ** attempt; // 8000
 
     // Run many samples to verify jitter range
     const results: number[] = [];

@@ -5,6 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "myndhyve-cli": "./bin/myndhyve-cli.js"
   },
@@ -15,13 +22,15 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit && biome check src/",
+    "lint:fix": "biome check --write src/"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@whiskeysockets/baileys": "^6.7.21",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
@@ -32,6 +41,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.2",
     "@types/node": "^22.13.4",
     "@types/qrcode-terminal": "^0.12.2",
     "tsup": "^8.3.6",

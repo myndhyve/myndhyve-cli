@@ -11,6 +11,7 @@
 
 import type { Command } from 'commander';
 import { formatTimeSince, formatTimeUntil } from '../utils/format.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // AUTH LOGIN
@@ -31,11 +32,12 @@ async function authLoginCommand(options: { token?: string }): Promise<void> {
       console.log(chalk.gray('\n  Token stored for this session.'));
       console.log(chalk.gray('  Note: Token-based login cannot be auto-refreshed.\n'));
     } catch (error) {
-      spinner.fail(chalk.red('Login failed'));
-      console.error(
-        chalk.red(`  ${error instanceof Error ? error.message : String(error)}\n`)
-      );
-      process.exitCode = 1;
+      spinner.fail('Login failed');
+      printErrorResult({
+        code: 'TOKEN_LOGIN_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      process.exitCode = ExitCode.GENERAL_ERROR;
     }
     return;
   }
@@ -53,19 +55,27 @@ async function authLoginCommand(options: { token?: string }): Promise<void> {
   try {
     const { email } = await login();
     spinner.succeed(chalk.green(`Logged in as ${chalk.bold(email)}`));
-    console.log(
-      chalk.gray(`\n  Credentials saved. Run ${chalk.bold('myndhyve-cli auth status')} to verify.\n`)
-    );
+    console.log(chalk.gray('\n  Credentials saved.\n'));
+    console.log(chalk.gray('  Next steps:'));
+    console.log(chalk.gray(`    ${chalk.bold('myndhyve-cli relay setup')}    Register a messaging relay`));
+    console.log(chalk.gray(`    ${chalk.bold('myndhyve-cli chat')}           Start chatting with AI`));
+    console.log(chalk.gray(`    ${chalk.bold('myndhyve-cli auth status')}    Verify authentication\n`));
   } catch (error) {
-    spinner.fail(chalk.red('Authentication failed'));
+    spinner.fail('Authentication failed');
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('timed out')) {
-      console.error(chalk.yellow('\n  Authentication timed out.'));
-      console.error(chalk.gray('  Please try again with `myndhyve-cli auth login`.\n'));
+      printErrorResult({
+        code: 'AUTH_TIMEOUT',
+        message: 'Authentication timed out.',
+        suggestion: 'Please try again with `myndhyve-cli auth login`.',
+      });
     } else {
-      console.error(chalk.red(`\n  ${message}\n`));
+      printErrorResult({
+        code: 'AUTH_FAILED',
+        message,
+      });
     }
-    process.exitCode = 1;
+    process.exitCode = ExitCode.GENERAL_ERROR;
   }
 }
 
@@ -96,7 +106,7 @@ async function authStatusCommand(): Promise<void> {
   console.log();
 
   if (!status.authenticated) {
-    console.log(chalk.yellow('  Not authenticated.'));
+    console.log(chalk.yellow('  \u2717 Not authenticated.'));
     console.log(
       chalk.gray(`  Run ${chalk.bold('myndhyve-cli auth login')} to sign in.`)
     );
@@ -107,7 +117,7 @@ async function authStatusCommand(): Promise<void> {
   // Source
   if (status.source === 'env') {
     console.log(chalk.gray('  Source:       ') + chalk.cyan('MYNDHYVE_TOKEN environment variable'));
-    console.log(chalk.gray('  Status:       ') + chalk.green('authenticated'));
+    console.log(chalk.gray('  Status:       ') + chalk.green('\u2713 authenticated'));
     console.log();
     console.log(
       chalk.gray('  Note: Token details unavailable when using env variable.')
@@ -120,8 +130,8 @@ async function authStatusCommand(): Promise<void> {
   console.log(
     chalk.gray('  Status:       ') +
       (status.expired
-        ? chalk.red('expired')
-        : chalk.green('authenticated'))
+        ? chalk.red('\u2717 expired')
+        : chalk.green('\u2713 authenticated'))
   );
   console.log(chalk.gray('  Email:        ') + chalk.bold(status.email || 'unknown'));
   console.log(chalk.gray('  User ID:      ') + (status.uid || 'unknown'));
@@ -132,7 +142,7 @@ async function authStatusCommand(): Promise<void> {
     if (status.expired) {
       const expiredAgo = formatTimeSince(expiresDate);
       console.log(
-        chalk.gray('  Token:        ') + chalk.red(`expired ${expiredAgo} ago`)
+        chalk.gray('  Token:        ') + chalk.red(`\u2717 expired ${expiredAgo} ago`)
       );
       console.log();
       console.log(
@@ -143,7 +153,7 @@ async function authStatusCommand(): Promise<void> {
     } else {
       const expiresIn = formatTimeUntil(expiresDate);
       console.log(
-        chalk.gray('  Token:        ') + chalk.green(`valid (expires in ${expiresIn})`)
+        chalk.gray('  Token:        ') + chalk.green(`\u2713 valid (expires in ${expiresIn})`)
       );
     }
   }
@@ -196,6 +206,10 @@ export function registerAuthCommands(program: Command): void {
     .command('login')
     .description('Sign in to MyndHyve (opens browser)')
     .option('-t, --token <token>', 'Use a Firebase ID token directly (for CI/CD)')
+    .addHelpText('after', `
+Examples:
+  $ myndhyve-cli auth login                   Interactive browser login
+  $ myndhyve-cli auth login --token=eyJ...    CI/CD token login`)
     .action(authLoginCommand);
 
   auth

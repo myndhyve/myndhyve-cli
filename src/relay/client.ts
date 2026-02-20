@@ -29,18 +29,34 @@ const log = createLogger('RelayClient');
 // CLIENT
 // ============================================================================
 
+/** Buffer before actual expiry to trigger early detection (5 minutes). */
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
 export class RelayClient {
   private readonly baseUrl: string;
   private deviceToken: string | undefined;
+  private tokenExpiresAt: Date | undefined;
 
-  constructor(baseUrl: string, deviceToken?: string) {
+  constructor(baseUrl: string, deviceToken?: string, tokenExpiresAt?: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.deviceToken = deviceToken;
+    this.tokenExpiresAt = tokenExpiresAt ? new Date(tokenExpiresAt) : undefined;
   }
 
   /** Update the device token (e.g., after activation). */
-  setDeviceToken(token: string): void {
+  setDeviceToken(token: string, expiresAt?: string): void {
     this.deviceToken = token;
+    this.tokenExpiresAt = expiresAt ? new Date(expiresAt) : undefined;
+  }
+
+  /**
+   * Check if the device token is expired or will expire within the buffer period.
+   * Returns false if no expiry information is available (backwards-compatible
+   * with configs that predate tokenExpiresAt storage).
+   */
+  isDeviceTokenExpired(): boolean {
+    if (!this.tokenExpiresAt) return false;
+    return Date.now() >= this.tokenExpiresAt.getTime() - TOKEN_EXPIRY_BUFFER_MS;
   }
 
   // ── Auth: Firebase ID Token ──────────────────────────────────────────────
@@ -86,8 +102,9 @@ export class RelayClient {
       body: JSON.stringify(body),
     });
 
-    // Store the device token for future requests
+    // Store the device token and expiry for future requests
     this.deviceToken = response.deviceToken;
+    this.tokenExpiresAt = new Date(response.tokenExpiresAt);
     return response;
   }
 
@@ -204,6 +221,12 @@ export class RelayClient {
       throw new RelayClientError(
         'Device token not set. Run `myndhyve-cli relay setup` first.',
         'NO_DEVICE_TOKEN'
+      );
+    }
+    if (this.isDeviceTokenExpired()) {
+      throw new RelayClientError(
+        'Device token has expired. Run `myndhyve-cli relay setup` to re-register.',
+        'DEVICE_TOKEN_EXPIRED'
       );
     }
   }

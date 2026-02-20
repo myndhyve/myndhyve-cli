@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from '../utils/logger.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 import {
   loadConfig,
   saveConfig,
@@ -58,8 +59,8 @@ export async function setupCommand(): Promise<void> {
   // Platform-specific warnings
   if (channel === 'whatsapp') {
     console.log();
-    console.log(chalk.yellow('  ⚠ WhatsApp uses the unofficial Baileys library.'));
-    console.log(chalk.yellow('    Meta may ban your number. Use a secondary number.'));
+    console.log(chalk.yellow('  Warning: WhatsApp uses the unofficial Baileys library.'));
+    console.log(chalk.yellow('  Meta may ban your number. Use a secondary number.'));
     console.log();
     const { proceed } = await inquirer.prompt([{
       type: 'confirm',
@@ -71,7 +72,10 @@ export async function setupCommand(): Promise<void> {
   }
 
   if (channel === 'imessage' && process.platform !== 'darwin') {
-    console.log(chalk.red('\n  iMessage is only available on macOS.\n'));
+    printErrorResult({
+      code: 'UNSUPPORTED_PLATFORM',
+      message: 'iMessage is only available on macOS.',
+    });
     return;
   }
 
@@ -103,7 +107,7 @@ export async function setupCommand(): Promise<void> {
 
   const registerSpinner = ora('Registering relay device...').start();
 
-  let registration;
+  let registration: Awaited<ReturnType<typeof client.register>>;
   try {
     registration = await client.register(channel, label, idToken);
     registerSpinner.succeed(
@@ -112,8 +116,11 @@ export async function setupCommand(): Promise<void> {
   } catch (error) {
     registerSpinner.fail('Registration failed');
     log.error('Setup failed', error instanceof Error ? error : new Error(String(error)));
-    console.error(chalk.red(`\n  ${error instanceof Error ? error.message : String(error)}\n`));
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'REGISTRATION_FAILED',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    process.exitCode = ExitCode.GENERAL_ERROR;
     return;
   }
 
@@ -142,6 +149,7 @@ export async function setupCommand(): Promise<void> {
       channel: channel as RelayChannel,
       relayId: registration.relayId,
       deviceToken: activation.deviceToken,
+      tokenExpiresAt: activation.tokenExpiresAt,
       heartbeat: {
         ...config.heartbeat,
         intervalSeconds: activation.heartbeatIntervalSeconds,
@@ -164,7 +172,10 @@ export async function setupCommand(): Promise<void> {
   } catch (error) {
     activateSpinner.fail('Activation failed');
     log.error('Setup failed', error instanceof Error ? error : new Error(String(error)));
-    console.error(chalk.red(`\n  ${error instanceof Error ? error.message : String(error)}\n`));
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'ACTIVATION_FAILED',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    process.exitCode = ExitCode.GENERAL_ERROR;
   }
 }

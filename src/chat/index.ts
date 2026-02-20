@@ -359,7 +359,7 @@ function getDefaultModel(provider: string): string {
 // RE-EXPORTS
 // ============================================================================
 
-export { type Conversation, type ChatMessage } from './history.js';
+export type { Conversation, ChatMessage } from './history.js';
 export { StreamError } from './streaming.js';
 export type { StreamCallbacks } from './streaming.js';
 export {

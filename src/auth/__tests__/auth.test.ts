@@ -56,6 +56,11 @@ const expiredCredentials: Credentials = {
   expiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
 };
 
+// ── Fetch mock ──────────────────────────────────────────────────────────────
+
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
 // ── Reset between tests ─────────────────────────────────────────────────────
 
 const originalEnv = process.env;
@@ -66,6 +71,7 @@ beforeEach(() => {
   mockWriteFileSync.mockReset();
   mockUnlinkSync.mockReset();
   mockBrowserLogin.mockReset();
+  mockFetch.mockReset();
   _resetForTests();
 
   // Clear MYNDHYVE_TOKEN env var
@@ -234,6 +240,103 @@ describe('getToken()', () => {
     const token = await getToken();
 
     expect(token).toBe('env-token');
+  });
+});
+
+// ============================================================================
+// getToken() — forceRefresh
+// ============================================================================
+
+describe('getToken() — forceRefresh', () => {
+  /** Helper: set up mocks so credentials load + API key exists + refresh succeeds. */
+  function setupRefreshMocks(creds: Credentials = validCredentials): void {
+    mockExistsSync.mockImplementation((path: string) => {
+      if (path.endsWith('credentials.json')) return true;
+      if (path.endsWith('.firebase-api-key')) return true;
+      return true;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (typeof path === 'string' && path.endsWith('.firebase-api-key')) return 'AIzaTestKey';
+      return JSON.stringify(creds);
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        id_token: 'refreshed-id-token',
+        refresh_token: 'new-refresh-token',
+        expires_in: '3600',
+      }),
+    });
+  }
+
+  it('triggers refresh even when stored token is not expired', async () => {
+    setupRefreshMocks(validCredentials); // Not expired
+
+    const token = await getToken(true);
+
+    expect(token).toBe('refreshed-id-token');
+    expect(mockFetch).toHaveBeenCalledOnce();
+    // Credentials should be saved with the new token
+    expect(mockWriteFileSync).toHaveBeenCalled();
+    const savedContent = JSON.parse(
+      mockWriteFileSync.mock.calls.find(
+        (c: string[]) => typeof c[0] === 'string' && c[0].endsWith('credentials.json')
+      )?.[1] as string
+    );
+    expect(savedContent.idToken).toBe('refreshed-id-token');
+  });
+
+  it('deduplicates concurrent refresh calls — only one fetch fires', async () => {
+    setupRefreshMocks(expiredCredentials);
+
+    // Fire two concurrent getToken calls — both see expired token
+    const [token1, token2] = await Promise.all([
+      getToken(),
+      getToken(),
+    ]);
+
+    expect(token1).toBe('refreshed-id-token');
+    expect(token2).toBe('refreshed-id-token');
+
+    // Only one actual refresh call made
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it('clears refreshPromise after failure so next call can retry', async () => {
+    mockExistsSync.mockImplementation((path: string) => {
+      if (path.endsWith('credentials.json')) return true;
+      if (path.endsWith('.firebase-api-key')) return true;
+      return true;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (typeof path === 'string' && path.endsWith('.firebase-api-key')) return 'AIzaTestKey';
+      return JSON.stringify(expiredCredentials);
+    });
+
+    // First attempt: refresh fails
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('TOKEN_EXPIRED'),
+    });
+
+    await expect(getToken()).rejects.toThrow(AuthError);
+
+    // Second attempt: refresh succeeds (new fetch mock)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        id_token: 'new-token',
+        refresh_token: 'new-refresh',
+        expires_in: '3600',
+      }),
+    });
+
+    const token = await getToken();
+    expect(token).toBe('new-token');
+
+    // Two fetch calls total
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

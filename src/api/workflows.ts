@@ -4,9 +4,9 @@
  * Operations for workflow management and run execution via Firestore REST API.
  *
  * Firestore collections:
- *   hyves/{hyveId}/workflows/{workflowId}           — Workflow definitions
- *   users/{userId}/hyves/{hyveId}/runs/{runId}       — Workflow runs
- *   users/{userId}/hyves/{hyveId}/artifacts/{artifactId} — Run artifacts
+ *   hyves/{hyveId}/workflows/{workflowId}   — Workflow definitions
+ *   runs/{runId}                             — Workflow runs (root-level)
+ *   runs/{runId}/artifacts/{artifactId}      — Run artifacts (nested under runs)
  */
 
 import { randomBytes } from 'node:crypto';
@@ -30,12 +30,10 @@ const log = createLogger('WorkflowAPI');
 export type WorkflowRunStatus =
   | 'pending'
   | 'running'
-  | 'paused'
-  | 'waiting-approval'
+  | 'awaiting_approval'
   | 'completed'
   | 'failed'
-  | 'cancelled'
-  | 'timed-out';
+  | 'cancelled';
 
 /** All valid workflow trigger types. */
 export type WorkflowTriggerType =
@@ -115,7 +113,7 @@ export interface NodeRunState {
   approval?: ApprovalInfo;
 }
 
-/** Approval information for a waiting-approval node. */
+/** Approval information for an awaiting_approval node. */
 export interface ApprovalInfo {
   requestedAt: string;
   requestedBy?: string;
@@ -222,6 +220,9 @@ export async function getWorkflow(
 /**
  * List workflow runs for a user's hyve.
  *
+ * Runs are stored in the root-level `runs/` collection with `userId` and
+ * `hyveId` fields for filtering.
+ *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
  * @param options - Optional filters
@@ -232,11 +233,13 @@ export async function listRuns(
   hyveId: string,
   options?: { status?: WorkflowRunStatus; workflowId?: string; limit?: number }
 ): Promise<RunSummary[]> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/runs`;
-
   log.debug('Listing runs', { userId, hyveId, options });
 
-  const filters: QueryFilter[] = [];
+  // Runs are root-level; always filter by userId + hyveId
+  const filters: QueryFilter[] = [
+    { field: 'userId', op: 'EQUAL', value: userId },
+    { field: 'hyveId', op: 'EQUAL', value: hyveId },
+  ];
 
   if (options?.status) {
     filters.push({ field: 'status', op: 'EQUAL', value: options.status });
@@ -246,26 +249,19 @@ export async function listRuns(
     filters.push({ field: 'workflowId', op: 'EQUAL', value: options.workflowId });
   }
 
-  if (filters.length > 0) {
-    const results = await runQuery(collectionPath, filters, {
-      orderBy: 'startedAt',
-      orderDirection: 'DESCENDING',
-      limit: options?.limit || 50,
-    });
-    return results.map(toRunSummary);
-  }
-
-  const { documents } = await listDocuments(collectionPath, {
-    pageSize: options?.limit || 50,
+  const results = await runQuery('runs', filters, {
+    orderBy: 'startedAt',
+    orderDirection: 'DESCENDING',
+    limit: options?.limit || 50,
   });
-  return documents.map(toRunSummary);
+  return results.map(toRunSummary);
 }
 
 /**
  * Get full run details by ID.
  *
- * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param userId - The authenticated user's UID (for response enrichment)
+ * @param hyveId - The hyve ID (for response enrichment)
  * @param runId - The run ID
  * @returns Run detail or null if not found
  */
@@ -274,14 +270,12 @@ export async function getRun(
   hyveId: string,
   runId: string
 ): Promise<RunDetail | null> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/runs`;
-
   log.debug('Getting run', { userId, hyveId, runId });
 
-  const doc = await getDocument(collectionPath, runId);
+  const doc = await getDocument('runs', runId);
   if (!doc) return null;
 
-  return toRunDetail(doc, userId, hyveId);
+  return toRunDetail(doc);
 }
 
 /**
@@ -299,13 +293,14 @@ export async function createRun(
   workflowId: string,
   options?: { inputData?: Record<string, unknown>; triggerType?: string }
 ): Promise<RunSummary> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/runs`;
   const runId = generateRunId();
   const now = new Date().toISOString();
 
   log.debug('Creating run', { userId, hyveId, workflowId, runId });
 
   const runData: Record<string, unknown> = {
+    userId,
+    hyveId,
     workflowId,
     status: 'pending',
     triggerType: options?.triggerType || 'manual',
@@ -319,15 +314,15 @@ export async function createRun(
     updatedAt: now,
   };
 
-  const result = await createDocument(collectionPath, runId, runData);
+  const result = await createDocument('runs', runId, runData);
   return toRunSummary(result);
 }
 
 /**
  * Get run logs (extracted from the run document).
  *
- * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param userId - The authenticated user's UID (unused, kept for API compat)
+ * @param hyveId - The hyve ID (unused, kept for API compat)
  * @param runId - The run ID
  * @returns Array of log entries, or null if run not found
  */
@@ -336,11 +331,9 @@ export async function getRunLogs(
   hyveId: string,
   runId: string
 ): Promise<RunLogEntry[] | null> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/runs`;
-
   log.debug('Getting run logs', { userId, hyveId, runId });
 
-  const doc = await getDocument(collectionPath, runId);
+  const doc = await getDocument('runs', runId);
   if (!doc) return null;
 
   const rawLogs = (doc.logs || []) as Array<Record<string, unknown>>;
@@ -352,7 +345,7 @@ export async function getRunLogs(
 // ============================================================================
 
 /**
- * Approve a waiting-approval run.
+ * Approve an awaiting_approval run.
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -369,7 +362,7 @@ export async function approveRun(
 }
 
 /**
- * Reject a waiting-approval run.
+ * Reject an awaiting_approval run.
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -386,7 +379,7 @@ export async function rejectRun(
 }
 
 /**
- * Request revisions on a waiting-approval run (reject with feedback).
+ * Request revisions on an awaiting_approval run (reject with feedback).
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -403,7 +396,7 @@ export async function reviseRun(
 }
 
 /**
- * Submit an approval/rejection decision for a waiting-approval run.
+ * Submit an approval/rejection decision for an awaiting_approval run.
  *
  * Caveat: This uses a read-then-write pattern (no Firestore transaction via
  * REST API). Concurrent approvals from multiple clients could race. This is
@@ -417,28 +410,26 @@ async function submitApprovalDecision(
   decision: 'approved' | 'rejected',
   feedback?: string
 ): Promise<RunDetail> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/runs`;
-
   log.debug('Submitting approval decision', { userId, hyveId, runId, decision });
 
   // Get the run to find the waiting node
-  const doc = await getDocument(collectionPath, runId);
+  const doc = await getDocument('runs', runId);
   if (!doc) {
     throw new Error(`Run "${runId}" not found`);
   }
 
-  if (doc.status !== 'waiting-approval') {
-    throw new Error(`Run "${runId}" is not waiting for approval (status: ${doc.status})`);
+  if (doc.status !== 'awaiting_approval') {
+    throw new Error(`Run "${runId}" is not awaiting approval (status: ${doc.status})`);
   }
 
-  // Find the node that's waiting for approval
+  // Find the node that's awaiting approval
   const nodeStates = (doc.nodeStates || {}) as Record<string, Record<string, unknown>>;
   const waitingNodeId = Object.keys(nodeStates).find(
-    (nid) => nodeStates[nid].status === 'waiting-approval'
+    (nid) => nodeStates[nid].status === 'awaiting_approval'
   );
 
   if (!waitingNodeId) {
-    throw new Error(`No node found waiting for approval in run "${runId}"`);
+    throw new Error(`No node found awaiting approval in run "${runId}"`);
   }
 
   const now = new Date().toISOString();
@@ -452,8 +443,8 @@ async function submitApprovalDecision(
   );
 
   const fieldPaths = Object.keys(updatePayload);
-  const result = await updateDocument(collectionPath, runId, updatePayload, fieldPaths);
-  return toRunDetail(result, userId, hyveId);
+  const result = await updateDocument('runs', runId, updatePayload, fieldPaths);
+  return toRunDetail(result);
 }
 
 /**
@@ -474,8 +465,8 @@ function buildApprovalPayload(
   fields[`${nodePrefix}.approval.decidedBy`] = decidedBy;
   fields[`${nodePrefix}.approval.decidedAt`] = decidedAt;
   fields[`${nodePrefix}.status`] = nodeStatus;
-  fields['status'] = runStatus;
-  fields['updatedAt'] = decidedAt;
+  fields.status = runStatus;
+  fields.updatedAt = decidedAt;
   if (feedback) {
     fields[`${nodePrefix}.approval.feedback`] = feedback;
   }
@@ -489,32 +480,19 @@ function buildApprovalPayload(
 /**
  * List artifacts for a run.
  *
- * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
- * @param options - Filter by runId or workflowId
+ * Artifacts are stored as subcollections under runs: `runs/{runId}/artifacts/`.
+ *
+ * @param runId - The workflow run ID
+ * @param options - Optional limit
  * @returns Array of artifact summaries
  */
 export async function listArtifacts(
-  userId: string,
-  hyveId: string,
-  options?: { runId?: string; limit?: number }
+  runId: string,
+  options?: { limit?: number }
 ): Promise<ArtifactSummary[]> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/artifacts`;
+  const collectionPath = `runs/${runId}/artifacts`;
 
-  log.debug('Listing artifacts', { userId, hyveId, options });
-
-  const filters: QueryFilter[] = [];
-
-  if (options?.runId) {
-    filters.push({ field: 'runId', op: 'EQUAL', value: options.runId });
-  }
-
-  if (filters.length > 0) {
-    const results = await runQuery(collectionPath, filters, {
-      limit: options?.limit || 50,
-    });
-    return results.map(toArtifactSummary);
-  }
+  log.debug('Listing artifacts', { runId, options });
 
   const { documents } = await listDocuments(collectionPath, {
     pageSize: options?.limit || 50,
@@ -525,19 +503,17 @@ export async function listArtifacts(
 /**
  * Get full artifact details by ID.
  *
- * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param runId - The workflow run ID
  * @param artifactId - The artifact ID
  * @returns Artifact detail or null if not found
  */
 export async function getArtifact(
-  userId: string,
-  hyveId: string,
+  runId: string,
   artifactId: string
 ): Promise<ArtifactDetail | null> {
-  const collectionPath = `users/${userId}/hyves/${hyveId}/artifacts`;
+  const collectionPath = `runs/${runId}/artifacts`;
 
-  log.debug('Getting artifact', { userId, hyveId, artifactId });
+  log.debug('Getting artifact', { runId, artifactId });
 
   const doc = await getDocument(collectionPath, artifactId);
   if (!doc) return null;
@@ -613,12 +589,12 @@ function toWorkflowDetail(doc: Record<string, unknown>, hyveId: string): Workflo
 function toRunSummary(doc: Record<string, unknown>): RunSummary {
   const nodeStates = (doc.nodeStates || {}) as Record<string, Record<string, unknown>>;
 
-  // Find current node (last running or waiting node)
+  // Find current node (last running or awaiting approval node)
   let currentNodeId: string | undefined;
   let currentNodeLabel: string | undefined;
 
   for (const [nid, state] of Object.entries(nodeStates)) {
-    if (state.status === 'running' || state.status === 'waiting-approval') {
+    if (state.status === 'running' || state.status === 'awaiting_approval') {
       currentNodeId = nid;
       currentNodeLabel = state.label as string | undefined;
       break;
@@ -643,8 +619,6 @@ function toRunSummary(doc: Record<string, unknown>): RunSummary {
 
 function toRunDetail(
   doc: Record<string, unknown>,
-  userId: string,
-  hyveId: string
 ): RunDetail {
   const summary = toRunSummary(doc);
   const rawNodeStates = (doc.nodeStates || {}) as Record<string, Record<string, unknown>>;
@@ -663,8 +637,8 @@ function toRunDetail(
 
   return {
     ...summary,
-    hyveId,
-    userId,
+    hyveId: (doc.hyveId as string) || '',
+    userId: (doc.userId as string) || '',
     inputData: doc.inputData as Record<string, unknown> | undefined,
     nodeStates,
     error: doc.error as string | undefined,

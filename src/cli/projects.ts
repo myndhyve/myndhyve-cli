@@ -9,7 +9,7 @@
  *   myndhyve-cli projects delete <project-id>
  */
 
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import {
   listProjects,
   getProject,
@@ -20,10 +20,11 @@ import { listSystemHyves, getSystemHyve, isValidSystemHyveId } from '../api/hyve
 import { setActiveContext } from '../context.js';
 import {
   requireAuth,
-  truncate,
   formatRelativeTime,
+  formatTableRow,
   printError,
 } from './helpers.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // REGISTER
@@ -32,7 +33,13 @@ import {
 export function registerProjectCommands(program: Command): void {
   const projects = program
     .command('projects')
-    .description('Manage MyndHyve projects');
+    .description('Manage MyndHyve projects')
+    .addHelpText('after', `
+Examples:
+  $ myndhyve-cli projects list
+  $ myndhyve-cli projects create "My App" --hyve=app-builder
+  $ myndhyve-cli projects info <project-id>
+  $ myndhyve-cli projects delete <project-id>`);
 
   // ── List ─────────────────────────────────────────────────────────────
 
@@ -46,11 +53,16 @@ export function registerProjectCommands(program: Command): void {
       const auth = requireAuth();
       if (!auth) return;
 
+      const ora = (await import('ora')).default;
+      const spinner = ora({ text: 'Loading projects...', stream: process.stderr }).start();
+
       try {
         const results = await listProjects(auth.uid, {
           hyveId: opts.hyve,
           status: opts.status,
         });
+
+        spinner.stop();
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(results, null, 2));
@@ -64,35 +76,29 @@ export function registerProjectCommands(program: Command): void {
         }
 
         console.log(`\n  Projects (${results.length})\n`);
-        console.log(
-          '  ' +
-            'ID'.padEnd(24) +
-            'Name'.padEnd(30) +
-            'Hyve'.padEnd(18) +
-            'Status'.padEnd(14) +
-            'Updated'
-        );
-        console.log('  ' + '─'.repeat(100));
+        const cols: Array<[string, number]> = [['ID', 24], ['Name', 30], ['Hyve', 18], ['Status', 14], ['Updated', 14]];
+        console.log(formatTableRow(cols));
+        console.log('  ' + '\u2500'.repeat(Math.min(100, (process.stdout.columns || 100) - 4)));
 
         for (const proj of results) {
           const hyve = getSystemHyve(proj.hyveId);
           const hyveName = hyve?.name || proj.hyveId;
           const updated = proj.updatedAt
             ? formatRelativeTime(proj.updatedAt)
-            : '—';
+            : '\u2014';
 
-          console.log(
-            '  ' +
-              proj.id.padEnd(24) +
-              truncate(proj.name, 28).padEnd(30) +
-              truncate(hyveName, 16).padEnd(18) +
-              proj.status.padEnd(14) +
-              updated
-          );
+          console.log(formatTableRow([
+            [proj.id, 24],
+            [proj.name, 30],
+            [hyveName, 18],
+            [proj.status, 14],
+            [updated, 14],
+          ]));
         }
 
         console.log('');
       } catch (error) {
+        spinner.stop();
         printError('Failed to list projects', error);
       }
     });
@@ -115,10 +121,12 @@ export function registerProjectCommands(program: Command): void {
       // Validate hyve ID
       if (!isValidSystemHyveId(opts.hyve)) {
         const available = listSystemHyves().map((h) => h.hyveId).join(', ');
-        console.error(`\n  Error: Unknown hyve "${opts.hyve}".`);
-        console.error(`  Available hyves: ${available}`);
-        console.error('  Run `myndhyve-cli hyves list` to see all options.\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'INVALID_HYVE',
+          message: `Unknown hyve "${opts.hyve}".`,
+          suggestion: `Available hyves: ${available}. Run \`myndhyve-cli hyves list\` to see all options.`,
+        });
+        process.exitCode = ExitCode.NOT_FOUND;
         return;
       }
 
@@ -179,8 +187,11 @@ export function registerProjectCommands(program: Command): void {
         const project = await getProject(projectId);
 
         if (!project) {
-          console.error(`\n  Error: Project "${projectId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Project "${projectId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -240,8 +251,11 @@ export function registerProjectCommands(program: Command): void {
         const project = await getProject(projectId);
 
         if (!project) {
-          console.error(`\n  Error: Project "${projectId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Project "${projectId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
@@ -279,13 +293,23 @@ export function registerProjectCommands(program: Command): void {
         const project = await getProject(projectId);
 
         if (!project) {
-          console.error(`\n  Error: Project "${projectId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Project "${projectId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
         // Confirm unless --force
         if (!opts.force) {
+          const metadata = project.metadata as Record<string, unknown>;
+          console.log(`\n  About to delete project "${project.name}":`);
+          console.log(`    - ${metadata.documentCount || 0} documents`);
+          console.log(`    - ${metadata.workflowCount || 0} workflows`);
+          console.log(`    - ${metadata.artifactCount || 0} artifacts`);
+          console.log(`    - ${project.collaboratorIds.length} collaborator(s)`);
+
           const readline = await import('node:readline');
           const rl = readline.createInterface({
             input: process.stdin,
@@ -294,7 +318,7 @@ export function registerProjectCommands(program: Command): void {
 
           const answer = await new Promise<string>((resolve) => {
             rl.question(
-              `\n  Delete project "${project.name}" (${projectId})? This cannot be undone. [y/N] `,
+              `\n  This cannot be undone. Delete? [y/N] `,
               resolve
             );
           });

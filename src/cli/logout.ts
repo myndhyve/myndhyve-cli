@@ -6,7 +6,7 @@
 
 import { createLogger } from '../utils/logger.js';
 import { loadConfiguredRelay, saveConfig } from '../config/loader.js';
-import { getChannel } from '../channels/registry.js';
+import { getChannel, ensureChannelsLoaded } from '../channels/registry.js';
 
 const log = createLogger('Logout');
 
@@ -35,6 +35,7 @@ export async function logoutCommand(): Promise<void> {
   }
 
   // Clear platform credentials
+  await ensureChannelsLoaded();
   const plugin = getChannel(channel);
   if (plugin) {
     try {

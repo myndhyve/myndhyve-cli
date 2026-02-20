@@ -154,7 +154,7 @@ const signalPlugin: ChannelPlugin = {
             throw sseError;
           }
 
-          const delayMs = SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(attempt, 5));
+          const delayMs = SSE_RECONNECT_BASE_MS * 2 ** Math.min(attempt, 5);
           log.warn('SSE stream dropped, reconnecting...', {
             attempt: attempt + 1,
             delayMs,

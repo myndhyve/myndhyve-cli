@@ -5,7 +5,6 @@ import {
   createTestEnvelope,
   validateEnvelope,
 } from '../envelope.js';
-import type { CreateEnvelopeOptions as _CreateEnvelopeOptions, ValidationResult as _ValidationResult } from '../envelope.js';
 import type { ChatIngressEnvelope, ChatEgressEnvelope } from '../../relay/types.js';
 
 // ============================================================================

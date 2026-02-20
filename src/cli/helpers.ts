@@ -5,6 +5,7 @@
  */
 
 import { getAuthStatus } from '../auth/index.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // AUTH
@@ -18,14 +19,22 @@ export function requireAuth(): { uid: string; email: string } | null {
   const status = getAuthStatus();
 
   if (!status.authenticated) {
-    console.error('\n  Error: Not authenticated. Run `myndhyve-cli auth login` first.\n');
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'NOT_AUTHENTICATED',
+      message: 'Not authenticated.',
+      suggestion: 'Run `myndhyve-cli auth login` to sign in, or set the MYNDHYVE_TOKEN environment variable for CI/CD.',
+    });
+    process.exitCode = ExitCode.UNAUTHORIZED;
     return null;
   }
 
   if (!status.uid) {
-    console.error('\n  Error: User ID not available. Run `myndhyve-cli auth login` to refresh.\n');
-    process.exitCode = 1;
+    printErrorResult({
+      code: 'MISSING_UID',
+      message: 'User ID not available.',
+      suggestion: 'Run `myndhyve-cli auth login` to refresh your session.',
+    });
+    process.exitCode = ExitCode.UNAUTHORIZED;
     return null;
   }
 
@@ -80,7 +89,103 @@ export function formatRelativeTime(isoDate: string): string {
  */
 export function printError(context: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`\n  Error: ${context}`);
-  console.error(`  ${message}\n`);
-  process.exitCode = 1;
+  printErrorResult({
+    code: 'COMMAND_ERROR',
+    message: `${context}: ${message}`,
+  });
+  process.exitCode = ExitCode.GENERAL_ERROR;
+}
+
+// ============================================================================
+// TABLE FORMATTING
+// ============================================================================
+
+/**
+ * Get the available terminal width for table output.
+ * Falls back to 80 columns if detection fails.
+ */
+export function getTerminalWidth(): number {
+  return process.stdout.columns || 80;
+}
+
+/**
+ * Format a fixed-width table row that fits within the terminal width.
+ * Each column is defined by [value, width]. Columns are truncated
+ * proportionally when the total exceeds the terminal width.
+ */
+export function formatTableRow(
+  columns: Array<[string, number]>,
+  indent = 2
+): string {
+  const termWidth = getTerminalWidth();
+  const totalWidth = columns.reduce((sum, [, w]) => sum + w, 0) + indent;
+
+  let row = ' '.repeat(indent);
+
+  if (totalWidth <= termWidth) {
+    // Fits — use original widths
+    for (const [value, width] of columns) {
+      row += truncate(value, width - 2).padEnd(width);
+    }
+  } else {
+    // Doesn't fit — shrink columns proportionally
+    const available = termWidth - indent;
+    const scale = available / totalWidth;
+
+    for (const [value, width] of columns) {
+      const scaled = Math.max(4, Math.floor(width * scale));
+      row += truncate(value, scaled - 2).padEnd(scaled);
+    }
+  }
+
+  return row;
+}
+
+// ============================================================================
+// DID-YOU-MEAN
+// ============================================================================
+
+/**
+ * Simple Levenshtein distance for "did you mean?" suggestions.
+ */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+
+  return dp[m][n];
+}
+
+/**
+ * Find the closest match from a list of candidates.
+ * Returns the candidate if the distance is <= maxDistance, otherwise undefined.
+ */
+export function didYouMean(
+  input: string,
+  candidates: string[],
+  maxDistance = 3
+): string | undefined {
+  let best: string | undefined;
+  let bestDist = maxDistance + 1;
+
+  for (const candidate of candidates) {
+    const dist = levenshtein(input.toLowerCase(), candidate.toLowerCase());
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = candidate;
+    }
+  }
+
+  return bestDist <= maxDistance ? best : undefined;
 }

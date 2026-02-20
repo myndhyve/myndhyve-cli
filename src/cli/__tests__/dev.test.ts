@@ -119,6 +119,7 @@ let mockFetch: MockInstance;
 describe('registerDevCommands', () => {
   let consoleSpy: MockInstance;
   let consoleErrSpy: MockInstance;
+  let stderrWriteSpy: MockInstance;
 
   beforeEach(() => {
     mockRunDoctorChecks.mockReset();
@@ -141,6 +142,7 @@ describe('registerDevCommands', () => {
 
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     process.exitCode = undefined;
 
     mockFetch = vi.fn() as unknown as MockInstance;
@@ -150,6 +152,7 @@ describe('registerDevCommands', () => {
   afterEach(() => {
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
+    stderrWriteSpy.mockRestore();
     globalThis.fetch = originalFetch;
     process.exitCode = undefined;
   });
@@ -461,10 +464,10 @@ describe('registerDevCommands', () => {
     it('rejects invalid channel', async () => {
       await run(['dev', 'envelope', 'create', '--channel', 'telegram']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Unknown channel "telegram"');
       expect(errOutput).toContain('whatsapp, signal, imessage');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockCreateTestEnvelope).not.toHaveBeenCalled();
     });
 
@@ -577,10 +580,10 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'envelope', 'validate', '/tmp/missing.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('File not found');
       expect(errOutput).toContain('/tmp/missing.json');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
       expect(mockValidateEnvelope).not.toHaveBeenCalled();
     });
 
@@ -590,7 +593,7 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'envelope', 'validate', '/tmp/broken.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Invalid JSON');
       expect(errOutput).toContain('/tmp/broken.json');
       expect(process.exitCode).toBe(1);
@@ -655,10 +658,10 @@ describe('registerDevCommands', () => {
     it('rejects invalid channel', async () => {
       await run(['dev', 'webhook', 'test', 'telegram']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Unknown channel "telegram"');
       expect(errOutput).toContain('whatsapp, signal, imessage');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockGenerateWebhookEvent).not.toHaveBeenCalled();
     });
 
@@ -667,10 +670,10 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'webhook', 'test', 'whatsapp', '--event', 'group-join-invalid']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Event type "group-join-invalid" not available');
       expect(errOutput).toContain('message, typing');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockGenerateWebhookEvent).not.toHaveBeenCalled();
     });
 
@@ -736,9 +739,9 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'webhook', 'test', 'whatsapp', '--payload', '/tmp/missing.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Payload file not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
       expect(mockGenerateWebhookEvent).not.toHaveBeenCalled();
     });
 
@@ -749,7 +752,7 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'webhook', 'test', 'whatsapp', '--payload', '/tmp/bad.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Invalid JSON in payload file');
       expect(process.exitCode).toBe(1);
       expect(mockGenerateWebhookEvent).not.toHaveBeenCalled();
@@ -853,9 +856,9 @@ describe('registerDevCommands', () => {
     it('rejects invalid channel', async () => {
       await run(['dev', 'webhook', 'events', 'sms']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Unknown channel "sms"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockGetAvailableEventTypes).not.toHaveBeenCalled();
     });
   });
@@ -1011,10 +1014,10 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'config', 'import', '/tmp/missing.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('File not found');
       expect(errOutput).toContain('/tmp/missing.json');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
       expect(mockSaveConfig).not.toHaveBeenCalled();
     });
 
@@ -1024,7 +1027,7 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'config', 'import', '/tmp/broken.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Invalid JSON');
       expect(process.exitCode).toBe(1);
       expect(mockSaveConfig).not.toHaveBeenCalled();
@@ -1036,7 +1039,7 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'config', 'import', '/tmp/noconfig.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('missing "config" section');
       expect(process.exitCode).toBe(1);
       expect(mockSaveConfig).not.toHaveBeenCalled();
@@ -1054,7 +1057,7 @@ describe('registerDevCommands', () => {
 
       await run(['dev', 'config', 'import', '/tmp/bad-config.json']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Invalid configuration');
       expect(errOutput).toContain('Invalid url');
       expect(process.exitCode).toBe(1);
@@ -1312,17 +1315,17 @@ describe('registerDevCommands', () => {
     it('rejects discord as invalid channel', async () => {
       await run(['dev', 'envelope', 'create', '--channel', 'discord']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Unknown channel "discord"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('rejects slack as invalid channel', async () => {
       await run(['dev', 'envelope', 'create', '--channel', 'slack']);
 
-      const errOutput = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const errOutput = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(errOutput).toContain('Unknown channel "slack"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
   });
 });

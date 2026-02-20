@@ -62,7 +62,6 @@ import {
   checkConnectivity,
   runDoctorChecks,
 } from '../doctor.js';
-import type { CheckResult as _CheckResult, DoctorReport as _DoctorReport } from '../doctor.js';
 
 // ── Cast mocks ──────────────────────────────────────────────────────────────
 

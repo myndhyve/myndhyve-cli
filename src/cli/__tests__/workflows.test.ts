@@ -184,7 +184,7 @@ const mockWaitingRunDetail = {
   id: 'run_waiting123',
   workflowId: 'wf-1',
   workflowName: 'App Builder Workflow',
-  status: 'waiting-approval',
+  status: 'awaiting_approval',
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
@@ -195,7 +195,7 @@ const mockWaitingRunDetail = {
     { nodeId: 'node-1', status: 'completed', label: 'Generate PRD' },
     {
       nodeId: 'node-2',
-      status: 'waiting-approval',
+      status: 'awaiting_approval',
       label: 'Review Plan',
       approval: { requestedAt: '2025-01-15T10:01:00Z' },
     },
@@ -239,6 +239,7 @@ const mockArtifactDetail = {
 describe('registerWorkflowCommands', () => {
   let consoleSpy: MockInstance;
   let consoleErrSpy: MockInstance;
+  let stderrWriteSpy: MockInstance;
 
   beforeEach(() => {
     mockRequireAuth.mockReset();
@@ -273,12 +274,14 @@ describe('registerWorkflowCommands', () => {
 
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     process.exitCode = undefined;
   });
 
   afterEach(() => {
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
+    stderrWriteSpy.mockRestore();
     process.exitCode = undefined;
   });
 
@@ -387,7 +390,7 @@ describe('registerWorkflowCommands', () => {
     it('returns early when auth fails for workflows artifacts list', async () => {
       mockRequireAuth.mockReturnValue(null);
 
-      await run(['workflows', 'artifacts', 'list']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
 
       expect(mockListArtifacts).not.toHaveBeenCalled();
     });
@@ -395,7 +398,7 @@ describe('registerWorkflowCommands', () => {
     it('returns early when auth fails for workflows artifacts get', async () => {
       mockRequireAuth.mockReturnValue(null);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123']);
 
       expect(mockGetArtifact).not.toHaveBeenCalled();
     });
@@ -435,10 +438,10 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'list']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('No hyve ID specified');
       expect(output).toContain('--hyve=<hyveId>');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2); // USAGE_ERROR
       expect(mockListWorkflows).not.toHaveBeenCalled();
     });
 
@@ -450,9 +453,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'list']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('No hyve ID specified');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2); // USAGE_ERROR
       expect(mockListWorkflows).not.toHaveBeenCalled();
     });
 
@@ -615,9 +618,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'info', 'wf-missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Workflow "wf-missing" not found in hyve "landing-page"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
     it('shows disabled status', async () => {
@@ -708,9 +711,9 @@ describe('registerWorkflowCommands', () => {
     it('shows error for invalid JSON input', async () => {
       await run(['workflows', 'run', 'wf-1', '--input', 'not-json']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid JSON for --input flag');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2); // USAGE_ERROR
       expect(mockGetWorkflow).not.toHaveBeenCalled();
       expect(mockCreateRun).not.toHaveBeenCalled();
     });
@@ -720,9 +723,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'run', 'wf-missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Workflow "wf-missing" not found in hyve "landing-page"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3); // NOT_FOUND
       expect(mockCreateRun).not.toHaveBeenCalled();
     });
 
@@ -731,9 +734,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'run', 'wf-1']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Workflow "wf-1" is disabled');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(1); // GENERAL_ERROR
       expect(mockCreateRun).not.toHaveBeenCalled();
     });
 
@@ -833,7 +836,7 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('approved');
     });
 
-    it('shows approval hints when status is waiting-approval', async () => {
+    it('shows approval hints when status is awaiting_approval', async () => {
       mockGetRun.mockResolvedValue(mockWaitingRunDetail);
 
       await run(['workflows', 'status', 'run_waiting123']);
@@ -878,9 +881,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'status', 'run_missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Run "run_missing" not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
     it('outputs JSON format', async () => {
@@ -994,9 +997,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'logs', 'run_missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Run "run_missing" not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
     it('respects --limit flag', async () => {
@@ -1069,10 +1072,9 @@ describe('registerWorkflowCommands', () => {
     it('lists artifacts with table', async () => {
       mockListArtifacts.mockResolvedValue([mockArtifactSummary]);
 
-      await run(['workflows', 'artifacts', 'list']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
 
-      expect(mockListArtifacts).toHaveBeenCalledWith('user-123', 'landing-page', {
-        runId: undefined,
+      expect(mockListArtifacts).toHaveBeenCalledWith('run_abc123', {
         limit: 50,
       });
 
@@ -1085,24 +1087,12 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('Created');
     });
 
-    it('filters by --run flag', async () => {
-      mockListArtifacts.mockResolvedValue([]);
-
-      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
-
-      expect(mockListArtifacts).toHaveBeenCalledWith('user-123', 'landing-page', {
-        runId: 'run_abc123',
-        limit: 50,
-      });
-    });
-
     it('respects --limit flag', async () => {
       mockListArtifacts.mockResolvedValue([]);
 
-      await run(['workflows', 'artifacts', 'list', '--limit', '10']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123', '--limit', '10']);
 
-      expect(mockListArtifacts).toHaveBeenCalledWith('user-123', 'landing-page', {
-        runId: undefined,
+      expect(mockListArtifacts).toHaveBeenCalledWith('run_abc123', {
         limit: 10,
       });
     });
@@ -1110,7 +1100,7 @@ describe('registerWorkflowCommands', () => {
     it('shows "no artifacts found" for empty results', async () => {
       mockListArtifacts.mockResolvedValue([]);
 
-      await run(['workflows', 'artifacts', 'list']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('No artifacts found');
@@ -1122,7 +1112,7 @@ describe('registerWorkflowCommands', () => {
         { ...mockArtifactSummary, createdAt: undefined },
       ]);
 
-      await run(['workflows', 'artifacts', 'list']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
 
       // Should not call formatRelativeTime for undefined createdAt
       // (it uses the em-dash fallback)
@@ -1134,7 +1124,7 @@ describe('registerWorkflowCommands', () => {
       const results = [mockArtifactSummary];
       mockListArtifacts.mockResolvedValue(results);
 
-      await run(['workflows', 'artifacts', 'list', '--format', 'json']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123', '--format', 'json']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(JSON.parse(output)).toEqual(results);
@@ -1143,7 +1133,7 @@ describe('registerWorkflowCommands', () => {
     it('calls printError on API failure', async () => {
       mockListArtifacts.mockRejectedValue(new Error('Forbidden'));
 
-      await run(['workflows', 'artifacts', 'list']);
+      await run(['workflows', 'artifacts', 'list', '--run', 'run_abc123']);
 
       expect(mockPrintError).toHaveBeenCalledWith('Failed to list artifacts', expect.any(Error));
     });
@@ -1157,9 +1147,9 @@ describe('registerWorkflowCommands', () => {
     it('prints artifact as JSON to stdout', async () => {
       mockGetArtifact.mockResolvedValue(mockArtifactDetail);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123']);
 
-      expect(mockGetArtifact).toHaveBeenCalledWith('user-123', 'landing-page', 'art-1');
+      expect(mockGetArtifact).toHaveBeenCalledWith('run_abc123', 'art-1');
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       const parsed = JSON.parse(output);
@@ -1169,7 +1159,7 @@ describe('registerWorkflowCommands', () => {
     it('writes to file with --output flag', async () => {
       mockGetArtifact.mockResolvedValue(mockArtifactDetail);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1', '--output', '/tmp/out.json']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123', '--output', '/tmp/out.json']);
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         '/tmp/out.json',
@@ -1186,7 +1176,7 @@ describe('registerWorkflowCommands', () => {
     it('writes content (not full artifact) to file', async () => {
       mockGetArtifact.mockResolvedValue(mockArtifactDetail);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1', '--output', '/tmp/out.json']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123', '--output', '/tmp/out.json']);
 
       const writtenContent = mockWriteFileSync.mock.calls[0][1] as string;
       const parsed = JSON.parse(writtenContent);
@@ -1197,17 +1187,17 @@ describe('registerWorkflowCommands', () => {
     it('shows error for missing artifact', async () => {
       mockGetArtifact.mockResolvedValue(null);
 
-      await run(['workflows', 'artifacts', 'get', 'art-missing']);
+      await run(['workflows', 'artifacts', 'get', 'art-missing', '--run', 'run_abc123']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Artifact "art-missing" not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
     it('prints raw content when --format raw', async () => {
       mockGetArtifact.mockResolvedValue(mockArtifactDetail);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1', '--format', 'raw']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123', '--format', 'raw']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       const parsed = JSON.parse(output);
@@ -1223,7 +1213,7 @@ describe('registerWorkflowCommands', () => {
       };
       mockGetArtifact.mockResolvedValue(artifactNoContent);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1', '--format', 'raw']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123', '--format', 'raw']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       const parsed = JSON.parse(output);
@@ -1238,7 +1228,7 @@ describe('registerWorkflowCommands', () => {
       };
       mockGetArtifact.mockResolvedValue(artifactEmpty);
 
-      await run(['workflows', 'artifacts', 'get', 'art-1', '--format', 'raw']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123', '--format', 'raw']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       const parsed = JSON.parse(output);
@@ -1248,7 +1238,7 @@ describe('registerWorkflowCommands', () => {
     it('calls printError on API failure', async () => {
       mockGetArtifact.mockRejectedValue(new Error('Not found'));
 
-      await run(['workflows', 'artifacts', 'get', 'art-1']);
+      await run(['workflows', 'artifacts', 'get', 'art-1', '--run', 'run_abc123']);
 
       expect(mockPrintError).toHaveBeenCalledWith('Failed to get artifact', expect.any(Error));
     });
@@ -1551,22 +1541,22 @@ describe('registerWorkflowCommands', () => {
     it('validates status against known values', async () => {
       await run(['workflows', 'runs', '--status', 'invalid-status']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Unknown run status "invalid-status"');
       expect(output).toContain('Valid statuses:');
       expect(output).toContain('pending');
       expect(output).toContain('running');
       expect(output).toContain('completed');
       expect(output).toContain('failed');
-      expect(output).toContain('waiting-approval');
-      expect(process.exitCode).toBe(1);
+      expect(output).toContain('awaiting_approval');
+      expect(process.exitCode).toBe(2);
       expect(mockListRuns).not.toHaveBeenCalled();
     });
 
     it('accepts all valid status values', async () => {
       const validStatuses = [
-        'pending', 'running', 'paused', 'waiting-approval',
-        'completed', 'failed', 'cancelled', 'timed-out',
+        'pending', 'running', 'awaiting_approval',
+        'completed', 'failed', 'cancelled',
       ];
 
       for (const status of validStatuses) {
@@ -1651,7 +1641,7 @@ describe('registerWorkflowCommands', () => {
   describe('format helpers (indirectly tested)', () => {
     it('formatRunStatus shows correct icons for different statuses', async () => {
       // Test several statuses by rendering them through the status command
-      const statuses = ['pending', 'running', 'completed', 'failed', 'waiting-approval'];
+      const statuses = ['pending', 'running', 'completed', 'failed', 'awaiting_approval'];
 
       for (const status of statuses) {
         consoleSpy.mockClear();
@@ -1766,7 +1756,7 @@ describe('registerWorkflowCommands', () => {
           { nodeId: 'n3', status: 'failed', label: 'Step 3' },
           { nodeId: 'n4', status: 'pending', label: 'Step 4' },
           { nodeId: 'n5', status: 'skipped', label: 'Step 5' },
-          { nodeId: 'n6', status: 'waiting-approval', label: 'Step 6' },
+          { nodeId: 'n6', status: 'awaiting_approval', label: 'Step 6' },
         ],
       });
 

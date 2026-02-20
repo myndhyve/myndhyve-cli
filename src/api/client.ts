@@ -79,11 +79,15 @@ export class MyndHyveClient {
     return `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  private async request<T>(url: string, init: RequestInit): Promise<T> {
-    // Get auth token (auto-refreshes if expired)
+  /**
+   * @param isRetry - If true, this is a retry after a 401 with a force-refreshed
+   *   token. Prevents infinite retry loops: a second 401 throws immediately.
+   */
+  private async request<T>(url: string, init: RequestInit, isRetry = false): Promise<T> {
+    // Get auth token — on retry, force-refresh to get a new token
     let token: string;
     try {
-      token = await getToken();
+      token = await getToken(isRetry);
     } catch (err) {
       if (err instanceof AuthError) throw err;
       throw new APIClientError(
@@ -115,7 +119,14 @@ export class MyndHyveClient {
           errorMessage = errorBody || `HTTP ${response.status}`;
         }
 
-        // Handle auth-specific errors
+        // On 401, retry once with a force-refreshed token.
+        // Handles tokens that were revoked server-side but appear
+        // valid locally (not expired by timestamp).
+        if (response.status === 401 && !isRetry) {
+          _log.debug('Received 401, retrying with refreshed token');
+          return this.request<T>(url, init, true);
+        }
+
         if (response.status === 401) {
           throw new APIClientError(
             'Authentication expired. Run `myndhyve-cli auth login` to sign in again.',

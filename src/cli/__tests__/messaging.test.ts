@@ -21,6 +21,11 @@ const {
   mockGetIdentity,
   mockLinkPeerToIdentity,
   mockQueryDeliveryLogs,
+  mockEnableConnector,
+  mockDisableConnector,
+  mockTestConnector,
+  mockDeleteSession,
+  mockUnlinkPeersFromIdentity,
 } = vi.hoisted(() => ({
   mockRequireAuth: vi.fn(),
   mockTruncate: vi.fn(),
@@ -39,6 +44,11 @@ const {
   mockGetIdentity: vi.fn(),
   mockLinkPeerToIdentity: vi.fn(),
   mockQueryDeliveryLogs: vi.fn(),
+  mockEnableConnector: vi.fn(),
+  mockDisableConnector: vi.fn(),
+  mockTestConnector: vi.fn(),
+  mockDeleteSession: vi.fn(),
+  mockUnlinkPeersFromIdentity: vi.fn(),
 }));
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
@@ -64,6 +74,11 @@ vi.mock('../../api/messaging.js', () => ({
   getIdentity: (...args: unknown[]) => mockGetIdentity(...args),
   linkPeerToIdentity: (...args: unknown[]) => mockLinkPeerToIdentity(...args),
   queryDeliveryLogs: (...args: unknown[]) => mockQueryDeliveryLogs(...args),
+  enableConnector: (...args: unknown[]) => mockEnableConnector(...args),
+  disableConnector: (...args: unknown[]) => mockDisableConnector(...args),
+  testConnector: (...args: unknown[]) => mockTestConnector(...args),
+  deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
+  unlinkPeersFromIdentity: (...args: unknown[]) => mockUnlinkPeersFromIdentity(...args),
   CLOUD_CHANNELS: ['slack', 'discord', 'telegram'],
   RELAY_CHANNELS: ['whatsapp', 'signal', 'imessage'],
 }));
@@ -95,6 +110,7 @@ async function run(args: string[]): Promise<void> {
 describe('registerMessagingCommands', () => {
   let consoleSpy: MockInstance;
   let consoleErrSpy: MockInstance;
+  let stderrWriteSpy: MockInstance;
 
   beforeEach(() => {
     mockRequireAuth.mockReset();
@@ -114,6 +130,11 @@ describe('registerMessagingCommands', () => {
     mockGetIdentity.mockReset();
     mockLinkPeerToIdentity.mockReset();
     mockQueryDeliveryLogs.mockReset();
+    mockEnableConnector.mockReset();
+    mockDisableConnector.mockReset();
+    mockTestConnector.mockReset();
+    mockDeleteSession.mockReset();
+    mockUnlinkPeersFromIdentity.mockReset();
 
     // Default auth success
     mockRequireAuth.mockReturnValue(AUTH_USER);
@@ -126,12 +147,14 @@ describe('registerMessagingCommands', () => {
 
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     process.exitCode = undefined;
   });
 
   afterEach(() => {
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
+    stderrWriteSpy.mockRestore();
     process.exitCode = undefined;
   });
 
@@ -323,9 +346,9 @@ describe('registerMessagingCommands', () => {
 
       await run(['messaging', 'connectors', 'status', 'conn_missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Connector "conn_missing" not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
     });
 
     it('shows connector details in table format', async () => {
@@ -477,9 +500,9 @@ describe('registerMessagingCommands', () => {
 
       await run(['messaging', 'policies', 'get', 'conn_missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('No policy found for connector "conn_missing"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
     });
 
     it('displays policy details in table format', async () => {
@@ -623,29 +646,29 @@ describe('registerMessagingCommands', () => {
     it('rejects invalid DM policy', async () => {
       await run(['messaging', 'policies', 'set', 'conn_1', '--dm', 'invalid']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid DM policy "invalid"');
       expect(output).toContain('pairing, allowlist, open, disabled');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockUpdatePolicy).not.toHaveBeenCalled();
     });
 
     it('rejects invalid group policy', async () => {
       await run(['messaging', 'policies', 'set', 'conn_1', '--group', 'pairing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid group policy "pairing"');
       expect(output).toContain('allowlist, open, disabled');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('shows error when no changes specified', async () => {
       await run(['messaging', 'policies', 'set', 'conn_1']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('No policy changes specified');
       expect(output).toContain('--dm, --group, or --mention');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('updates DM policy successfully', async () => {
@@ -959,9 +982,9 @@ describe('registerMessagingCommands', () => {
         '--target', 'hyve:app-builder',
       ]);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid condition format');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockCreateRoutingRule).not.toHaveBeenCalled();
     });
 
@@ -973,9 +996,9 @@ describe('registerMessagingCommands', () => {
         '--target', 'hyve:app-builder',
       ]);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid condition format');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('rejects invalid target format (no colon)', async () => {
@@ -986,9 +1009,9 @@ describe('registerMessagingCommands', () => {
         '--target', 'nocolon',
       ]);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid target format');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockCreateRoutingRule).not.toHaveBeenCalled();
     });
 
@@ -1000,9 +1023,9 @@ describe('registerMessagingCommands', () => {
         '--target', 'unknown:some-id',
       ]);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid target format');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('rejects target with empty targetId', async () => {
@@ -1013,9 +1036,9 @@ describe('registerMessagingCommands', () => {
         '--target', 'hyve:',
       ]);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid target format');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
     });
 
     it('outputs JSON format when --format json', async () => {
@@ -1404,9 +1427,9 @@ describe('registerMessagingCommands', () => {
 
       await run(['messaging', 'sessions', 'inspect', 'sess_missing']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Session "sess_missing" not found');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(3);
     });
 
     it('displays full session details', async () => {
@@ -1686,20 +1709,20 @@ describe('registerMessagingCommands', () => {
     it('rejects invalid peer format (no colon)', async () => {
       await run(['messaging', 'identity', 'link', 'id_1', '--peer', 'nocolon']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid peer format "nocolon"');
-      expect(output).toContain('Expected channel:peerId');
-      expect(process.exitCode).toBe(1);
+      expect(output).toContain('Expected format: channel:peerId');
+      expect(process.exitCode).toBe(2);
       expect(mockLinkPeerToIdentity).not.toHaveBeenCalled();
     });
 
     it('rejects unknown channel', async () => {
       await run(['messaging', 'identity', 'link', 'id_1', '--peer', 'teams:U001']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Unknown channel "teams"');
       expect(output).toContain('Valid channels:');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockLinkPeerToIdentity).not.toHaveBeenCalled();
     });
 
@@ -1783,18 +1806,347 @@ describe('registerMessagingCommands', () => {
       await run(['messaging', 'identity', 'link', 'id_1', '--peer', 'slack:U001', '--peer', 'badpeer']);
 
       // First peer is valid, second is invalid — should error out
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Invalid peer format "badpeer"');
-      expect(process.exitCode).toBe(1);
+      expect(process.exitCode).toBe(2);
       expect(mockLinkPeerToIdentity).not.toHaveBeenCalled();
     });
 
     it('stops on first unknown channel in multi-peer list', async () => {
       await run(['messaging', 'identity', 'link', 'id_1', '--peer', 'slack:U001', '--peer', 'teams:U002']);
 
-      const output = consoleErrSpy.mock.calls.map((c) => c[0]).join('\n');
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Unknown channel "teams"');
       expect(mockLinkPeerToIdentity).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // CONNECTORS ENABLE
+  // ==========================================================================
+
+  describe('connectors enable', () => {
+    it('returns early when auth fails', async () => {
+      mockRequireAuth.mockReturnValue(null);
+
+      await run(['messaging', 'connectors', 'enable', 'conn-1']);
+
+      expect(mockEnableConnector).not.toHaveBeenCalled();
+    });
+
+    it('calls enableConnector with auth.uid and connectorId', async () => {
+      mockEnableConnector.mockResolvedValue({
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: true,
+      });
+
+      await run(['messaging', 'connectors', 'enable', 'conn-1']);
+
+      expect(mockEnableConnector).toHaveBeenCalledWith('user_abc', 'conn-1');
+    });
+
+    it('shows success message', async () => {
+      mockEnableConnector.mockResolvedValue({
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: true,
+      });
+
+      await run(['messaging', 'connectors', 'enable', 'conn-1']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('conn-1');
+      expect(output).toContain('enabled');
+    });
+
+    it('outputs JSON format when --format json', async () => {
+      const connector = {
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: true,
+      };
+      mockEnableConnector.mockResolvedValue(connector);
+
+      await run(['messaging', 'connectors', 'enable', 'conn-1', '--format', 'json']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(JSON.parse(output)).toEqual(connector);
+    });
+
+    it('calls printError on API failure', async () => {
+      mockEnableConnector.mockRejectedValue(new Error('Not found'));
+
+      await run(['messaging', 'connectors', 'enable', 'conn-1']);
+
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to enable connector', expect.any(Error));
+    });
+  });
+
+  // ==========================================================================
+  // CONNECTORS DISABLE
+  // ==========================================================================
+
+  describe('connectors disable', () => {
+    it('returns early when auth fails', async () => {
+      mockRequireAuth.mockReturnValue(null);
+
+      await run(['messaging', 'connectors', 'disable', 'conn-1']);
+
+      expect(mockDisableConnector).not.toHaveBeenCalled();
+    });
+
+    it('calls disableConnector with auth.uid and connectorId', async () => {
+      mockDisableConnector.mockResolvedValue({
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: false,
+      });
+
+      await run(['messaging', 'connectors', 'disable', 'conn-1']);
+
+      expect(mockDisableConnector).toHaveBeenCalledWith('user_abc', 'conn-1');
+    });
+
+    it('shows success message', async () => {
+      mockDisableConnector.mockResolvedValue({
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: false,
+      });
+
+      await run(['messaging', 'connectors', 'disable', 'conn-1']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('conn-1');
+      expect(output).toContain('disabled');
+    });
+
+    it('outputs JSON format when --format json', async () => {
+      const connector = {
+        id: 'conn-1',
+        channel: 'slack',
+        platformAccountId: 'workspace-1',
+        enabled: false,
+      };
+      mockDisableConnector.mockResolvedValue(connector);
+
+      await run(['messaging', 'connectors', 'disable', 'conn-1', '--format', 'json']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(JSON.parse(output)).toEqual(connector);
+    });
+
+    it('calls printError on API failure', async () => {
+      mockDisableConnector.mockRejectedValue(new Error('Forbidden'));
+
+      await run(['messaging', 'connectors', 'disable', 'conn-1']);
+
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to disable connector', expect.any(Error));
+    });
+  });
+
+  // ==========================================================================
+  // CONNECTORS TEST
+  // ==========================================================================
+
+  describe('connectors test', () => {
+    it('returns early when auth fails', async () => {
+      mockRequireAuth.mockReturnValue(null);
+
+      await run(['messaging', 'connectors', 'test', 'conn-1']);
+
+      expect(mockTestConnector).not.toHaveBeenCalled();
+    });
+
+    it('shows test passed with latency on success', async () => {
+      mockTestConnector.mockResolvedValue({
+        success: true,
+        message: 'Connection OK',
+        latencyMs: 42,
+      });
+
+      await run(['messaging', 'connectors', 'test', 'conn-1']);
+
+      expect(mockTestConnector).toHaveBeenCalledWith('user_abc', 'conn-1');
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('pass');
+      expect(output).toContain('42');
+    });
+
+    it('shows test failed and sets exitCode=1 on failure', async () => {
+      mockTestConnector.mockResolvedValue({
+        success: false,
+        message: 'Connection failed',
+        error: 'Timeout',
+      });
+
+      await run(['messaging', 'connectors', 'test', 'conn-1']);
+
+      expect(mockTestConnector).toHaveBeenCalledWith('user_abc', 'conn-1');
+      const allOutput = [
+        ...consoleSpy.mock.calls.map((c) => c[0]),
+        ...consoleErrSpy.mock.calls.map((c) => c[0]),
+        ...stderrWriteSpy.mock.calls.map((c) => c[0]),
+      ].join('\n');
+      expect(allOutput).toContain('fail');
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('outputs JSON format when --format json', async () => {
+      const result = {
+        success: true,
+        message: 'Connection OK',
+        latencyMs: 42,
+      };
+      mockTestConnector.mockResolvedValue(result);
+
+      await run(['messaging', 'connectors', 'test', 'conn-1', '--format', 'json']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(JSON.parse(output)).toEqual(result);
+    });
+
+    it('calls printError on API failure', async () => {
+      mockTestConnector.mockRejectedValue(new Error('Network error'));
+
+      await run(['messaging', 'connectors', 'test', 'conn-1']);
+
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to test connector', expect.any(Error));
+    });
+  });
+
+  // ==========================================================================
+  // SESSIONS CLOSE
+  // ==========================================================================
+
+  describe('sessions close', () => {
+    it('returns early when auth fails', async () => {
+      mockRequireAuth.mockReturnValue(null);
+
+      await run(['messaging', 'sessions', 'close', 'sess_1', '--force']);
+
+      expect(mockDeleteSession).not.toHaveBeenCalled();
+    });
+
+    it('calls deleteSession with --force (skips confirmation)', async () => {
+      mockDeleteSession.mockResolvedValue(undefined);
+
+      await run(['messaging', 'sessions', 'close', 'sess_1', '--force']);
+
+      expect(mockDeleteSession).toHaveBeenCalledWith('user_abc', 'sess_1');
+    });
+
+    it('shows success message after deletion', async () => {
+      mockDeleteSession.mockResolvedValue(undefined);
+
+      await run(['messaging', 'sessions', 'close', 'sess_1', '--force']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('sess_1');
+      expect(output.includes('closed') || output.includes('deleted')).toBe(true);
+    });
+
+    it('calls printError on API failure', async () => {
+      mockDeleteSession.mockRejectedValue(new Error('Session not found'));
+
+      await run(['messaging', 'sessions', 'close', 'sess_1', '--force']);
+
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to close session', expect.any(Error));
+    });
+  });
+
+  // ==========================================================================
+  // IDENTITY UNLINK
+  // ==========================================================================
+
+  describe('identity unlink', () => {
+    it('returns early when auth fails', async () => {
+      mockRequireAuth.mockReturnValue(null);
+
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'slack:U001']);
+
+      expect(mockUnlinkPeersFromIdentity).not.toHaveBeenCalled();
+    });
+
+    it('calls unlinkPeersFromIdentity with parsed peers', async () => {
+      mockUnlinkPeersFromIdentity.mockResolvedValue({
+        id: 'id-1',
+        displayName: 'Alice',
+        linkedPeers: [{ channel: 'discord', peerId: 'D456' }],
+        properties: {},
+        managedBy: 'user',
+      });
+
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'slack:U001']);
+
+      expect(mockUnlinkPeersFromIdentity).toHaveBeenCalledWith(
+        'user_abc',
+        'id-1',
+        [{ channel: 'slack', peerId: 'U001' }],
+      );
+    });
+
+    it('shows remaining peers after unlinking', async () => {
+      mockUnlinkPeersFromIdentity.mockResolvedValue({
+        id: 'id-1',
+        displayName: 'Alice',
+        linkedPeers: [{ channel: 'discord', peerId: 'D456' }],
+        properties: {},
+        managedBy: 'user',
+      });
+
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'slack:U001']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('discord:D456');
+    });
+
+    it('rejects invalid peer format (no colon)', async () => {
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'nocolon']);
+
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('Invalid peer format "nocolon"');
+      expect(process.exitCode).toBe(2);
+      expect(mockUnlinkPeersFromIdentity).not.toHaveBeenCalled();
+    });
+
+    it('rejects unknown channel', async () => {
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'teams:U001']);
+
+      const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('Unknown channel "teams"');
+      expect(process.exitCode).toBe(2);
+      expect(mockUnlinkPeersFromIdentity).not.toHaveBeenCalled();
+    });
+
+    it('outputs JSON format when --format json', async () => {
+      const result = {
+        id: 'id-1',
+        displayName: 'Alice',
+        linkedPeers: [{ channel: 'discord', peerId: 'D456' }],
+        properties: {},
+        managedBy: 'user',
+      };
+      mockUnlinkPeersFromIdentity.mockResolvedValue(result);
+
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'slack:U001', '--format', 'json']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(JSON.parse(output)).toEqual(result);
+    });
+
+    it('calls printError on API failure', async () => {
+      mockUnlinkPeersFromIdentity.mockRejectedValue(new Error('Identity not found'));
+
+      await run(['messaging', 'identity', 'unlink', 'id-1', '--peer', 'slack:U001']);
+
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to unlink peer', expect.any(Error));
     });
   });
 });

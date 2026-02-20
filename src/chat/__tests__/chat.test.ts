@@ -8,7 +8,7 @@ vi.mock('../../auth/index.js', () => ({
 
 vi.mock('../streaming.js', () => ({
   streamChat: vi.fn(),
-  AI_PROXY_URL: 'https://test.api/aiProxyStream',
+  AI_PROXY_URL: 'https://test.api/aiProxyStreamV2',
   StreamError: class StreamError extends Error {
     code: string;
     constructor(message: string, code: string) {
@@ -448,7 +448,7 @@ describe('sendMessage()', () => {
 
     expect(mockStreamChat).toHaveBeenCalledOnce();
     const [request] = mockStreamChat.mock.calls[0];
-    expect(request.url).toBe('https://test.api/aiProxyStream');
+    expect(request.url).toBe('https://test.api/aiProxyStreamV2');
     expect(request.token).toBe('my-token');
     expect(request.body.provider).toBe('openai');
     expect(request.body.model).toBe('gpt-4o');

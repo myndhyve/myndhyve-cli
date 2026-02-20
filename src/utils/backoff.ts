@@ -16,7 +16,7 @@ export function computeBackoff(config: ReconnectConfig, attempt: number): number
   const { initialDelayMs, maxDelayMs } = config;
 
   // Exponential: initialDelay * 2^attempt
-  const exponential = initialDelayMs * Math.pow(2, attempt);
+  const exponential = initialDelayMs * 2 ** attempt;
 
   // Cap at maxDelay
   const capped = Math.min(exponential, maxDelayMs);
@@ -36,7 +36,20 @@ export function isMaxAttemptsReached(config: ReconnectConfig, attempt: number): 
 
 /**
  * Sleep for the specified duration in milliseconds.
+ * Optionally accepts an AbortSignal for cancellation (e.g. during shutdown).
  */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+
+    const timer = setTimeout(resolve, ms);
+
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+    }, { once: true });
+  });
 }

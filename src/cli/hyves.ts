@@ -9,7 +9,7 @@
  *   myndhyve-cli whoami
  */
 
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import { getAuthStatus } from '../auth/index.js';
 import {
   listSystemHyves,
@@ -27,6 +27,7 @@ import {
   truncate,
   printError,
 } from './helpers.js';
+import { ExitCode, printErrorResult } from '../utils/output.js';
 
 // ============================================================================
 // REGISTER
@@ -83,9 +84,12 @@ export function registerHyveCommands(program: Command): void {
       const hyve = getSystemHyve(hyveId);
 
       if (!hyve) {
-        console.error(`\n  Error: Unknown hyve "${hyveId}".`);
-        console.error('  Run `myndhyve-cli hyves list` to see available hyves.\n');
-        process.exitCode = 1;
+        printErrorResult({
+          code: 'NOT_FOUND',
+          message: `Unknown hyve "${hyveId}".`,
+          suggestion: 'Run `myndhyve-cli hyves list` to see available hyves.',
+        });
+        process.exitCode = ExitCode.NOT_FOUND;
         return;
       }
 
@@ -187,15 +191,21 @@ export function registerContextCommands(program: Command): void {
         const project = await getProject(projectId);
 
         if (!project) {
-          console.error(`\n  Error: Project "${projectId}" not found.\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'NOT_FOUND',
+            message: `Project "${projectId}" not found.`,
+          });
+          process.exitCode = ExitCode.NOT_FOUND;
           return;
         }
 
         // Verify ownership
         if (project.ownerId !== auth.uid) {
-          console.error(`\n  Error: You do not own project "${projectId}".\n`);
-          process.exitCode = 1;
+          printErrorResult({
+            code: 'UNAUTHORIZED',
+            message: `You do not own project "${projectId}".`,
+          });
+          process.exitCode = ExitCode.UNAUTHORIZED;
           return;
         }
 

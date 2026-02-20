@@ -7,10 +7,10 @@
 
 import { createLogger, setLogLevel } from '../utils/logger.js';
 import { loadConfiguredRelay } from '../config/loader.js';
-import { RelayClient } from '../relay/client.js';
+import { RelayClient, RelayClientError } from '../relay/client.js';
 import { startHeartbeatLoop } from '../relay/heartbeat.js';
 import { startOutboundPoller } from '../relay/outbound-poller.js';
-import { getChannel } from '../channels/registry.js';
+import { getChannel, ensureChannelsLoaded } from '../channels/registry.js';
 import { computeBackoff, isMaxAttemptsReached, sleep } from '../utils/backoff.js';
 import { spawnDaemon, getDaemonPid } from './daemon.js';
 
@@ -61,6 +61,9 @@ export async function startCommand(options: {
   setLogLevel(config.logging.level);
 
   const { channel, relayId, deviceToken } = config;
+
+  // Lazy-load channel plugins (only needed for relay commands)
+  await ensureChannelsLoaded();
   const plugin = getChannel(channel);
 
   if (!plugin) {
@@ -101,7 +104,7 @@ export async function startCommand(options: {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  const client = new RelayClient(config.server.baseUrl, deviceToken);
+  const client = new RelayClient(config.server.baseUrl, deviceToken, config.tokenExpiresAt);
   const startTime = Date.now();
 
   console.log();
@@ -153,6 +156,15 @@ export async function startCommand(options: {
         break;
       } catch (error) {
         if (signal.aborted) break;
+
+        // Device token expired — reconnecting won't help, need re-setup
+        if (error instanceof RelayClientError && error.code === 'DEVICE_TOKEN_EXPIRED') {
+          log.error('Device token expired');
+          console.log(chalk.red('\n  Device token has expired.'));
+          console.log(chalk.gray('  Run `myndhyve-cli relay setup` to re-register.\n'));
+          process.exitCode = 1;
+          break;
+        }
 
         // If connection was stable for a while, reset the attempt counter
         // so transient disconnections don't accumulate over weeks of uptime
