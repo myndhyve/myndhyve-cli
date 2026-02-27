@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ function mockJsonRpcError(code: number, message: string): void {
 
 describe('MCP Client Commands', () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: MockInstance;
 
   beforeEach(() => {
     mockFetch.mockReset();

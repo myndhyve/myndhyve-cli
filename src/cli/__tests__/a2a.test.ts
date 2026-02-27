@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ function mockFetchResponse(body: unknown, status = 200): void {
 
 describe('A2A Commands', () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: MockInstance;
 
   beforeEach(() => {
     mockFetch.mockReset();
