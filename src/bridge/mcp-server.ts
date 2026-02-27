@@ -228,8 +228,8 @@ export async function startMCPServer(
       const summary = {
         total: files.length,
         synced: files.filter(f => f.syncStatus === 'synced').length,
-        localAhead: files.filter(f => f.syncStatus === 'local-ahead').length,
-        remoteAhead: files.filter(f => f.syncStatus === 'remote-ahead').length,
+        localAhead: files.filter(f => f.syncStatus === 'modified-local').length,
+        remoteAhead: files.filter(f => f.syncStatus === 'modified-remote').length,
         conflicts: files.filter(f => f.syncStatus === 'conflict').length,
         files: files.map(f => ({
           path: f.relativePath,
@@ -299,7 +299,7 @@ export async function startMCPServer(
         .optional()
         .describe('Override the default build command (e.g. "npm run build:staging")'),
     },
-  }, async ({ buildType, command }) => {
+  }, async ({ buildType, command: rawCommand }) => {
     try {
       const { executeBuildRequest } = await import('./builder.js');
       const buildId = `build-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -314,10 +314,18 @@ export async function startMCPServer(
         preview: 'npm run preview',
       };
 
+      // Validate command to prevent shell injection
+      const SHELL_META = /[;&|`$(){}[\]<>!#~]/;
+      const command = rawCommand
+        ? (SHELL_META.test(rawCommand)
+            ? (() => { throw new Error(`Command contains disallowed shell metacharacters: ${rawCommand}`); })()
+            : rawCommand)
+        : BUILD_COMMANDS[buildType] || 'npm run build';
+
       const buildRecord: Record<string, unknown> = {
         id: buildId,
         buildType,
-        command: command || BUILD_COMMANDS[buildType] || 'npm run build',
+        command,
         env: {},
         requestedBy: 'mcp',
         requestedAt: now,

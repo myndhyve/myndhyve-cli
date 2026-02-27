@@ -81,7 +81,7 @@ export async function pushLocalChange(
     localModifiedAt: new Date().toISOString(),
     pendingContent: base64Content,
     pendingSource: 'local',
-    syncStatus: 'local-ahead' satisfies FileSyncStatus,
+    syncStatus: 'modified-local' satisfies FileSyncStatus,
     fileSize: content.length,
     mimeType: event.mimeType || MIME_TYPES[extname(event.relativePath).toLowerCase()] || 'application/octet-stream',
   });
@@ -182,7 +182,7 @@ export async function manualSync(
   }
 
   if (direction === 'push' || direction === 'bidirectional') {
-    // For push, scan all tracked files and push any that are local-ahead
+    // For push, scan all tracked files and push any that are modified-local
     const records = await listFileSyncRecords(config.sessionId);
     for (const record of records) {
       const relativePath = record.relativePath as string;
@@ -201,7 +201,7 @@ export async function manualSync(
           localModifiedAt: new Date().toISOString(),
           pendingContent: content.toString('base64'),
           pendingSource: 'local',
-          syncStatus: 'local-ahead',
+          syncStatus: 'modified-local',
         });
         filesChanged++;
       }

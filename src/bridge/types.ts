@@ -87,11 +87,11 @@ export type BridgeEntityType =
   | 'config'
   | 'asset';
 
-/** File sync status */
+/** File sync status — must match web app's FileSyncStatus in ide-bridge/types.ts */
 export type FileSyncStatus =
   | 'synced'
-  | 'local-ahead'
-  | 'remote-ahead'
+  | 'modified-local'
+  | 'modified-remote'
   | 'conflict'
   | 'new'
   | 'deleted';

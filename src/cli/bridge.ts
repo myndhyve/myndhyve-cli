@@ -229,10 +229,27 @@ Examples:
 
       const { getBridgeDaemonPid } = await import('../bridge/daemon.js');
       const { HEARTBEAT_STALE_MS } = await import('../bridge/types.js');
+      const { getOutputMode } = await import('../utils/output.js');
 
       const lastHb = new Date(session.lastHeartbeat).getTime();
       const isOnline = session.status === 'online' && Date.now() - lastHb < HEARTBEAT_STALE_MS;
       const daemonPid = getBridgeDaemonPid();
+
+      // --json mode: structured output for VS Code extension and programmatic use
+      if (getOutputMode() === 'json') {
+        console.log(JSON.stringify({
+          status: isOnline ? 'online' : 'offline',
+          daemonPid: daemonPid ?? null,
+          sessionId: session.id,
+          projectId: session.projectId,
+          hyveId: session.hyveId,
+          framework: session.framework,
+          syncDirection: session.syncDirection,
+          localPath: session.localPath,
+          lastHeartbeat: session.lastHeartbeat,
+        }));
+        return;
+      }
 
       console.log('');
       console.log(`  ${chalk.bold('IDE Bridge Status')}`);

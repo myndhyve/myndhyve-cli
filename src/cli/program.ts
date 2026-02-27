@@ -23,6 +23,8 @@ import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerDevCommands } from './dev.js';
 import { registerBridgeCommands } from './bridge.js';
+import { registerA2ACommands } from './a2a.js';
+import { registerMCPClientCommands } from './mcp-client.js';
 import { registerCompletionCommand } from './completion.js';
 import { registerUpdateCommand } from './update.js';
 import { applyGlobalOptions } from './global-options.js';
@@ -91,6 +93,14 @@ export function createProgram(): Command {
   // ── IDE Bridge ────────────────────────────────────────────────────────
 
   registerBridgeCommands(program);
+
+  // ── A2A Client ──────────────────────────────────────────────────────
+
+  registerA2ACommands(program);
+
+  // ── MCP Client ──────────────────────────────────────────────────────
+
+  registerMCPClientCommands(program);
 
   // ── Relay Subcommand Group ──────────────────────────────────────────────
 
