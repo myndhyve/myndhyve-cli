@@ -24,6 +24,7 @@ import { registerWorkflowCommands } from './workflows.js';
 import { registerCrmCommands } from './crm.js';
 import { registerAgentCommands } from './agents.js';
 import { registerKanbanCommands } from './kanban.js';
+import { registerCronCommands } from './cron.js';
 import { registerDevCommands } from './dev.js';
 import { registerBridgeCommands } from './bridge.js';
 import { registerA2ACommands } from './a2a.js';
@@ -92,6 +93,10 @@ export function createProgram(): Command {
   // ── Kanban ────────────────────────────────────────────────────────────
 
   registerKanbanCommands(program);
+
+  // ── Cron Scheduler ──────────────────────────────────────────────────────
+
+  registerCronCommands(program);
 
   // ── Developer Tools ──────────────────────────────────────────────────────
 
