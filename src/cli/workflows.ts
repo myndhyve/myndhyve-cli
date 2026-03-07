@@ -44,8 +44,8 @@ import { ExitCode, printErrorResult } from '../utils/output.js';
 // ============================================================================
 
 const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
-  'pending', 'running', 'awaiting_approval',
-  'completed', 'failed', 'cancelled',
+  'pending', 'running', 'paused', 'waiting-approval',
+  'completed', 'failed', 'cancelled', 'timed-out', 'interrupted',
 ];
 
 // ============================================================================
@@ -390,7 +390,7 @@ function registerStatusCommand(workflows: Command): void {
         }
 
         // Show approval hint if waiting
-        if (run.status === 'awaiting_approval') {
+        if (run.status === 'waiting-approval') {
           console.log('');
           console.log(`  Approve: myndhyve-cli workflows approve ${run.id} --hyve=${hyveId}`);
           console.log(`  Reject:  myndhyve-cli workflows reject ${run.id} --hyve=${hyveId}`);
@@ -873,7 +873,10 @@ function formatRunStatus(status: string): string {
   const icons: Record<string, string> = {
     'pending': '\u25cb pending',
     'running': '\u25cf running',
-    'awaiting_approval': '\u2691 approval',
+    'waiting-approval': '\u2691 approval',
+    'paused': '\u25a1 paused',
+    'timed-out': '\u29d6 timed-out',
+    'interrupted': '\u26a0 interrupted',
     'completed': '\u2713 completed',
     'failed': '\u2717 failed',
     'cancelled': '\u2014 cancelled',
@@ -891,7 +894,12 @@ function getStatusIcon(status: string): string {
     'completed': '\u2713',
     'failed': '\u2717',
     'skipped': '\u2014',
-    'awaiting_approval': '\u2691',
+    'waiting-approval': '\u2691',
+    'waiting-input': '\u270e',
+    'queued': '\u25cb',
+    'paused': '\u25a1',
+    'timed-out': '\u29d6',
+    'interrupted': '\u26a0',
   };
   return icons[status] || '\u25cb';
 }

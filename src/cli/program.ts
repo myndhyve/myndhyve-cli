@@ -21,6 +21,9 @@ import { registerProjectCommands } from './projects.js';
 import { registerHyveCommands, registerContextCommands } from './hyves.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
+import { registerCrmCommands } from './crm.js';
+import { registerAgentCommands } from './agents.js';
+import { registerKanbanCommands } from './kanban.js';
 import { registerDevCommands } from './dev.js';
 import { registerBridgeCommands } from './bridge.js';
 import { registerA2ACommands } from './a2a.js';
@@ -77,6 +80,18 @@ export function createProgram(): Command {
   // ── Workflow Automation ─────────────────────────────────────────────────
 
   registerWorkflowCommands(program);
+
+  // ── CRM ───────────────────────────────────────────────────────────────
+
+  registerCrmCommands(program);
+
+  // ── Agents ────────────────────────────────────────────────────────────
+
+  registerAgentCommands(program);
+
+  // ── Kanban ────────────────────────────────────────────────────────────
+
+  registerKanbanCommands(program);
 
   // ── Developer Tools ──────────────────────────────────────────────────────
 

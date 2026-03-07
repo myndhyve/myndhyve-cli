@@ -132,13 +132,13 @@ const mockWaitingRunDoc: Record<string, unknown> = {
   userId: USER_ID,
   hyveId: HYVE_ID,
   workflowId: 'wf-1',
-  status: 'awaiting_approval',
+  status: 'waiting-approval',
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
   nodeStates: {
     'node-1': { status: 'completed', label: 'Generate PRD' },
-    'node-2': { status: 'awaiting_approval', label: 'Review Plan', approval: { requestedAt: '2025-01-15T10:01:00Z' } },
+    'node-2': { status: 'waiting-approval', label: 'Review Plan', approval: { requestedAt: '2025-01-15T10:01:00Z' } },
   },
   startedAt: '2025-01-15T10:00:00Z',
 };
@@ -705,7 +705,7 @@ describe('getRunLogs()', () => {
 // ============================================================================
 
 describe('approveRun()', () => {
-  it('verifies run is awaiting_approval, finds waiting node, and updates with approved decision', async () => {
+  it('verifies run is waiting-approval, finds waiting node, and updates with approved decision', async () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({
       ...mockWaitingRunDoc,
@@ -784,7 +784,7 @@ describe('approveRun()', () => {
     expect(mockUpdateDocument).not.toHaveBeenCalled();
   });
 
-  it('throws if run is not awaiting_approval', async () => {
+  it('throws if run is not waiting-approval', async () => {
     mockGetDocument.mockResolvedValue({ ...mockRunDoc, status: 'running' });
 
     await expect(approveRun(USER_ID, HYVE_ID, 'run_abc123')).rejects.toThrow(
@@ -797,7 +797,7 @@ describe('approveRun()', () => {
   it('throws if no node is awaiting approval', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'run_no_waiting',
-      status: 'awaiting_approval',
+      status: 'waiting-approval',
       nodeStates: {
         'node-1': { status: 'completed' },
         'node-2': { status: 'completed' },
@@ -814,7 +814,7 @@ describe('approveRun()', () => {
   it('throws if nodeStates is empty', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'run_empty_nodes',
-      status: 'awaiting_approval',
+      status: 'waiting-approval',
       nodeStates: {},
     });
 
@@ -1208,7 +1208,7 @@ describe('toRunSummary (tested via listRuns)', () => {
     expect(results[0].currentNodeLabel).toBe('Generate Plan');
   });
 
-  it('finds currentNodeId from awaiting_approval node', async () => {
+  it('finds currentNodeId from waiting-approval node', async () => {
     mockRunQuery.mockResolvedValue([mockWaitingRunDoc]);
 
     const results = await listRuns(USER_ID, HYVE_ID);

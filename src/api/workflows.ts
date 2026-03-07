@@ -30,10 +30,13 @@ const log = createLogger('WorkflowAPI');
 export type WorkflowRunStatus =
   | 'pending'
   | 'running'
-  | 'awaiting_approval'
+  | 'paused'
+  | 'waiting-approval'
   | 'completed'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'timed-out'
+  | 'interrupted';
 
 /** All valid workflow trigger types. */
 export type WorkflowTriggerType =
@@ -113,7 +116,7 @@ export interface NodeRunState {
   approval?: ApprovalInfo;
 }
 
-/** Approval information for an awaiting_approval node. */
+/** Approval information for a waiting-approval node. */
 export interface ApprovalInfo {
   requestedAt: string;
   requestedBy?: string;
@@ -345,7 +348,7 @@ export async function getRunLogs(
 // ============================================================================
 
 /**
- * Approve an awaiting_approval run.
+ * Approve a waiting-approval run.
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -362,7 +365,7 @@ export async function approveRun(
 }
 
 /**
- * Reject an awaiting_approval run.
+ * Reject a waiting-approval run.
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -379,7 +382,7 @@ export async function rejectRun(
 }
 
 /**
- * Request revisions on an awaiting_approval run (reject with feedback).
+ * Request revisions on a waiting-approval run (reject with feedback).
  *
  * @param userId - The authenticated user's UID
  * @param hyveId - The hyve ID
@@ -396,7 +399,7 @@ export async function reviseRun(
 }
 
 /**
- * Submit an approval/rejection decision for an awaiting_approval run.
+ * Submit an approval/rejection decision for a waiting-approval run.
  *
  * Caveat: This uses a read-then-write pattern (no Firestore transaction via
  * REST API). Concurrent approvals from multiple clients could race. This is
@@ -418,14 +421,14 @@ async function submitApprovalDecision(
     throw new Error(`Run "${runId}" not found`);
   }
 
-  if (doc.status !== 'awaiting_approval') {
+  if (doc.status !== 'waiting-approval') {
     throw new Error(`Run "${runId}" is not awaiting approval (status: ${doc.status})`);
   }
 
   // Find the node that's awaiting approval
   const nodeStates = (doc.nodeStates || {}) as Record<string, Record<string, unknown>>;
   const waitingNodeId = Object.keys(nodeStates).find(
-    (nid) => nodeStates[nid].status === 'awaiting_approval'
+    (nid) => nodeStates[nid].status === 'waiting-approval'
   );
 
   if (!waitingNodeId) {
@@ -594,7 +597,7 @@ function toRunSummary(doc: Record<string, unknown>): RunSummary {
   let currentNodeLabel: string | undefined;
 
   for (const [nid, state] of Object.entries(nodeStates)) {
-    if (state.status === 'running' || state.status === 'awaiting_approval') {
+    if (state.status === 'running' || state.status === 'waiting-approval') {
       currentNodeId = nid;
       currentNodeLabel = state.label as string | undefined;
       break;

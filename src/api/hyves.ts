@@ -108,8 +108,8 @@ export const SYSTEM_HYVES: SystemHyve[] = [
   },
   {
     hyveId: 'landing-page',
-    name: 'LandingPage Canvas',
-    description: 'Create marketing landing pages with drag-and-drop sections, AI-assisted content, responsive design, and lead capture forms.',
+    name: 'Launch Studio',
+    description: 'Build startup launch funnels with drag-and-drop sections, AI-assisted content, responsive design, and lead capture forms.',
     icon: 'Globe',
     tier: 'platform',
     visibility: 'public',

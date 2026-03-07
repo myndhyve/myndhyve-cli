@@ -184,7 +184,7 @@ const mockWaitingRunDetail = {
   id: 'run_waiting123',
   workflowId: 'wf-1',
   workflowName: 'App Builder Workflow',
-  status: 'awaiting_approval',
+  status: 'waiting-approval',
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
@@ -195,7 +195,7 @@ const mockWaitingRunDetail = {
     { nodeId: 'node-1', status: 'completed', label: 'Generate PRD' },
     {
       nodeId: 'node-2',
-      status: 'awaiting_approval',
+      status: 'waiting-approval',
       label: 'Review Plan',
       approval: { requestedAt: '2025-01-15T10:01:00Z' },
     },
@@ -836,7 +836,7 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('approved');
     });
 
-    it('shows approval hints when status is awaiting_approval', async () => {
+    it('shows approval hints when status is waiting-approval', async () => {
       mockGetRun.mockResolvedValue(mockWaitingRunDetail);
 
       await run(['workflows', 'status', 'run_waiting123']);
@@ -1548,14 +1548,14 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('running');
       expect(output).toContain('completed');
       expect(output).toContain('failed');
-      expect(output).toContain('awaiting_approval');
+      expect(output).toContain('waiting-approval');
       expect(process.exitCode).toBe(2);
       expect(mockListRuns).not.toHaveBeenCalled();
     });
 
     it('accepts all valid status values', async () => {
       const validStatuses = [
-        'pending', 'running', 'awaiting_approval',
+        'pending', 'running', 'waiting-approval',
         'completed', 'failed', 'cancelled',
       ];
 
@@ -1641,7 +1641,7 @@ describe('registerWorkflowCommands', () => {
   describe('format helpers (indirectly tested)', () => {
     it('formatRunStatus shows correct icons for different statuses', async () => {
       // Test several statuses by rendering them through the status command
-      const statuses = ['pending', 'running', 'completed', 'failed', 'awaiting_approval'];
+      const statuses = ['pending', 'running', 'completed', 'failed', 'waiting-approval'];
 
       for (const status of statuses) {
         consoleSpy.mockClear();
@@ -1756,7 +1756,7 @@ describe('registerWorkflowCommands', () => {
           { nodeId: 'n3', status: 'failed', label: 'Step 3' },
           { nodeId: 'n4', status: 'pending', label: 'Step 4' },
           { nodeId: 'n5', status: 'skipped', label: 'Step 5' },
-          { nodeId: 'n6', status: 'awaiting_approval', label: 'Step 6' },
+          { nodeId: 'n6', status: 'waiting-approval', label: 'Step 6' },
         ],
       });
 

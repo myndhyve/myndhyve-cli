@@ -136,7 +136,7 @@ describe('getSystemHyve()', () => {
       { id: 'hyve-maker', name: 'Hyve Maker' },
       { id: 'hyve-builder', name: 'Hyve Builder' },
       { id: 'cad', name: 'CAD Designer' },
-      { id: 'landing-page', name: 'LandingPage Canvas' },
+      { id: 'landing-page', name: 'Launch Studio' },
     ];
 
     for (const { id, name } of expected) {

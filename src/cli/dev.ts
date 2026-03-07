@@ -56,6 +56,7 @@ export function registerDevCommands(program: Command): void {
   registerEnvelopeCommands(dev);
   registerWebhookCommands(dev);
   registerConfigCommands(dev);
+  registerSchemaCommand(dev);
 }
 
 // ============================================================================
@@ -540,6 +541,152 @@ function registerConfigCommands(dev: Command): void {
         console.error('  Some config files are invalid. Fix them and re-validate.\n');
         process.exitCode = 1;
       }
+    });
+}
+
+// ============================================================================
+// SCHEMA / REFERENCE COMMAND
+// ============================================================================
+
+function registerSchemaCommand(dev: Command): void {
+  const schema = dev
+    .command('schema')
+    .description('Reference information about platform types and envelopes');
+
+  schema
+    .command('envelopes')
+    .description('List all AI envelope types used by the workflow engine')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action((opts) => {
+      const envelopeTypes = [
+        // Artifact content
+        { type: 'prd.create', category: 'Artifact', description: 'Create a new PRD' },
+        { type: 'prd.generate', category: 'Artifact', description: 'AI-generate PRD content' },
+        { type: 'prd.review', category: 'Artifact', description: 'Review an existing PRD' },
+        { type: 'prd.update', category: 'Artifact', description: 'Update PRD fields' },
+        { type: 'theme.create', category: 'Artifact', description: 'Create design theme' },
+        { type: 'theme.suggest', category: 'Artifact', description: 'Suggest theme alternatives' },
+        { type: 'tasks.create', category: 'Artifact', description: 'Create task set from plan' },
+        { type: 'task.update', category: 'Artifact', description: 'Update a single task' },
+        { type: 'feature.breakdown', category: 'Artifact', description: 'Break feature into subtasks' },
+        { type: 'screen.emit', category: 'Artifact', description: 'Emit screen/component design' },
+        // Interaction
+        { type: 'ask.clarify', category: 'Interaction', description: 'Ask user for clarification' },
+        { type: 'feature.unsupported', category: 'Interaction', description: 'Report unsupported feature' },
+        { type: 'error', category: 'Interaction', description: 'Report an error' },
+        { type: 'plan.snapshot', category: 'Interaction', description: 'Snapshot current plan state' },
+        // Orchestration
+        { type: 'workflow.manifest.request', category: 'Orchestration', description: 'Request workflow manifest' },
+        { type: 'workflow.manifest.response', category: 'Orchestration', description: 'Return workflow manifest' },
+        { type: 'workflow.execute', category: 'Orchestration', description: 'Execute a workflow' },
+        { type: 'workflow.status', category: 'Orchestration', description: 'Report workflow status' },
+        { type: 'workflow.result', category: 'Orchestration', description: 'Return workflow result' },
+        { type: 'workflow.generate', category: 'Orchestration', description: 'Generate workflow definition' },
+        { type: 'orchestration.request', category: 'Orchestration', description: 'Agent orchestration request' },
+        { type: 'orchestration.response', category: 'Orchestration', description: 'Agent orchestration response' },
+        // Schema exchange
+        { type: 'schema.request', category: 'Schema', description: 'Request component schema' },
+        { type: 'schema.response', category: 'Schema', description: 'Return component schema' },
+        // Hyve Builder
+        { type: 'hyve.ideation', category: 'Hyve Builder', description: 'Hyve ideation phase' },
+        { type: 'hyve.prd', category: 'Hyve Builder', description: 'Hyve PRD generation' },
+        { type: 'hyve.prompts', category: 'Hyve Builder', description: 'Hyve prompt generation' },
+        { type: 'hyve.workflows', category: 'Hyve Builder', description: 'Hyve workflow generation' },
+        { type: 'hyve.schemas', category: 'Hyve Builder', description: 'Hyve schema generation' },
+        { type: 'hyve.integrations', category: 'Hyve Builder', description: 'Hyve integration setup' },
+      ];
+
+      if (opts.format === 'json') {
+        console.log(JSON.stringify(envelopeTypes, null, 2));
+        return;
+      }
+
+      console.log(`\n  AI Envelope Types (${envelopeTypes.length})\n`);
+
+      let lastCategory = '';
+      for (const env of envelopeTypes) {
+        if (env.category !== lastCategory) {
+          if (lastCategory) console.log('');
+          console.log(`  ${env.category}:`);
+          lastCategory = env.category;
+        }
+        console.log(`    ${env.type.padEnd(32)} ${env.description}`);
+      }
+
+      console.log('');
+    });
+
+  schema
+    .command('node-categories')
+    .description('List workflow node categories and counts')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action((opts) => {
+      const categories = [
+        { id: 'agentOrchestration', name: 'Agent Orchestration', count: 6, description: 'Swarm, skill, delegation, consensus, spawn' },
+        { id: 'coordination', name: 'Coordination', count: 6, description: 'Vote, consensus, compete, map-reduce, delegate, round-robin (disabled)' },
+        { id: 'dataIntegration', name: 'Data Integration', count: 8, description: 'REST, MCP, A2A, GraphQL, fetch, compute, binding, transform' },
+        { id: 'webResearch', name: 'Web Research', count: 4, description: 'Search, scrape, analyze, summarize' },
+        { id: 'landingPageBuild', name: 'Landing Page', count: 8, description: 'Content, structure, personas, theme, tracking, validate, review, publish' },
+        { id: 'brandTheme', name: 'Brand & Theme', count: 8, description: 'Discovery, generate, validate, competitor, review, implement, template, publish' },
+        { id: 'adsStudio', name: 'Ads Studio', count: 11, description: 'Campaigns, audiences, creatives, budgets, scheduling' },
+        { id: 'campaignStudio', name: 'Campaign Studio', count: 7, description: 'Create, launch, pause, metrics, forecast, rebalance, attribute' },
+        { id: 'campaignAutopilot', name: 'Campaign Autopilot', count: 5, description: 'AI-driven campaign management' },
+        { id: 'kanban', name: 'Kanban', count: 7, description: 'Decompose, create, assign, timeline, review, monitor, automate' },
+        { id: 'launchBlueprint', name: 'Launch Blueprint', count: 8, description: 'Discovery, generate, validate, review, campaign, tracking, execute, monitor' },
+        { id: 'chat', name: 'Chat', count: 5, description: 'Message routing, AI responses, context management' },
+        { id: 'messaging', name: 'Messaging', count: 2, description: 'Send, receive across platforms' },
+        { id: 'skills', name: 'Skills', count: 9, description: 'Execute, positioning, lead-magnet, copywriter, ad-strategy, optimizer, design' },
+      ];
+
+      const totalNodes = categories.reduce((sum, c) => sum + c.count, 0);
+
+      if (opts.format === 'json') {
+        console.log(JSON.stringify({ totalNodes, categories }, null, 2));
+        return;
+      }
+
+      console.log(`\n  Workflow Node Categories (${categories.length} categories, ${totalNodes} node types)\n`);
+      console.log(
+        '  ' +
+          'Category'.padEnd(24) +
+          'Nodes'.padEnd(8) +
+          'Description'
+      );
+      console.log('  ' + '\u2500'.repeat(80));
+
+      for (const cat of categories) {
+        console.log(
+          '  ' +
+            cat.name.padEnd(24) +
+            String(cat.count).padEnd(8) +
+            cat.description
+        );
+      }
+
+      console.log('');
+    });
+
+  schema
+    .command('trigger-types')
+    .description('List workflow trigger types')
+    .action(() => {
+      const triggers = [
+        { type: 'manual', description: 'User-initiated via UI or CLI' },
+        { type: 'schedule', description: 'Cron-based scheduling' },
+        { type: 'webhook', description: 'External HTTP webhook' },
+        { type: 'event', description: 'Internal event bus' },
+        { type: 'artifact', description: 'Triggered when artifact is created/updated' },
+        { type: 'canvas', description: 'Canvas interaction trigger' },
+        { type: 'envelope', description: 'AI envelope emission trigger' },
+        { type: 'command', description: 'Slash command trigger' },
+        { type: 'chat-message', description: 'Chat message trigger' },
+      ];
+
+      console.log(`\n  Workflow Trigger Types (${triggers.length})\n`);
+      for (const t of triggers) {
+        console.log(`    ${t.type.padEnd(18)} ${t.description}`);
+      }
+      console.log('');
     });
 }
 
