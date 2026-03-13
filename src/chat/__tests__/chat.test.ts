@@ -26,6 +26,10 @@ vi.mock('../history.js', () => ({
   generateTitle: vi.fn(),
 }));
 
+vi.mock('../../api/prompts.js', () => ({
+  fetchCanvasTypeSystemPrompt: vi.fn(),
+}));
+
 import { getToken } from '../../auth/index.js';
 import { streamChat } from '../streaming.js';
 import {
@@ -34,6 +38,7 @@ import {
   generateSessionId,
   generateTitle,
 } from '../history.js';
+import { fetchCanvasTypeSystemPrompt } from '../../api/prompts.js';
 import {
   createSession,
   resolveSystemPrompt,
@@ -50,6 +55,7 @@ const mockSaveConversation = saveConversation as ReturnType<typeof vi.fn>;
 const mockLoadConversation = loadConversation as ReturnType<typeof vi.fn>;
 const mockGenerateSessionId = generateSessionId as ReturnType<typeof vi.fn>;
 const mockGenerateTitle = generateTitle as ReturnType<typeof vi.fn>;
+const mockFetchCanvasTypeSystemPrompt = fetchCanvasTypeSystemPrompt as ReturnType<typeof vi.fn>;
 
 // ── Reset between tests ─────────────────────────────────────────────────────
 
@@ -60,12 +66,15 @@ beforeEach(() => {
   mockLoadConversation.mockReset();
   mockGenerateSessionId.mockReset();
   mockGenerateTitle.mockReset();
+  mockFetchCanvasTypeSystemPrompt.mockReset();
 
   // Defaults
   mockGenerateSessionId.mockReturnValue('chat_test_abc123');
   mockGenerateTitle.mockImplementation((msg: string) =>
     msg.length > 60 ? msg.slice(0, 57) + '...' : msg
   );
+  // Default: API returns null (use fallback)
+  mockFetchCanvasTypeSystemPrompt.mockResolvedValue(null);
 });
 
 // ============================================================================
@@ -73,42 +82,47 @@ beforeEach(() => {
 // ============================================================================
 
 describe('createSession()', () => {
-  it('creates a session with default values', () => {
-    const session = createSession();
+  it('creates a session with default values', async () => {
+    const session = await createSession();
 
     expect(session.sessionId).toBe('chat_test_abc123');
     expect(session.provider).toBe('anthropic');
     expect(session.model).toBe('claude-sonnet');
     expect(session.temperature).toBe(0.7);
     expect(session.messages).toEqual([]);
-    expect(session.hyveId).toBeUndefined();
+    expect(session.canvasTypeId).toBeUndefined();
     expect(session.systemPrompt).toContain('MyndHyve AI');
     expect(session.createdAt).toBeTruthy();
     expect(mockGenerateSessionId).toHaveBeenCalledOnce();
   });
 
-  it('creates a session with custom options', () => {
-    const session = createSession({
-      hyveId: 'landing-page',
+  it('uses API prompt when available', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue('You are the Landing Page AI from Firestore.');
+
+    const session = await createSession({
+      canvasTypeId: 'landing-page',
       model: 'gpt-4o',
       provider: 'openai',
       temperature: 0.3,
     });
 
-    expect(session.sessionId).toBe('chat_test_abc123');
-    expect(session.hyveId).toBe('landing-page');
-    expect(session.provider).toBe('openai');
-    expect(session.model).toBe('gpt-4o');
-    expect(session.temperature).toBe(0.3);
-    expect(session.systemPrompt).toContain('Landing Page Builder');
-    expect(session.messages).toEqual([]);
+    expect(session.systemPrompt).toBe('You are the Landing Page AI from Firestore.');
+    expect(mockFetchCanvasTypeSystemPrompt).toHaveBeenCalledWith('landing-page');
   });
 
-  it('resumes an existing session when resumeSessionId is found', () => {
+  it('falls back to default when API returns null', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue(null);
+
+    const session = await createSession({ canvasTypeId: 'landing-page' });
+
+    expect(session.systemPrompt).toContain('MyndHyve AI');
+  });
+
+  it('resumes an existing session when resumeSessionId is found', async () => {
     const existingConversation = {
       sessionId: 'chat_existing_xyz',
       title: 'Old Chat',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       model: 'claude-sonnet',
       provider: 'anthropic',
       messages: [
@@ -125,25 +139,24 @@ describe('createSession()', () => {
 
     mockLoadConversation.mockReturnValue(existingConversation);
 
-    const session = createSession({ resumeSessionId: 'chat_existing_xyz' });
+    const session = await createSession({ resumeSessionId: 'chat_existing_xyz' });
 
     expect(session.sessionId).toBe('chat_existing_xyz');
-    expect(session.hyveId).toBe('app-builder');
+    expect(session.canvasTypeId).toBe('app-builder');
     expect(session.provider).toBe('anthropic');
     expect(session.model).toBe('claude-sonnet');
     expect(session.messages).toHaveLength(2);
     expect(session.messages[0].content).toBe('Hello');
     expect(session.createdAt).toBe('2025-01-01T00:00:00.000Z');
-    expect(session.systemPrompt).toContain('App Builder');
     // Should NOT generate a new session ID
     expect(mockGenerateSessionId).not.toHaveBeenCalled();
     expect(mockLoadConversation).toHaveBeenCalledWith('chat_existing_xyz');
   });
 
-  it('falls back to new session when resume ID is not found', () => {
+  it('falls back to new session when resume ID is not found', async () => {
     mockLoadConversation.mockReturnValue(null);
 
-    const session = createSession({ resumeSessionId: 'nonexistent_session' });
+    const session = await createSession({ resumeSessionId: 'nonexistent_session' });
 
     expect(mockLoadConversation).toHaveBeenCalledWith('nonexistent_session');
     // Should fall through to creating a new session
@@ -152,39 +165,35 @@ describe('createSession()', () => {
     expect(mockGenerateSessionId).toHaveBeenCalledOnce();
   });
 
-  it('uses agentId as hyveId when hyveId is not provided', () => {
-    const session = createSession({ agentId: 'hyve-maker' });
-
-    expect(session.hyveId).toBe('hyve-maker');
-    expect(session.systemPrompt).toContain('Hyve Maker');
-  });
-
-  it('uses default model based on provider', () => {
-    const openaiSession = createSession({ provider: 'openai' });
+  it('uses default model based on provider', async () => {
+    const openaiSession = await createSession({ provider: 'openai' });
     expect(openaiSession.model).toBe('gpt-4o');
 
-    const geminiSession = createSession({ provider: 'gemini' });
+    const geminiSession = await createSession({ provider: 'gemini' });
     expect(geminiSession.model).toBe('gemini-2.5-flash');
 
-    const minimaxSession = createSession({ provider: 'minimax' });
+    const minimaxSession = await createSession({ provider: 'minimax' });
     expect(minimaxSession.model).toBe('minimax-m2.5');
   });
 
-  it('uses custom system prompt when provided, overriding hyve default', () => {
+  it('uses custom system prompt when provided, overriding API', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue('API prompt');
     const customPrompt = 'You are a custom bot.';
-    const session = createSession({
-      hyveId: 'app-builder',
+    const session = await createSession({
+      canvasTypeId: 'app-builder',
       systemPrompt: customPrompt,
     });
 
     expect(session.systemPrompt).toBe(customPrompt);
+    // Should not even call the API when custom prompt is provided
+    expect(mockFetchCanvasTypeSystemPrompt).not.toHaveBeenCalled();
   });
 
-  it('uses custom system prompt when resuming session', () => {
+  it('uses custom system prompt when resuming session', async () => {
     mockLoadConversation.mockReturnValue({
       sessionId: 'chat_resume_1',
       title: 'Resumed',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       model: 'claude-sonnet',
       provider: 'anthropic',
       messages: [],
@@ -193,7 +202,7 @@ describe('createSession()', () => {
     });
 
     const customPrompt = 'Custom override prompt';
-    const session = createSession({
+    const session = await createSession({
       resumeSessionId: 'chat_resume_1',
       systemPrompt: customPrompt,
     });
@@ -201,8 +210,8 @@ describe('createSession()', () => {
     expect(session.systemPrompt).toBe(customPrompt);
   });
 
-  it('sets temperature to 0 when explicitly provided as 0', () => {
-    const session = createSession({ temperature: 0 });
+  it('sets temperature to 0 when explicitly provided as 0', async () => {
+    const session = await createSession({ temperature: 0 });
 
     expect(session.temperature).toBe(0);
   });
@@ -213,47 +222,48 @@ describe('createSession()', () => {
 // ============================================================================
 
 describe('resolveSystemPrompt()', () => {
-  it('returns app-builder prompt', () => {
-    const prompt = resolveSystemPrompt('app-builder');
+  it('returns API prompt when available', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue('Firestore prompt for app-builder');
 
-    expect(prompt).toContain('MyndHyve App Builder');
-    expect(prompt).toContain('PRDs');
-    expect(prompt).toContain('web applications');
+    const prompt = await resolveSystemPrompt('app-builder');
+
+    expect(prompt).toBe('Firestore prompt for app-builder');
+    expect(mockFetchCanvasTypeSystemPrompt).toHaveBeenCalledWith('app-builder');
   });
 
-  it('returns landing-page prompt', () => {
-    const prompt = resolveSystemPrompt('landing-page');
+  it('returns default prompt when API returns null', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue(null);
 
-    expect(prompt).toContain('MyndHyve Landing Page Builder');
-    expect(prompt).toContain('high-converting');
-    expect(prompt).toContain('conversion optimization');
-  });
-
-  it('returns hyve-maker prompt', () => {
-    const prompt = resolveSystemPrompt('hyve-maker');
-
-    expect(prompt).toContain('MyndHyve Hyve Maker');
-    expect(prompt).toContain('custom hyves');
-    expect(prompt).toContain('workflows');
-  });
-
-  it('returns default prompt for unknown hyve ID', () => {
-    const prompt = resolveSystemPrompt('unknown-hyve');
+    const prompt = await resolveSystemPrompt('unknown-hyve');
 
     expect(prompt).toContain('MyndHyve AI');
     expect(prompt).toContain('helpful and knowledgeable assistant');
-    expect(prompt).not.toContain('App Builder');
-    expect(prompt).not.toContain('Landing Page');
-    expect(prompt).not.toContain('Hyve Maker');
   });
 
-  it('returns default prompt when no hyve is specified', () => {
-    const promptUndefined = resolveSystemPrompt(undefined);
-    const promptNoArg = resolveSystemPrompt();
+  it('returns default prompt when API throws (error is swallowed)', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockRejectedValue(new Error('Network error'));
+
+    // .resolves asserts the promise resolves (not rejects) — catching the regression
+    await expect(resolveSystemPrompt('app-builder')).resolves.toContain('MyndHyve AI');
+  });
+
+  it('falls back to default when API throws during createSession', async () => {
+    mockFetchCanvasTypeSystemPrompt.mockRejectedValue(new Error('DNS failure'));
+
+    const session = await createSession({ canvasTypeId: 'landing-page' });
+
+    expect(session.systemPrompt).toContain('MyndHyve AI');
+  });
+
+  it('returns default prompt when no canvas type is specified', async () => {
+    const promptUndefined = await resolveSystemPrompt(undefined);
+    const promptNoArg = await resolveSystemPrompt();
 
     expect(promptUndefined).toContain('MyndHyve AI');
     expect(promptNoArg).toContain('MyndHyve AI');
     expect(promptUndefined).toBe(promptNoArg);
+    // Should not call API when no canvasTypeId
+    expect(mockFetchCanvasTypeSystemPrompt).not.toHaveBeenCalled();
   });
 });
 
@@ -265,7 +275,7 @@ describe('persistSession()', () => {
   it('saves conversation with generated title from first user message', () => {
     const session: ChatSession = {
       sessionId: 'chat_persist_1',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       provider: 'anthropic',
       model: 'claude-sonnet',
       temperature: 0.7,
@@ -289,7 +299,7 @@ describe('persistSession()', () => {
     const savedConversation = mockSaveConversation.mock.calls[0][0];
     expect(savedConversation.sessionId).toBe('chat_persist_1');
     expect(savedConversation.title).toBe('Build me a todo app');
-    expect(savedConversation.hyveId).toBe('app-builder');
+    expect(savedConversation.canvasTypeId).toBe('app-builder');
     expect(savedConversation.model).toBe('claude-sonnet');
     expect(savedConversation.provider).toBe('anthropic');
     expect(savedConversation.messages).toHaveLength(2);

@@ -1,10 +1,10 @@
 /**
- * MyndHyve CLI — Hyve Commands
+ * MyndHyve CLI — Canvas Type Commands
  *
- * Commander subcommand group for hyve management and context:
- *   myndhyve-cli hyves list
- *   myndhyve-cli hyves info <hyve-id>
- *   myndhyve-cli hyves docs [--hyve=<hyveId>]
+ * Commander subcommand group for canvas type management and context:
+ *   myndhyve-cli canvas-types list
+ *   myndhyve-cli canvas-types info <canvas-type-id>
+ *   myndhyve-cli canvas-types docs [--canvas-type=<canvasTypeId>]
  *   myndhyve-cli use <project-id>
  *   myndhyve-cli whoami
  */
@@ -12,10 +12,10 @@
 import type { Command } from 'commander';
 import { getAuthStatus } from '../auth/index.js';
 import {
-  listSystemHyves,
-  getSystemHyve,
-  listHyveDocuments,
-} from '../api/hyves.js';
+  listCanvasTypes,
+  getCanvasType,
+  listCanvases,
+} from '../api/canvasTypes.js';
 import { getProject } from '../api/projects.js';
 import {
   getActiveContext,
@@ -33,27 +33,27 @@ import { ExitCode, printErrorResult } from '../utils/output.js';
 // REGISTER
 // ============================================================================
 
-export function registerHyveCommands(program: Command): void {
-  const hyves = program
-    .command('hyves')
-    .description('Explore MyndHyve system hyves (app templates)');
+export function registerCanvasTypeCommands(program: Command): void {
+  const canvasTypes = program
+    .command('canvas-types')
+    .description('Explore MyndHyve canvas types');
 
   // ── List ──────────────────────────────────────────────────────────────
 
-  hyves
+  canvasTypes
     .command('list')
-    .description('List available system hyves')
-    .option('--all', 'Include internal-visibility hyves')
+    .description('List available canvas types')
+    .option('--all', 'Include internal-visibility canvas types')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action((opts) => {
-      const hyveList = listSystemHyves(opts.all);
+      const canvasTypeList = listCanvasTypes(opts.all);
 
       if (opts.format === 'json') {
-        console.log(JSON.stringify(hyveList, null, 2));
+        console.log(JSON.stringify(canvasTypeList, null, 2));
         return;
       }
 
-      console.log(`\n  System Hyves (${hyveList.length})\n`);
+      console.log(`\n  Canvas Types (${canvasTypeList.length})\n`);
       console.log(
         '  ' +
           'ID'.padEnd(18) +
@@ -62,12 +62,12 @@ export function registerHyveCommands(program: Command): void {
       );
       console.log('  ' + '\u2500'.repeat(90));
 
-      for (const hyve of hyveList) {
+      for (const canvasType of canvasTypeList) {
         console.log(
           '  ' +
-            hyve.hyveId.padEnd(18) +
-            hyve.name.padEnd(22) +
-            truncate(hyve.description, 50)
+            canvasType.canvasTypeId.padEnd(18) +
+            canvasType.name.padEnd(22) +
+            truncate(canvasType.description, 50)
         );
       }
 
@@ -76,47 +76,47 @@ export function registerHyveCommands(program: Command): void {
 
   // ── Info ──────────────────────────────────────────────────────────────
 
-  hyves
-    .command('info <hyve-id>')
-    .description('Show detailed information about a system hyve')
+  canvasTypes
+    .command('info <canvas-type-id>')
+    .description('Show detailed information about a canvas type')
     .option('--format <format>', 'Output format (table, json)', 'table')
-    .action((hyveId: string, opts) => {
-      const hyve = getSystemHyve(hyveId);
+    .action((canvasTypeId: string, opts) => {
+      const canvasType = getCanvasType(canvasTypeId);
 
-      if (!hyve) {
+      if (!canvasType) {
         printErrorResult({
           code: 'NOT_FOUND',
-          message: `Unknown hyve "${hyveId}".`,
-          suggestion: 'Run `myndhyve-cli hyves list` to see available hyves.',
+          message: `Unknown canvas type "${canvasTypeId}".`,
+          suggestion: 'Run `myndhyve-cli canvas-types list` to see available canvas types.',
         });
         process.exitCode = ExitCode.NOT_FOUND;
         return;
       }
 
       if (opts.format === 'json') {
-        console.log(JSON.stringify(hyve, null, 2));
+        console.log(JSON.stringify(canvasType, null, 2));
         return;
       }
 
-      console.log(`\n  ${hyve.name}`);
+      console.log(`\n  ${canvasType.name}`);
       console.log('  ' + '\u2500'.repeat(50));
-      console.log(`  ID:          ${hyve.hyveId}`);
-      console.log(`  Description: ${hyve.description}`);
-      console.log(`  Icon:        ${hyve.icon}`);
-      console.log(`  Visibility:  ${hyve.visibility}`);
-      console.log(`  Color:       ${hyve.primaryColor}`);
-      console.log(`  Tags:        ${hyve.tags.join(', ')}`);
+      console.log(`  ID:          ${canvasType.canvasTypeId}`);
+      console.log(`  Description: ${canvasType.description}`);
+      console.log(`  Icon:        ${canvasType.icon}`);
+      console.log(`  Visibility:  ${canvasType.visibility}`);
+      console.log(`  Color:       ${canvasType.primaryColor}`);
+      console.log(`  Tags:        ${canvasType.tags.join(', ')}`);
       console.log('');
-      console.log(`  Create a project: myndhyve-cli projects create "My Project" --hyve=${hyve.hyveId}`);
+      console.log(`  Create a project: myndhyve-cli projects create "My Project" --canvas-type=${canvasType.canvasTypeId}`);
       console.log('');
     });
 
   // ── Docs ──────────────────────────────────────────────────────────────
 
-  hyves
+  canvasTypes
     .command('docs')
-    .description('List your hyve documents (work items within system hyves)')
-    .option('--hyve <hyveId>', 'Filter by hyve type')
+    .description('List your canvases (work items within canvas types)')
+    .option('--canvas-type <canvasTypeId>', 'Filter by canvas type')
     .option('--pinned', 'Show only pinned documents')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
@@ -124,8 +124,8 @@ export function registerHyveCommands(program: Command): void {
       if (!auth) return;
 
       try {
-        const docs = await listHyveDocuments(auth.uid, {
-          hyveId: opts.hyve,
+        const docs = await listCanvases(auth.uid, {
+          canvasTypeId: opts.canvasType,
           pinned: opts.pinned || undefined,
         });
 
@@ -135,32 +135,32 @@ export function registerHyveCommands(program: Command): void {
         }
 
         if (docs.length === 0) {
-          console.log('\n  No hyve documents found.');
+          console.log('\n  No canvases found.');
           console.log('  Create a project first, or open the web app to create documents.\n');
           return;
         }
 
-        console.log(`\n  Hyve Documents (${docs.length})\n`);
+        console.log(`\n  Canvases (${docs.length})\n`);
         console.log(
           '  ' +
             'ID'.padEnd(24) +
             'Name'.padEnd(28) +
-            'Hyve'.padEnd(18) +
+            'Canvas Type'.padEnd(18) +
             'Status'.padEnd(12) +
             'Pinned'
         );
         console.log('  ' + '\u2500'.repeat(90));
 
         for (const doc of docs) {
-          const hyve = getSystemHyve(doc.hyveId);
-          const hyveName = hyve?.name || doc.hyveId;
+          const canvasType = getCanvasType(doc.canvasTypeId);
+          const canvasTypeName = canvasType?.name || doc.canvasTypeId;
           const pinnedIcon = doc.pinned ? '\u2605' : '';
 
           console.log(
             '  ' +
               doc.id.padEnd(24) +
               truncate(doc.name, 26).padEnd(28) +
-              truncate(hyveName, 16).padEnd(18) +
+              truncate(canvasTypeName, 16).padEnd(18) +
               doc.status.padEnd(12) +
               pinnedIcon
           );
@@ -168,7 +168,7 @@ export function registerHyveCommands(program: Command): void {
 
         console.log('');
       } catch (error) {
-        printError('Failed to list hyve documents', error);
+        printError('Failed to list canvases', error);
       }
     });
 }
@@ -209,19 +209,19 @@ export function registerContextCommands(program: Command): void {
           return;
         }
 
-        const hyve = getSystemHyve(project.hyveId);
+        const canvasType = getCanvasType(project.canvasTypeId);
 
         setActiveContext({
           projectId: project.id,
           projectName: project.name,
-          hyveId: project.hyveId,
-          hyveName: hyve?.name,
+          canvasTypeId: project.canvasTypeId,
+          canvasTypeName: canvasType?.name,
         });
 
         console.log(`\n  Active project set:`);
-        console.log(`  Project: ${project.name}`);
-        console.log(`  ID:      ${project.id}`);
-        console.log(`  Hyve:    ${hyve?.name || project.hyveId}\n`);
+        console.log(`  Project:      ${project.name}`);
+        console.log(`  ID:           ${project.id}`);
+        console.log(`  Canvas Type:  ${canvasType?.name || project.canvasTypeId}\n`);
       } catch (error) {
         printError('Failed to set active project', error);
       }
@@ -287,9 +287,9 @@ export function registerContextCommands(program: Command): void {
       // Active project
       console.log('');
       if (context) {
-        console.log(`  Project:  ${context.projectName}`);
-        console.log(`  ID:       ${context.projectId}`);
-        console.log(`  Hyve:     ${context.hyveName || context.hyveId}`);
+        console.log(`  Project:      ${context.projectName}`);
+        console.log(`  ID:           ${context.projectId}`);
+        console.log(`  Canvas Type:  ${context.canvasTypeName || context.canvasTypeId}`);
       } else {
         console.log('  No active project. Run `myndhyve-cli use <project-id>` to set one.');
       }

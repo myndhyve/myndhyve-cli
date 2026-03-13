@@ -970,7 +970,7 @@ describe('runQuery', () => {
     ]);
 
     await runQuery('users/uid1/hyveDocuments', [
-      { field: 'hyveId', op: 'EQUAL', value: 'app-builder' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
 
     const [url] = mockFetch.mock.calls[0];

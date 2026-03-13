@@ -114,10 +114,10 @@ describe('listProjects', () => {
     });
   });
 
-  it('adds hyveId filter when option provided', async () => {
+  it('adds canvasTypeId filter when option provided', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listProjects(USER_ID, { hyveId: 'app-builder' });
+    await listProjects(USER_ID, { canvasTypeId: 'app-builder' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
@@ -138,10 +138,10 @@ describe('listProjects', () => {
     ]);
   });
 
-  it('combines hyveId and status filters', async () => {
+  it('combines canvasTypeId and status filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listProjects(USER_ID, { hyveId: 'landing-page', status: 'draft' });
+    await listProjects(USER_ID, { canvasTypeId: 'landing-page', status: 'draft' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(3);
@@ -166,7 +166,7 @@ describe('listProjects', () => {
       id: 'proj_1',
       name: 'First Project',
       slug: 'my-test-project',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       status: 'draft',
       type: 'general',
       description: 'A test project',
@@ -265,7 +265,7 @@ describe('getProject', () => {
       id: 'proj_test123_abc456',
       name: 'My Test Project',
       slug: 'my-test-project',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       status: 'draft',
       type: 'general',
       description: 'A test project',
@@ -309,7 +309,7 @@ describe('getProject', () => {
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Untitled');
     expect(result!.slug).toBe('');
-    expect(result!.hyveId).toBe('');
+    expect(result!.canvasTypeId).toBe('');
     expect(result!.status).toBe('draft');
     expect(result!.type).toBe('general');
     expect(result!.ownerId).toBe('');
@@ -342,7 +342,7 @@ describe('createProject', () => {
   it('creates project with correct fields', async () => {
     const result = await createProject(USER_ID, {
       name: 'My New App',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
@@ -359,14 +359,14 @@ describe('createProject', () => {
 
     // Result is a ProjectDetail
     expect(result.name).toBe('My New App');
-    expect(result.hyveId).toBe('app-builder');
+    expect(result.canvasTypeId).toBe('app-builder');
     expect(result.ownerId).toBe(USER_ID);
   });
 
   it('generates project ID with proj_ prefix', async () => {
     await createProject(USER_ID, {
       name: 'Test',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
     });
 
     const [, projectId] = mockCreateDocument.mock.calls[0];
@@ -376,7 +376,7 @@ describe('createProject', () => {
   it('generates slug from name', async () => {
     await createProject(USER_ID, {
       name: 'My Awesome Landing Page',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -386,7 +386,7 @@ describe('createProject', () => {
   it('applies default settings', async () => {
     await createProject(USER_ID, {
       name: 'Settings Test',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -400,7 +400,7 @@ describe('createProject', () => {
   it('applies default metadata with timestamps and counts', async () => {
     await createProject(USER_ID, {
       name: 'Metadata Test',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -422,7 +422,7 @@ describe('createProject', () => {
   it('uses default type "general" when not specified', async () => {
     await createProject(USER_ID, {
       name: 'No Type',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -432,7 +432,7 @@ describe('createProject', () => {
   it('uses custom type when specified', async () => {
     await createProject(USER_ID, {
       name: 'Custom Type',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       type: 'website',
     });
 
@@ -443,7 +443,7 @@ describe('createProject', () => {
   it('sets description to empty string when not provided', async () => {
     await createProject(USER_ID, {
       name: 'No Desc',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -453,7 +453,7 @@ describe('createProject', () => {
   it('includes description when provided', async () => {
     await createProject(USER_ID, {
       name: 'With Desc',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       description: 'A detailed description of this project',
     });
 
@@ -464,7 +464,7 @@ describe('createProject', () => {
   it('sets tags to empty array when not provided', async () => {
     await createProject(USER_ID, {
       name: 'No Tags',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -474,7 +474,7 @@ describe('createProject', () => {
   it('includes tags when provided', async () => {
     await createProject(USER_ID, {
       name: 'With Tags',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       tags: ['marketing', 'saas', 'landing-page'],
     });
 
@@ -485,7 +485,7 @@ describe('createProject', () => {
   it('returns a valid ProjectDetail', async () => {
     const result = await createProject(USER_ID, {
       name: 'Return Value Test',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       description: 'Testing return',
       tags: ['test'],
     });
@@ -494,7 +494,7 @@ describe('createProject', () => {
     expect(result.id).toMatch(/^proj_/);
     expect(result.name).toBe('Return Value Test');
     expect(result.slug).toBe('return-value-test');
-    expect(result.hyveId).toBe('app-builder');
+    expect(result.canvasTypeId).toBe('app-builder');
     expect(result.ownerId).toBe(USER_ID);
     expect(result.status).toBe('draft');
     expect(result.description).toBe('Testing return');
@@ -669,50 +669,50 @@ describe('toSlug (tested via createProject)', () => {
   });
 
   it('converts name to lowercase', async () => {
-    await createProject(USER_ID, { name: 'UPPERCASE', hyveId: 'test' });
+    await createProject(USER_ID, { name: 'UPPERCASE', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('uppercase');
   });
 
   it('replaces spaces with hyphens', async () => {
-    await createProject(USER_ID, { name: 'hello world', hyveId: 'test' });
+    await createProject(USER_ID, { name: 'hello world', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('hello-world');
   });
 
   it('replaces special characters with hyphens', async () => {
-    await createProject(USER_ID, { name: 'Hello, World! (2025)', hyveId: 'test' });
+    await createProject(USER_ID, { name: 'Hello, World! (2025)', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('hello-world-2025');
   });
 
   it('removes leading and trailing hyphens', async () => {
-    await createProject(USER_ID, { name: '---test---', hyveId: 'test' });
+    await createProject(USER_ID, { name: '---test---', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('test');
   });
 
   it('collapses consecutive special chars into single hyphen', async () => {
-    await createProject(USER_ID, { name: 'hello   ///   world', hyveId: 'test' });
+    await createProject(USER_ID, { name: 'hello   ///   world', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('hello-world');
   });
 
   it('truncates slug to 60 characters', async () => {
     const longName = 'a'.repeat(100);
-    await createProject(USER_ID, { name: longName, hyveId: 'test' });
+    await createProject(USER_ID, { name: longName, canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect((data.slug as string).length).toBeLessThanOrEqual(60);
   });
 
   it('handles names with only special characters', async () => {
-    await createProject(USER_ID, { name: '!!!@@@###', hyveId: 'test' });
+    await createProject(USER_ID, { name: '!!!@@@###', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('');
   });
 
   it('preserves numbers in slug', async () => {
-    await createProject(USER_ID, { name: 'Version 2 Release 3', hyveId: 'test' });
+    await createProject(USER_ID, { name: 'Version 2 Release 3', canvasTypeId: 'test' });
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.slug).toBe('version-2-release-3');
   });
@@ -739,12 +739,12 @@ describe('toProjectSummary (tested via listProjects)', () => {
     expect(results[0].slug).toBe('');
   });
 
-  it('handles missing hyveId (defaults to empty string)', async () => {
+  it('handles missing canvasTypeId (defaults to empty string)', async () => {
     mockRunQuery.mockResolvedValue([{ id: 'proj_1', name: 'Test' }]);
 
     const results = await listProjects(USER_ID);
 
-    expect(results[0].hyveId).toBe('');
+    expect(results[0].canvasTypeId).toBe('');
   });
 
   it('handles missing status (defaults to "draft")', async () => {
@@ -843,7 +843,7 @@ describe('toProjectDetail (tested via getProject)', () => {
     expect(result!.id).toBeDefined();
     expect(result!.name).toBeDefined();
     expect(result!.slug).toBeDefined();
-    expect(result!.hyveId).toBeDefined();
+    expect(result!.canvasTypeId).toBeDefined();
     expect(result!.status).toBeDefined();
     expect(result!.type).toBeDefined();
   });

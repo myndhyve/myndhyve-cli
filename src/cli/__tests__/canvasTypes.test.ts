@@ -7,9 +7,9 @@ const {
   mockRequireAuth,
   mockTruncate,
   mockPrintError,
-  mockListSystemHyves,
-  mockGetSystemHyve,
-  mockListHyveDocuments,
+  mockListCanvasTypes,
+  mockGetCanvasType,
+  mockListCanvases,
   mockGetProject,
   mockGetActiveContext,
   mockSetActiveContext,
@@ -19,9 +19,9 @@ const {
   mockRequireAuth: vi.fn(),
   mockTruncate: vi.fn(),
   mockPrintError: vi.fn(),
-  mockListSystemHyves: vi.fn(),
-  mockGetSystemHyve: vi.fn(),
-  mockListHyveDocuments: vi.fn(),
+  mockListCanvasTypes: vi.fn(),
+  mockGetCanvasType: vi.fn(),
+  mockListCanvases: vi.fn(),
   mockGetProject: vi.fn(),
   mockGetActiveContext: vi.fn(),
   mockSetActiveContext: vi.fn(),
@@ -37,10 +37,10 @@ vi.mock('../helpers.js', () => ({
   printError: (...args: unknown[]) => mockPrintError(...args),
 }));
 
-vi.mock('../../api/hyves.js', () => ({
-  listSystemHyves: (...args: unknown[]) => mockListSystemHyves(...args),
-  getSystemHyve: (...args: unknown[]) => mockGetSystemHyve(...args),
-  listHyveDocuments: (...args: unknown[]) => mockListHyveDocuments(...args),
+vi.mock('../../api/canvasTypes.js', () => ({
+  listCanvasTypes: (...args: unknown[]) => mockListCanvasTypes(...args),
+  getCanvasType: (...args: unknown[]) => mockGetCanvasType(...args),
+  listCanvases: (...args: unknown[]) => mockListCanvases(...args),
 }));
 
 vi.mock('../../api/projects.js', () => ({
@@ -67,14 +67,14 @@ vi.mock('../../utils/output.js', () => ({
   },
 }));
 
-import { registerHyveCommands, registerContextCommands } from '../hyves.js';
+import { registerCanvasTypeCommands, registerContextCommands } from '../canvasTypes.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const AUTH_USER = { uid: 'user_abc', email: 'test@test.com' };
 
-const SAMPLE_HYVE = {
-  hyveId: 'app-builder',
+const SAMPLE_CANVAS_TYPE = {
+  canvasTypeId: 'app-builder',
   name: 'App Builder',
   description: 'Build applications',
   icon: '\u{1F3D7}\uFE0F',
@@ -83,8 +83,8 @@ const SAMPLE_HYVE = {
   tags: ['apps', 'development'],
 };
 
-const SAMPLE_HYVE_2 = {
-  hyveId: 'landing-page',
+const SAMPLE_CANVAS_TYPE_2 = {
+  canvasTypeId: 'landing-page',
   name: 'Landing Page',
   description: 'Create landing pages',
   icon: '\u{1F680}',
@@ -97,7 +97,7 @@ const SAMPLE_PROJECT = {
   id: 'proj-1',
   name: 'Test Project',
   slug: 'test-project',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   ownerId: 'user_abc',
   type: 'general',
   status: 'in_progress',
@@ -111,7 +111,7 @@ const SAMPLE_PROJECT = {
 const SAMPLE_DOC = {
   id: 'doc-1',
   name: 'My Document',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   status: 'active',
   pinned: false,
 };
@@ -119,7 +119,7 @@ const SAMPLE_DOC = {
 const SAMPLE_DOC_PINNED = {
   id: 'doc-2',
   name: 'Important Doc',
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   status: 'active',
   pinned: true,
 };
@@ -131,7 +131,7 @@ function createTestProgram(): Command {
     writeOut: () => {},
     writeErr: () => {},
   });
-  registerHyveCommands(program);
+  registerCanvasTypeCommands(program);
   registerContextCommands(program);
   return program;
 }
@@ -143,7 +143,7 @@ async function run(args: string[]): Promise<void> {
 
 // ── Test setup ─────────────────────────────────────────────────────────────────
 
-describe('registerHyveCommands & registerContextCommands', () => {
+describe('registerCanvasTypeCommands & registerContextCommands', () => {
   let consoleSpy: MockInstance;
   let consoleErrSpy: MockInstance;
   let stderrWriteSpy: MockInstance;
@@ -152,9 +152,9 @@ describe('registerHyveCommands & registerContextCommands', () => {
     mockRequireAuth.mockReset();
     mockTruncate.mockReset();
     mockPrintError.mockReset();
-    mockListSystemHyves.mockReset();
-    mockGetSystemHyve.mockReset();
-    mockListHyveDocuments.mockReset();
+    mockListCanvasTypes.mockReset();
+    mockGetCanvasType.mockReset();
+    mockListCanvases.mockReset();
     mockGetProject.mockReset();
     mockGetActiveContext.mockReset();
     mockSetActiveContext.mockReset();
@@ -179,13 +179,13 @@ describe('registerHyveCommands & registerContextCommands', () => {
     // getActiveContext default: no active project
     mockGetActiveContext.mockReturnValue(null);
 
-    // listSystemHyves default
-    mockListSystemHyves.mockReturnValue([SAMPLE_HYVE, SAMPLE_HYVE_2]);
+    // listCanvasTypes default
+    mockListCanvasTypes.mockReturnValue([SAMPLE_CANVAS_TYPE, SAMPLE_CANVAS_TYPE_2]);
 
-    // getSystemHyve default
-    mockGetSystemHyve.mockImplementation((hyveId: string) => {
-      if (hyveId === 'app-builder') return SAMPLE_HYVE;
-      if (hyveId === 'landing-page') return SAMPLE_HYVE_2;
+    // getCanvasType default
+    mockGetCanvasType.mockImplementation((canvasTypeId: string) => {
+      if (canvasTypeId === 'app-builder') return SAMPLE_CANVAS_TYPE;
+      if (canvasTypeId === 'landing-page') return SAMPLE_CANVAS_TYPE_2;
       return null;
     });
 
@@ -207,18 +207,18 @@ describe('registerHyveCommands & registerContextCommands', () => {
   // ==========================================================================
 
   describe('command registration', () => {
-    it('registers the hyves command group on the program', () => {
+    it('registers the canvas-types command group on the program', () => {
       const program = new Command();
-      registerHyveCommands(program);
-      const hyves = program.commands.find((c) => c.name() === 'hyves');
-      expect(hyves).toBeDefined();
+      registerCanvasTypeCommands(program);
+      const canvasTypes = program.commands.find((c) => c.name() === 'canvas-types');
+      expect(canvasTypes).toBeDefined();
     });
 
-    it('registers all subcommands under hyves', () => {
+    it('registers all subcommands under canvas-types', () => {
       const program = new Command();
-      registerHyveCommands(program);
-      const hyves = program.commands.find((c) => c.name() === 'hyves')!;
-      const subNames = hyves.commands.map((c) => c.name());
+      registerCanvasTypeCommands(program);
+      const canvasTypes = program.commands.find((c) => c.name() === 'canvas-types')!;
+      const subNames = canvasTypes.commands.map((c) => c.name());
 
       expect(subNames).toContain('list');
       expect(subNames).toContain('info');
@@ -237,36 +237,36 @@ describe('registerHyveCommands & registerContextCommands', () => {
   });
 
   // ==========================================================================
-  // HYVES LIST
+  // CANVAS-TYPES LIST
   // ==========================================================================
 
-  describe('hyves list', () => {
-    it('shows table with hyves', () => {
-      run(['hyves', 'list']);
+  describe('canvas-types list', () => {
+    it('shows table with canvas types', () => {
+      run(['canvas-types', 'list']);
 
-      expect(mockListSystemHyves).toHaveBeenCalledWith(undefined);
+      expect(mockListCanvasTypes).toHaveBeenCalledWith(undefined);
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('System Hyves (2)');
+      expect(output).toContain('Canvas Types (2)');
       expect(output).toContain('app-builder');
       expect(output).toContain('App Builder');
       expect(output).toContain('landing-page');
     });
 
     it('outputs JSON format', () => {
-      run(['hyves', 'list', '--format', 'json']);
+      run(['canvas-types', 'list', '--format', 'json']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(JSON.parse(output)).toEqual([SAMPLE_HYVE, SAMPLE_HYVE_2]);
+      expect(JSON.parse(output)).toEqual([SAMPLE_CANVAS_TYPE, SAMPLE_CANVAS_TYPE_2]);
     });
 
-    it('passes --all flag to listSystemHyves', () => {
-      run(['hyves', 'list', '--all']);
+    it('passes --all flag to listCanvasTypes', () => {
+      run(['canvas-types', 'list', '--all']);
 
-      expect(mockListSystemHyves).toHaveBeenCalledWith(true);
+      expect(mockListCanvasTypes).toHaveBeenCalledWith(true);
     });
 
     it('calls truncate on description', () => {
-      run(['hyves', 'list']);
+      run(['canvas-types', 'list']);
 
       expect(mockTruncate).toHaveBeenCalledWith('Build applications', 50);
       expect(mockTruncate).toHaveBeenCalledWith('Create landing pages', 50);
@@ -274,14 +274,14 @@ describe('registerHyveCommands & registerContextCommands', () => {
   });
 
   // ==========================================================================
-  // HYVES INFO
+  // CANVAS-TYPES INFO
   // ==========================================================================
 
-  describe('hyves info', () => {
-    it('shows detailed hyve information', () => {
-      run(['hyves', 'info', 'app-builder']);
+  describe('canvas-types info', () => {
+    it('shows detailed canvas type information', () => {
+      run(['canvas-types', 'info', 'app-builder']);
 
-      expect(mockGetSystemHyve).toHaveBeenCalledWith('app-builder');
+      expect(mockGetCanvasType).toHaveBeenCalledWith('app-builder');
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('App Builder');
       expect(output).toContain('ID:          app-builder');
@@ -292,98 +292,98 @@ describe('registerHyveCommands & registerContextCommands', () => {
     });
 
     it('shows create hint', () => {
-      run(['hyves', 'info', 'app-builder']);
+      run(['canvas-types', 'info', 'app-builder']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('myndhyve-cli projects create');
-      expect(output).toContain('--hyve=app-builder');
+      expect(output).toContain('--canvas-type=app-builder');
     });
 
-    it('shows NOT_FOUND error for unknown hyve', () => {
-      mockGetSystemHyve.mockReturnValue(null);
+    it('shows NOT_FOUND error for unknown canvas type', () => {
+      mockGetCanvasType.mockReturnValue(null);
 
-      run(['hyves', 'info', 'invalid-hyve']);
+      run(['canvas-types', 'info', 'invalid-type']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Unknown hyve "invalid-hyve"');
+      expect(output).toContain('Unknown canvas type "invalid-type"');
       expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
     it('outputs JSON format', () => {
-      run(['hyves', 'info', 'app-builder', '--format', 'json']);
+      run(['canvas-types', 'info', 'app-builder', '--format', 'json']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(JSON.parse(output)).toEqual(SAMPLE_HYVE);
+      expect(JSON.parse(output)).toEqual(SAMPLE_CANVAS_TYPE);
     });
 
-    it('shows suggestion when hyve not found', () => {
-      mockGetSystemHyve.mockReturnValue(null);
+    it('shows suggestion when canvas type not found', () => {
+      mockGetCanvasType.mockReturnValue(null);
 
-      run(['hyves', 'info', 'bad-id']);
+      run(['canvas-types', 'info', 'bad-id']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('myndhyve-cli hyves list');
+      expect(output).toContain('myndhyve-cli canvas-types list');
     });
   });
 
   // ==========================================================================
-  // HYVES DOCS
+  // CANVAS-TYPES DOCS
   // ==========================================================================
 
-  describe('hyves docs', () => {
+  describe('canvas-types docs', () => {
     it('shows documents list', async () => {
-      mockListHyveDocuments.mockResolvedValue([SAMPLE_DOC, SAMPLE_DOC_PINNED]);
+      mockListCanvases.mockResolvedValue([SAMPLE_DOC, SAMPLE_DOC_PINNED]);
 
-      await run(['hyves', 'docs']);
+      await run(['canvas-types', 'docs']);
 
-      expect(mockListHyveDocuments).toHaveBeenCalledWith('user_abc', {
-        hyveId: undefined,
+      expect(mockListCanvases).toHaveBeenCalledWith('user_abc', {
+        canvasTypeId: undefined,
         pinned: undefined,
       });
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Hyve Documents (2)');
+      expect(output).toContain('Canvases (2)');
       expect(output).toContain('doc-1');
       expect(output).toContain('My Document');
     });
 
     it('shows hint when document list is empty', async () => {
-      mockListHyveDocuments.mockResolvedValue([]);
+      mockListCanvases.mockResolvedValue([]);
 
-      await run(['hyves', 'docs']);
+      await run(['canvas-types', 'docs']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('No hyve documents found');
+      expect(output).toContain('No canvases found');
       expect(output).toContain('Create a project first');
     });
 
     it('outputs JSON format', async () => {
       const docs = [SAMPLE_DOC];
-      mockListHyveDocuments.mockResolvedValue(docs);
+      mockListCanvases.mockResolvedValue(docs);
 
-      await run(['hyves', 'docs', '--format', 'json']);
+      await run(['canvas-types', 'docs', '--format', 'json']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(JSON.parse(output)).toEqual(docs);
     });
 
-    it('passes --hyve filter to API', async () => {
-      mockListHyveDocuments.mockResolvedValue([]);
+    it('passes --canvas-type filter to API', async () => {
+      mockListCanvases.mockResolvedValue([]);
 
-      await run(['hyves', 'docs', '--hyve', 'app-builder']);
+      await run(['canvas-types', 'docs', '--canvas-type', 'app-builder']);
 
-      expect(mockListHyveDocuments).toHaveBeenCalledWith('user_abc', {
-        hyveId: 'app-builder',
+      expect(mockListCanvases).toHaveBeenCalledWith('user_abc', {
+        canvasTypeId: 'app-builder',
         pinned: undefined,
       });
     });
 
     it('passes --pinned filter to API', async () => {
-      mockListHyveDocuments.mockResolvedValue([]);
+      mockListCanvases.mockResolvedValue([]);
 
-      await run(['hyves', 'docs', '--pinned']);
+      await run(['canvas-types', 'docs', '--pinned']);
 
-      expect(mockListHyveDocuments).toHaveBeenCalledWith('user_abc', {
-        hyveId: undefined,
+      expect(mockListCanvases).toHaveBeenCalledWith('user_abc', {
+        canvasTypeId: undefined,
         pinned: true,
       });
     });
@@ -391,23 +391,23 @@ describe('registerHyveCommands & registerContextCommands', () => {
     it('returns early when auth fails', async () => {
       mockRequireAuth.mockReturnValue(null);
 
-      await run(['hyves', 'docs']);
+      await run(['canvas-types', 'docs']);
 
-      expect(mockListHyveDocuments).not.toHaveBeenCalled();
+      expect(mockListCanvases).not.toHaveBeenCalled();
     });
 
     it('calls printError on API failure', async () => {
-      mockListHyveDocuments.mockRejectedValue(new Error('Timeout'));
+      mockListCanvases.mockRejectedValue(new Error('Timeout'));
 
-      await run(['hyves', 'docs']);
+      await run(['canvas-types', 'docs']);
 
-      expect(mockPrintError).toHaveBeenCalledWith('Failed to list hyve documents', expect.any(Error));
+      expect(mockPrintError).toHaveBeenCalledWith('Failed to list canvases', expect.any(Error));
     });
 
     it('calls truncate on document names', async () => {
-      mockListHyveDocuments.mockResolvedValue([SAMPLE_DOC]);
+      mockListCanvases.mockResolvedValue([SAMPLE_DOC]);
 
-      await run(['hyves', 'docs']);
+      await run(['canvas-types', 'docs']);
 
       expect(mockTruncate).toHaveBeenCalledWith('My Document', 26);
     });
@@ -427,8 +427,8 @@ describe('registerHyveCommands & registerContextCommands', () => {
       expect(mockSetActiveContext).toHaveBeenCalledWith({
         projectId: 'proj-1',
         projectName: 'Test Project',
-        hyveId: 'app-builder',
-        hyveName: 'App Builder',
+        canvasTypeId: 'app-builder',
+        canvasTypeName: 'App Builder',
       });
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
@@ -500,8 +500,8 @@ describe('registerHyveCommands & registerContextCommands', () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-1',
         projectName: 'Test Project',
-        hyveId: 'app-builder',
-        hyveName: 'App Builder',
+        canvasTypeId: 'app-builder',
+        canvasTypeName: 'App Builder',
       });
 
       run(['whoami']);
@@ -577,8 +577,8 @@ describe('registerHyveCommands & registerContextCommands', () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-1',
         projectName: 'Test Project',
-        hyveId: 'app-builder',
-        hyveName: 'App Builder',
+        canvasTypeId: 'app-builder',
+        canvasTypeName: 'App Builder',
       });
 
       run(['whoami', '--format', 'json']);

@@ -34,8 +34,8 @@ export interface BridgeSession {
   userId: string;
   /** MyndHyve project or hyveDocument ID */
   projectId: string;
-  /** System hyve ID (e.g. 'app-builder', 'landing-page') */
-  hyveId: string;
+  /** Canvas type ID (e.g. 'app-builder', 'landing-page') */
+  canvasTypeId: string;
 
   /** Absolute local project path */
   localPath: string;
@@ -343,8 +343,8 @@ export interface BridgeLocalConfig {
   sessionId: string;
   /** MyndHyve project/hyveDocument ID */
   projectId: string;
-  /** System hyve ID */
-  hyveId: string;
+  /** Canvas type ID */
+  canvasTypeId: string;
   /** Target framework */
   framework: ExportFramework;
   /** Firebase user ID */

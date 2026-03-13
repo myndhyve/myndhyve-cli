@@ -70,7 +70,7 @@ export interface BoardConfig {
 export interface BoardSummary {
   id: string;
   name: string;
-  hyveId?: string;
+  canvasTypeId?: string;
   columnCount: number;
   taskCount: number;
   createdAt?: string;
@@ -119,7 +119,7 @@ export interface TaskDetail extends TaskSummary {
  */
 export async function listBoards(
   userId: string,
-  options?: { hyveId?: string }
+  options?: { canvasTypeId?: string }
 ): Promise<BoardSummary[]> {
   const path = `users/${userId}/kanban`;
 
@@ -129,9 +129,9 @@ export async function listBoards(
 
   let boards = documents.map(toBoardSummary);
 
-  if (options?.hyveId) {
+  if (options?.canvasTypeId) {
     boards = boards.filter(
-      (b) => (b as BoardSummary & { hyveId?: string }).hyveId === options.hyveId
+      (b) => (b as BoardSummary & { canvasTypeId?: string }).canvasTypeId === options.canvasTypeId
     );
   }
 
@@ -163,7 +163,7 @@ export async function createBoard(
   boardId: string,
   data: {
     name: string;
-    hyveId?: string;
+    canvasTypeId?: string;
     description?: string;
     columns?: BoardColumn[];
   }
@@ -175,7 +175,7 @@ export async function createBoard(
   const now = new Date().toISOString();
   const boardData: Record<string, unknown> = {
     name: data.name,
-    hyveId: data.hyveId || null,
+    hyveId: data.canvasTypeId || null,
     description: data.description || '',
     ownerId: userId,
     columns: data.columns || DEFAULT_COLUMNS,
@@ -307,7 +307,7 @@ function toBoardSummary(doc: Record<string, unknown>): BoardSummary {
   return {
     id: doc.id as string,
     name: (doc.name as string) || 'Untitled Board',
-    hyveId: doc.hyveId as string | undefined,
+    canvasTypeId: doc.hyveId as string | undefined,
     columnCount: columns.length,
     taskCount: tasks ? Object.keys(tasks).length : 0,
     createdAt: doc.createdAt as string | undefined,

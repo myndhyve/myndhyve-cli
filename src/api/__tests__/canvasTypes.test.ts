@@ -19,14 +19,14 @@ vi.mock('../../utils/logger.js', () => ({
 
 import { getDocument, listDocuments, runQuery } from '../firestore.js';
 import {
-  SYSTEM_HYVES,
-  listSystemHyves,
-  getSystemHyve,
-  isValidSystemHyveId,
-  listHyveDocuments,
-  getHyveDocument,
-} from '../hyves.js';
-import type { HyveDocumentSummary, } from '../hyves.js';
+  CANVAS_TYPES,
+  listCanvasTypes,
+  getCanvasType,
+  isValidCanvasTypeId,
+  listCanvases,
+  getCanvas,
+} from '../canvasTypes.js';
+import type { CanvasSummary, } from '../canvasTypes.js';
 
 // ── Cast mocks ──────────────────────────────────────────────────────────────
 
@@ -43,41 +43,41 @@ beforeEach(() => {
 });
 
 // ============================================================================
-// SYSTEM HYVE FUNCTIONS (pure data — no mocks needed)
+// CANVAS TYPE FUNCTIONS (pure data — no mocks needed)
 // ============================================================================
 
-describe('listSystemHyves()', () => {
-  it('returns only public hyves by default', () => {
-    const hyves = listSystemHyves();
+describe('listCanvasTypes()', () => {
+  it('returns only public canvas types by default', () => {
+    const canvasTypes = listCanvasTypes();
 
-    expect(hyves.length).toBeGreaterThan(0);
-    for (const hyve of hyves) {
-      expect(hyve.visibility).toBe('public');
+    expect(canvasTypes.length).toBeGreaterThan(0);
+    for (const canvasType of canvasTypes) {
+      expect(canvasType.visibility).toBe('public');
     }
     // hyve-maker is internal, should not be present
-    expect(hyves.find((h) => h.hyveId === 'hyve-maker')).toBeUndefined();
+    expect(canvasTypes.find((h) => h.canvasTypeId === 'hyve-maker')).toBeUndefined();
   });
 
-  it('includes internal hyves when includeInternal=true', () => {
-    const hyves = listSystemHyves(true);
+  it('includes internal canvas types when includeInternal=true', () => {
+    const canvasTypes = listCanvasTypes(true);
 
-    expect(hyves.length).toBe(SYSTEM_HYVES.length);
-    const hyveMaker = hyves.find((h) => h.hyveId === 'hyve-maker');
-    expect(hyveMaker).toBeDefined();
-    expect(hyveMaker!.visibility).toBe('internal');
+    expect(canvasTypes.length).toBe(CANVAS_TYPES.length);
+    const canvasTypeMaker = canvasTypes.find((h) => h.canvasTypeId === 'hyve-maker');
+    expect(canvasTypeMaker).toBeDefined();
+    expect(canvasTypeMaker!.visibility).toBe('internal');
   });
 
   it('returns a copy, not the original array', () => {
-    const hyves1 = listSystemHyves(true);
-    const hyves2 = listSystemHyves(true);
+    const canvasTypes1 = listCanvasTypes(true);
+    const canvasTypes2 = listCanvasTypes(true);
 
-    expect(hyves1).not.toBe(hyves2);
-    expect(hyves1).toEqual(hyves2);
+    expect(canvasTypes1).not.toBe(canvasTypes2);
+    expect(canvasTypes1).toEqual(canvasTypes2);
   });
 
-  it('includes expected public hyves', () => {
-    const hyves = listSystemHyves();
-    const ids = hyves.map((h) => h.hyveId);
+  it('includes expected public canvas types', () => {
+    const canvasTypes = listCanvasTypes();
+    const ids = canvasTypes.map((h) => h.canvasTypeId);
 
     expect(ids).toContain('app-builder');
     expect(ids).toContain('slides');
@@ -86,49 +86,49 @@ describe('listSystemHyves()', () => {
     expect(ids).toContain('cad');
   });
 
-  it('each hyve has all required fields', () => {
-    const hyves = listSystemHyves(true);
+  it('each canvas type has all required fields', () => {
+    const canvasTypes = listCanvasTypes(true);
 
-    for (const hyve of hyves) {
-      expect(hyve.hyveId).toBeTruthy();
-      expect(hyve.name).toBeTruthy();
-      expect(hyve.description).toBeTruthy();
-      expect(hyve.icon).toBeTruthy();
-      expect(hyve.tier).toMatch(/^(user|team|platform)$/);
-      expect(hyve.primaryColor).toMatch(/^#[0-9a-f]{6}$/);
-      expect(hyve.visibility).toMatch(/^(public|internal)$/);
-      expect(Array.isArray(hyve.tags)).toBe(true);
-      expect(hyve.tags.length).toBeGreaterThan(0);
+    for (const canvasType of canvasTypes) {
+      expect(canvasType.canvasTypeId).toBeTruthy();
+      expect(canvasType.name).toBeTruthy();
+      expect(canvasType.description).toBeTruthy();
+      expect(canvasType.icon).toBeTruthy();
+      expect(canvasType.tier).toMatch(/^(user|team|platform)$/);
+      expect(canvasType.primaryColor).toMatch(/^#[0-9a-f]{6}$/);
+      expect(canvasType.visibility).toMatch(/^(public|internal)$/);
+      expect(Array.isArray(canvasType.tags)).toBe(true);
+      expect(canvasType.tags.length).toBeGreaterThan(0);
     }
   });
 });
 
-describe('getSystemHyve()', () => {
-  it('returns hyve metadata for valid ID', () => {
-    const hyve = getSystemHyve('app-builder');
+describe('getCanvasType()', () => {
+  it('returns canvas type metadata for valid ID', () => {
+    const canvasType = getCanvasType('app-builder');
 
-    expect(hyve).not.toBeNull();
-    expect(hyve!.hyveId).toBe('app-builder');
-    expect(hyve!.name).toBe('App Builder');
-    expect(hyve!.icon).toBe('Layers');
+    expect(canvasType).not.toBeNull();
+    expect(canvasType!.canvasTypeId).toBe('app-builder');
+    expect(canvasType!.name).toBe('App Builder');
+    expect(canvasType!.icon).toBe('Layers');
   });
 
   it('returns null for invalid ID', () => {
-    expect(getSystemHyve('nonexistent')).toBeNull();
+    expect(getCanvasType('nonexistent')).toBeNull();
   });
 
   it('returns null for empty string', () => {
-    expect(getSystemHyve('')).toBeNull();
+    expect(getCanvasType('')).toBeNull();
   });
 
-  it('returns internal hyves too', () => {
-    const hyve = getSystemHyve('hyve-maker');
+  it('returns internal canvas types too', () => {
+    const canvasType = getCanvasType('hyve-maker');
 
-    expect(hyve).not.toBeNull();
-    expect(hyve!.visibility).toBe('internal');
+    expect(canvasType).not.toBeNull();
+    expect(canvasType!.visibility).toBe('internal');
   });
 
-  it('returns correct metadata for each known hyve', () => {
+  it('returns correct metadata for each known canvas type', () => {
     const expected = [
       { id: 'app-builder', name: 'App Builder' },
       { id: 'slides', name: 'Slides' },
@@ -140,37 +140,37 @@ describe('getSystemHyve()', () => {
     ];
 
     for (const { id, name } of expected) {
-      const hyve = getSystemHyve(id);
-      expect(hyve).not.toBeNull();
-      expect(hyve!.name).toBe(name);
+      const canvasType = getCanvasType(id);
+      expect(canvasType).not.toBeNull();
+      expect(canvasType!.name).toBe(name);
     }
   });
 });
 
-describe('isValidSystemHyveId()', () => {
-  it('returns true for valid system hyve IDs', () => {
-    expect(isValidSystemHyveId('app-builder')).toBe(true);
-    expect(isValidSystemHyveId('slides')).toBe(true);
-    expect(isValidSystemHyveId('drawings')).toBe(true);
-    expect(isValidSystemHyveId('hyve-maker')).toBe(true);
-    expect(isValidSystemHyveId('hyve-builder')).toBe(true);
-    expect(isValidSystemHyveId('cad')).toBe(true);
-    expect(isValidSystemHyveId('landing-page')).toBe(true);
+describe('isValidCanvasTypeId()', () => {
+  it('returns true for valid canvas type IDs', () => {
+    expect(isValidCanvasTypeId('app-builder')).toBe(true);
+    expect(isValidCanvasTypeId('slides')).toBe(true);
+    expect(isValidCanvasTypeId('drawings')).toBe(true);
+    expect(isValidCanvasTypeId('hyve-maker')).toBe(true);
+    expect(isValidCanvasTypeId('hyve-builder')).toBe(true);
+    expect(isValidCanvasTypeId('cad')).toBe(true);
+    expect(isValidCanvasTypeId('landing-page')).toBe(true);
   });
 
   it('returns false for invalid IDs', () => {
-    expect(isValidSystemHyveId('nonexistent')).toBe(false);
-    expect(isValidSystemHyveId('')).toBe(false);
-    expect(isValidSystemHyveId('App-Builder')).toBe(false); // case-sensitive
-    expect(isValidSystemHyveId('APP_BUILDER')).toBe(false);
+    expect(isValidCanvasTypeId('nonexistent')).toBe(false);
+    expect(isValidCanvasTypeId('')).toBe(false);
+    expect(isValidCanvasTypeId('App-Builder')).toBe(false); // case-sensitive
+    expect(isValidCanvasTypeId('APP_BUILDER')).toBe(false);
   });
 });
 
 // ============================================================================
-// listHyveDocuments()
+// listCanvases()
 // ============================================================================
 
-describe('listHyveDocuments()', () => {
+describe('listCanvases()', () => {
   const userId = 'user-abc123';
 
   it('lists all documents without filters using listDocuments', async () => {
@@ -199,7 +199,7 @@ describe('listHyveDocuments()', () => {
       ],
     });
 
-    const results = await listHyveDocuments(userId);
+    const results = await listCanvases(userId);
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
@@ -212,7 +212,7 @@ describe('listHyveDocuments()', () => {
     expect(results[1].id).toBe('doc-2');
   });
 
-  it('filters by hyveId using runQuery', async () => {
+  it('filters by canvasTypeId using runQuery', async () => {
     mockRunQuery.mockResolvedValue([
       {
         id: 'doc-1',
@@ -225,7 +225,7 @@ describe('listHyveDocuments()', () => {
       },
     ]);
 
-    const results = await listHyveDocuments(userId, { hyveId: 'app-builder' });
+    const results = await listCanvases(userId, { canvasTypeId: 'app-builder' });
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
@@ -236,13 +236,13 @@ describe('listHyveDocuments()', () => {
     expect(options).toEqual({ limit: 100 });
     expect(mockListDocuments).not.toHaveBeenCalled();
     expect(results).toHaveLength(1);
-    expect(results[0].hyveId).toBe('app-builder');
+    expect(results[0].canvasTypeId).toBe('app-builder');
   });
 
   it('filters by status using runQuery', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listHyveDocuments(userId, { status: 'published' });
+    await listCanvases(userId, { status: 'published' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
@@ -263,7 +263,7 @@ describe('listHyveDocuments()', () => {
       },
     ]);
 
-    const results = await listHyveDocuments(userId, { pinned: true });
+    const results = await listCanvases(userId, { pinned: true });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
@@ -275,7 +275,7 @@ describe('listHyveDocuments()', () => {
   it('handles pinned=false filter correctly', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listHyveDocuments(userId, { pinned: false });
+    await listCanvases(userId, { pinned: false });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
@@ -286,8 +286,8 @@ describe('listHyveDocuments()', () => {
   it('combines multiple filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listHyveDocuments(userId, {
-      hyveId: 'app-builder',
+    await listCanvases(userId, {
+      canvasTypeId: 'app-builder',
       status: 'draft',
       pinned: true,
     });
@@ -301,7 +301,7 @@ describe('listHyveDocuments()', () => {
     ]);
   });
 
-  it('returns HyveDocumentSummary[] with correct shape', async () => {
+  it('returns CanvasSummary[] with correct shape', async () => {
     mockListDocuments.mockResolvedValue({
       documents: [
         {
@@ -319,11 +319,11 @@ describe('listHyveDocuments()', () => {
       ],
     });
 
-    const [doc] = await listHyveDocuments(userId);
+    const [doc] = await listCanvases(userId);
 
-    expect(doc).toEqual<HyveDocumentSummary>({
+    expect(doc).toEqual<CanvasSummary>({
       id: 'doc-shape',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       name: 'Landing',
       slug: 'landing',
       status: 'published',
@@ -345,10 +345,10 @@ describe('listHyveDocuments()', () => {
       ],
     });
 
-    const [doc] = await listHyveDocuments(userId);
+    const [doc] = await listCanvases(userId);
 
     expect(doc.id).toBe('doc-sparse');
-    expect(doc.hyveId).toBe('');
+    expect(doc.canvasTypeId).toBe('');
     expect(doc.name).toBe('Untitled');
     expect(doc.slug).toBe('');
     expect(doc.status).toBe('draft');
@@ -362,7 +362,7 @@ describe('listHyveDocuments()', () => {
   it('returns empty array when no documents exist', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    const results = await listHyveDocuments(userId);
+    const results = await listCanvases(userId);
 
     expect(results).toEqual([]);
   });
@@ -370,7 +370,7 @@ describe('listHyveDocuments()', () => {
   it('returns empty array from query when no matches', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    const results = await listHyveDocuments(userId, { hyveId: 'nonexistent' });
+    const results = await listCanvases(userId, { canvasTypeId: 'nonexistent' });
 
     expect(results).toEqual([]);
   });
@@ -378,7 +378,7 @@ describe('listHyveDocuments()', () => {
   it('passes empty options object without triggering query', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listHyveDocuments(userId, {});
+    await listCanvases(userId, {});
 
     // No filters set, should use listDocuments
     expect(mockListDocuments).toHaveBeenCalledOnce();
@@ -387,14 +387,14 @@ describe('listHyveDocuments()', () => {
 });
 
 // ============================================================================
-// getHyveDocument()
+// getCanvas()
 // ============================================================================
 
-describe('getHyveDocument()', () => {
+describe('getCanvas()', () => {
   const userId = 'user-xyz';
   const documentId = 'doc-123';
 
-  it('returns HyveDocumentDetail for existing document', async () => {
+  it('returns CanvasDetail for existing document', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'doc-123',
       hyveId: 'app-builder',
@@ -416,7 +416,7 @@ describe('getHyveDocument()', () => {
       settings: { theme: 'dark', autoSave: true },
     });
 
-    const doc = await getHyveDocument(userId, documentId);
+    const doc = await getCanvas(userId, documentId);
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
@@ -426,7 +426,7 @@ describe('getHyveDocument()', () => {
 
     expect(doc).not.toBeNull();
     expect(doc!.id).toBe('doc-123');
-    expect(doc!.hyveId).toBe('app-builder');
+    expect(doc!.canvasTypeId).toBe('app-builder');
     expect(doc!.name).toBe('My App');
     expect(doc!.slug).toBe('my-app');
     expect(doc!.status).toBe('draft');
@@ -445,7 +445,7 @@ describe('getHyveDocument()', () => {
   it('returns null for non-existent document', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    const doc = await getHyveDocument(userId, 'nonexistent-doc');
+    const doc = await getCanvas(userId, 'nonexistent-doc');
 
     expect(doc).toBeNull();
   });
@@ -456,12 +456,12 @@ describe('getHyveDocument()', () => {
       // Only id provided, everything else missing
     });
 
-    const doc = await getHyveDocument(userId, 'doc-minimal');
+    const doc = await getCanvas(userId, 'doc-minimal');
 
     expect(doc).not.toBeNull();
     // Summary fields — defaults
     expect(doc!.id).toBe('doc-minimal');
-    expect(doc!.hyveId).toBe('');
+    expect(doc!.canvasTypeId).toBe('');
     expect(doc!.name).toBe('Untitled');
     expect(doc!.slug).toBe('');
     expect(doc!.status).toBe('draft');
@@ -497,11 +497,11 @@ describe('getHyveDocument()', () => {
       collaboratorIds: [],
     });
 
-    const doc = await getHyveDocument(userId, 'doc-ext');
+    const doc = await getCanvas(userId, 'doc-ext');
 
     // Verify summary fields are present in the detail result
     expect(doc!.id).toBe('doc-ext');
-    expect(doc!.hyveId).toBe('slides');
+    expect(doc!.canvasTypeId).toBe('slides');
     expect(doc!.name).toBe('Presentation');
     expect(doc!.slug).toBe('presentation');
     expect(doc!.status).toBe('published');
@@ -522,7 +522,7 @@ describe('getHyveDocument()', () => {
   it('propagates errors from getDocument', async () => {
     mockGetDocument.mockRejectedValue(new Error('Network error'));
 
-    await expect(getHyveDocument(userId, documentId)).rejects.toThrow(
+    await expect(getCanvas(userId, documentId)).rejects.toThrow(
       'Network error'
     );
   });

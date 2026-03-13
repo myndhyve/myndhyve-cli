@@ -48,7 +48,7 @@ Examples:
     .command('link [path]')
     .description('Link a local directory to a MyndHyve project')
     .requiredOption('--project <projectId>', 'MyndHyve project or hyveDocument ID')
-    .option('--hyve <hyveId>', 'System hyve ID (e.g. app-builder)', 'app-builder')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (e.g. app-builder)', 'app-builder')
     .option('--framework <framework>', 'Target framework (auto-detected from package.json)')
     .option('--force', 'Overwrite existing link')
     .action(async (path: string | undefined, opts) => {
@@ -89,7 +89,7 @@ Examples:
         const session = await createSession({
           projectRoot,
           projectId: opts.project,
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           framework,
         });
 
@@ -242,7 +242,7 @@ Examples:
           daemonPid: daemonPid ?? null,
           sessionId: session.id,
           projectId: session.projectId,
-          hyveId: session.hyveId,
+          canvasTypeId: session.canvasTypeId,
           framework: session.framework,
           syncDirection: session.syncDirection,
           localPath: session.localPath,
@@ -258,7 +258,7 @@ Examples:
       console.log(`  ${chalk.bold('Daemon:')}      ${daemonPid ? chalk.green(`running (PID ${daemonPid})`) : chalk.dim('not running')}`);
       console.log(`  ${chalk.bold('Session:')}     ${session.id}`);
       console.log(`  ${chalk.bold('Project:')}     ${session.projectId}`);
-      console.log(`  ${chalk.bold('Hyve:')}        ${session.hyveId}`);
+      console.log(`  ${chalk.bold('Canvas Type:')} ${session.canvasTypeId}`);
       console.log(`  ${chalk.bold('Framework:')}   ${session.framework}`);
       console.log(`  ${chalk.bold('Direction:')}   ${session.syncDirection}`);
       console.log(`  ${chalk.bold('Path:')}        ${session.localPath}`);

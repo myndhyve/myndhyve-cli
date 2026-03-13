@@ -61,7 +61,7 @@ const AUTH_USER = { uid: 'user_abc', email: 'test@test.com' };
 const SAMPLE_BOARD_SUMMARY = {
   id: 'board-abc',
   name: 'Sprint Board',
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   columnCount: 5,
   taskCount: 12,
   createdAt: '2026-02-01T10:00:00Z',
@@ -71,7 +71,7 @@ const SAMPLE_BOARD_SUMMARY = {
 const SAMPLE_BOARD_SUMMARY_2 = {
   id: 'board-def',
   name: 'Product Backlog',
-  hyveId: undefined,
+  canvasTypeId: undefined,
   columnCount: 3,
   taskCount: 0,
   createdAt: '2026-02-15T10:00:00Z',
@@ -81,7 +81,7 @@ const SAMPLE_BOARD_SUMMARY_2 = {
 const SAMPLE_BOARD_DETAIL = {
   id: 'board-abc',
   name: 'Sprint Board',
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   description: 'Current sprint tasks',
   ownerId: 'user_abc',
   columnCount: 5,
@@ -142,7 +142,7 @@ const SAMPLE_TASK_DETAIL = {
 const SAMPLE_CREATED_BOARD = {
   id: 'board-new123',
   name: 'New Board',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   description: 'A fresh board',
   ownerId: 'user_abc',
   columnCount: 5,
@@ -248,7 +248,7 @@ describe('registerKanbanCommands', () => {
 
       await run(['kanban', 'boards']);
 
-      expect(mockListBoards).toHaveBeenCalledWith('user_abc', { hyveId: undefined });
+      expect(mockListBoards).toHaveBeenCalledWith('user_abc', { canvasTypeId: undefined });
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Kanban Boards (2)');
       expect(output).toContain('board-abc');
@@ -277,12 +277,12 @@ describe('registerKanbanCommands', () => {
       expect(output).toContain('kanban create --name');
     });
 
-    it('passes --hyve filter to API', async () => {
+    it('passes --canvas-type filter to API', async () => {
       mockListBoards.mockResolvedValue([]);
 
-      await run(['kanban', 'boards', '--hyve', 'landing-page']);
+      await run(['kanban', 'boards', '--canvas-type', 'landing-page']);
 
-      expect(mockListBoards).toHaveBeenCalledWith('user_abc', { hyveId: 'landing-page' });
+      expect(mockListBoards).toHaveBeenCalledWith('user_abc', { canvasTypeId: 'landing-page' });
     });
 
     it('calls truncate on board id and name', async () => {
@@ -325,7 +325,7 @@ describe('registerKanbanCommands', () => {
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Sprint Board');
       expect(output).toContain('ID:          board-abc');
-      expect(output).toContain('Hyve:        landing-page');
+      expect(output).toContain('Canvas Type: landing-page');
       expect(output).toContain('Description: Current sprint tasks');
       expect(output).toContain('Tasks:       12');
       expect(output).toContain('View:        board');
@@ -365,7 +365,7 @@ describe('registerKanbanCommands', () => {
     it('omits optional fields when absent', async () => {
       const boardNoOptionals = {
         ...SAMPLE_BOARD_DETAIL,
-        hyveId: undefined,
+        canvasTypeId: undefined,
         description: undefined,
         swimlanes: [],
         workflowRunId: undefined,
@@ -375,7 +375,7 @@ describe('registerKanbanCommands', () => {
       await run(['kanban', 'board', 'board-abc']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).not.toContain('Hyve:');
+      expect(output).not.toContain('Canvas Type:');
       expect(output).not.toContain('Description:');
       expect(output).not.toContain('Swimlanes:');
       expect(output).not.toContain('Workflow Run:');
@@ -406,14 +406,14 @@ describe('registerKanbanCommands', () => {
     it('calls createBoard with correct args and shows result', async () => {
       mockCreateBoard.mockResolvedValue(SAMPLE_CREATED_BOARD);
 
-      await run(['kanban', 'create', '--name', 'New Board', '--hyve', 'app-builder', '--description', 'A fresh board']);
+      await run(['kanban', 'create', '--name', 'New Board', '--canvas-type', 'app-builder', '--description', 'A fresh board']);
 
       expect(mockCreateBoard).toHaveBeenCalledWith(
         'user_abc',
         expect.stringMatching(/^board-/),
         {
           name: 'New Board',
-          hyveId: 'app-builder',
+          canvasTypeId: 'app-builder',
           description: 'A fresh board',
         }
       );

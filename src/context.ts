@@ -25,10 +25,14 @@ const ContextSchema = z.object({
   projectId: z.string().min(1),
   /** Project display name (cached for quick display) */
   projectName: z.string().min(1),
-  /** Parent hyve ID */
-  hyveId: z.string().min(1),
-  /** Hyve display name (cached) */
-  hyveName: z.string().optional(),
+  /** Parent canvas type ID */
+  canvasTypeId: z.string().min(1),
+  /** Canvas type display name (cached) */
+  canvasTypeName: z.string().optional(),
+  /** Active canvas ID */
+  canvasId: z.string().optional(),
+  /** Active canvas session key */
+  sessionKey: z.string().optional(),
   /** When the context was set */
   setAt: z.string(),
 });
@@ -73,8 +77,8 @@ export function getActiveContext(): ActiveContext | null {
 export function setActiveContext(context: {
   projectId: string;
   projectName: string;
-  hyveId: string;
-  hyveName?: string;
+  canvasTypeId: string;
+  canvasTypeName?: string;
 }): ActiveContext {
   ensureCliDir();
 

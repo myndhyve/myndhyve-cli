@@ -5,7 +5,7 @@
  * - Streaming (SSE parsing)
  * - History (local persistence)
  * - Authentication (via getToken)
- * - System prompt resolution (built-in defaults per hyve)
+ * - System prompt resolution (built-in defaults per canvas type)
  */
 
 import { getToken } from '../auth/index.js';
@@ -24,6 +24,7 @@ import {
   type Conversation,
   type ChatMessage,
 } from './history.js';
+import { fetchCanvasTypeSystemPrompt } from '../api/prompts.js';
 
 const log = createLogger('Chat');
 
@@ -33,9 +34,9 @@ const log = createLogger('Chat');
 
 /** Options for creating a new chat session. */
 export interface ChatSessionOptions {
-  /** System hyve ID (e.g., 'app-builder', 'landing-page'). */
-  hyveId?: string;
-  /** Custom agent name (maps to hyveId internally). */
+  /** Canvas type ID (e.g., 'app-builder', 'landing-page'). */
+  canvasTypeId?: string;
+  /** Custom agent name (maps to canvasTypeId internally). */
   agentId?: string;
   /** AI provider to use. */
   provider?: string;
@@ -43,7 +44,7 @@ export interface ChatSessionOptions {
   model?: string;
   /** Sampling temperature (0-2). */
   temperature?: number;
-  /** Custom system prompt (overrides hyve default). */
+  /** Custom system prompt (overrides canvas type default). */
   systemPrompt?: string;
   /** Resume an existing session by ID. */
   resumeSessionId?: string;
@@ -53,8 +54,8 @@ export interface ChatSessionOptions {
 export interface ChatSession {
   /** Unique session ID. */
   sessionId: string;
-  /** Resolved hyve ID. */
-  hyveId?: string;
+  /** Resolved canvas type ID. */
+  canvasTypeId?: string;
   /** Provider being used. */
   provider: string;
   /** Model being used. */
@@ -85,9 +86,12 @@ export interface ChatStreamCallbacks {
 
 /**
  * Create a new chat session or resume an existing one.
+ *
+ * Fetches the system prompt from the Prompt API (database-first).
+ * Falls back to hardcoded defaults if the API is unavailable.
  */
-export function createSession(options: ChatSessionOptions = {}): ChatSession {
-  const hyveId = options.hyveId || options.agentId;
+export async function createSession(options: ChatSessionOptions = {}): Promise<ChatSession> {
+  const canvasTypeId = options.canvasTypeId || options.agentId;
   const provider = options.provider || 'anthropic';
   const model = options.model || getDefaultModel(provider);
   const temperature = options.temperature ?? 0.7;
@@ -97,13 +101,14 @@ export function createSession(options: ChatSessionOptions = {}): ChatSession {
     const existing = loadConversation(options.resumeSessionId);
     if (existing) {
       log.info('Resumed session', { sessionId: existing.sessionId });
+      const systemPrompt = options.systemPrompt || await resolveSystemPrompt(existing.canvasTypeId);
       return {
         sessionId: existing.sessionId,
-        hyveId: existing.hyveId,
+        canvasTypeId: existing.canvasTypeId,
         provider: existing.provider || provider,
         model: existing.model || model,
         temperature,
-        systemPrompt: options.systemPrompt || resolveSystemPrompt(existing.hyveId),
+        systemPrompt,
         messages: existing.messages,
         createdAt: existing.createdAt,
       };
@@ -114,13 +119,13 @@ export function createSession(options: ChatSessionOptions = {}): ChatSession {
   }
 
   const sessionId = generateSessionId();
-  const systemPrompt = options.systemPrompt || resolveSystemPrompt(hyveId);
+  const systemPrompt = options.systemPrompt || await resolveSystemPrompt(canvasTypeId);
 
-  log.info('Created session', { sessionId, hyveId, provider, model });
+  log.info('Created session', { sessionId, canvasTypeId, provider, model });
 
   return {
     sessionId,
-    hyveId,
+    canvasTypeId,
     provider,
     model,
     temperature,
@@ -244,7 +249,7 @@ export function persistSession(session: ChatSession): void {
   const conversation: Conversation = {
     sessionId: session.sessionId,
     title,
-    hyveId: session.hyveId,
+    canvasTypeId: session.canvasTypeId,
     model: session.model,
     provider: session.provider,
     messages: messagesToSave,
@@ -286,43 +291,10 @@ function buildAPIMessages(
 }
 
 // ============================================================================
-// SYSTEM PROMPT RESOLUTION
+// SYSTEM PROMPT RESOLUTION (Database-First)
 // ============================================================================
 
-/** Built-in system prompts for system hyves. */
-const HYVE_PROMPTS: Record<string, string> = {
-  'app-builder': `You are MyndHyve App Builder, an expert AI assistant for building web applications. You help users create PRDs (Product Requirements Documents), design UI components, plan technical architecture, and generate implementation plans.
-
-When the user describes an app idea:
-1. Ask clarifying questions if the requirements are vague
-2. Propose a structured approach (PRD → Design → Implementation)
-3. Generate detailed, actionable specifications
-4. Consider UX best practices, accessibility, and performance
-
-Be concise, technical, and practical. Use markdown formatting for readability.`,
-
-  'landing-page': `You are MyndHyve Landing Page Builder, an expert AI assistant for creating high-converting marketing landing pages. You help with copywriting, section design, A/B testing strategy, and conversion optimization.
-
-When the user describes a landing page need:
-1. Understand the target audience and value proposition
-2. Suggest an effective page structure (Hero → Features → Social Proof → CTA)
-3. Write compelling copy with clear CTAs
-4. Recommend design patterns that drive conversions
-
-Focus on clarity, persuasion, and measurable outcomes. Use markdown formatting.`,
-
-  'hyve-maker': `You are MyndHyve Hyve Maker, an AI assistant that helps users create custom hyves (workspaces). You help design workspace layouts, define workflows, configure AI agents, and set up automation.
-
-Guide users through:
-1. Defining the hyve's purpose and target users
-2. Designing the workspace layout and navigation
-3. Configuring AI agents and their capabilities
-4. Setting up workflows and automation rules
-
-Be creative yet practical. Focus on user experience and productivity.`,
-};
-
-/** Default system prompt when no hyve is specified. */
+/** Fallback prompt when no canvas type is specified or API is unavailable. */
 const DEFAULT_SYSTEM_PROMPT = `You are MyndHyve AI, a helpful and knowledgeable assistant. You help users with a variety of tasks including writing, analysis, coding, and creative work.
 
 Guidelines:
@@ -333,11 +305,28 @@ Guidelines:
 - Consider best practices and potential edge cases`;
 
 /**
- * Resolve the system prompt for a given hyve ID.
+ * Resolve the system prompt for a given canvas type ID.
+ *
+ * Database-first: fetches from the Prompt API (Firestore-backed).
+ * Falls back to DEFAULT_SYSTEM_PROMPT if the API is unavailable.
  */
-export function resolveSystemPrompt(hyveId?: string): string {
-  if (!hyveId) return DEFAULT_SYSTEM_PROMPT;
-  return HYVE_PROMPTS[hyveId] || DEFAULT_SYSTEM_PROMPT;
+export async function resolveSystemPrompt(canvasTypeId?: string): Promise<string> {
+  if (!canvasTypeId) return DEFAULT_SYSTEM_PROMPT;
+
+  try {
+    const apiPrompt = await fetchCanvasTypeSystemPrompt(canvasTypeId);
+    if (apiPrompt) {
+      log.debug('Resolved prompt from API', { canvasTypeId });
+      return apiPrompt;
+    }
+  } catch (err) {
+    log.warn('Failed to fetch system prompt from API, using fallback', {
+      canvasTypeId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return DEFAULT_SYSTEM_PROMPT;
 }
 
 // ============================================================================

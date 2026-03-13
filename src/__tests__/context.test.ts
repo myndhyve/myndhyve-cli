@@ -67,8 +67,8 @@ const CONTEXT_PATH = '/mock-home/.myndhyve-cli/context.json';
 const validContext: ActiveContext = {
   projectId: 'proj-123',
   projectName: 'My Project',
-  hyveId: 'app-builder',
-  hyveName: 'App Builder',
+  canvasTypeId: 'app-builder',
+  canvasTypeName: 'App Builder',
   setAt: '2024-06-15T10:30:00.000Z',
 };
 
@@ -96,8 +96,8 @@ describe('getActiveContext()', () => {
     expect(result).not.toBeNull();
     expect(result!.projectId).toBe('proj-123');
     expect(result!.projectName).toBe('My Project');
-    expect(result!.hyveId).toBe('app-builder');
-    expect(result!.hyveName).toBe('App Builder');
+    expect(result!.canvasTypeId).toBe('app-builder');
+    expect(result!.canvasTypeName).toBe('App Builder');
     expect(result!.setAt).toBe('2024-06-15T10:30:00.000Z');
   });
 
@@ -110,21 +110,21 @@ describe('getActiveContext()', () => {
     expect(mockReadFileSync).toHaveBeenCalledWith(CONTEXT_PATH, 'utf-8');
   });
 
-  it('returns context without optional hyveName', () => {
-    const contextNoHyveName = {
+  it('returns context without optional canvasTypeName', () => {
+    const contextNoCanvasTypeName = {
       projectId: 'proj-456',
       projectName: 'Another Project',
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
       setAt: '2024-07-01T00:00:00.000Z',
     };
     mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue(JSON.stringify(contextNoHyveName));
+    mockReadFileSync.mockReturnValue(JSON.stringify(contextNoCanvasTypeName));
 
     const result = getActiveContext();
 
     expect(result).not.toBeNull();
     expect(result!.projectId).toBe('proj-456');
-    expect(result!.hyveName).toBeUndefined();
+    expect(result!.canvasTypeName).toBeUndefined();
   });
 
   it('returns null and clears file when context is corrupt JSON', () => {
@@ -139,11 +139,11 @@ describe('getActiveContext()', () => {
   });
 
   it('returns null and clears file when context fails Zod validation', () => {
-    // Missing required fields (projectId, projectName, hyveId, setAt)
+    // Missing required fields (projectId, projectName, canvasTypeId, setAt)
     const invalidContext = {
       projectId: 'proj-123',
       // projectName is missing
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       setAt: '2024-06-15T10:30:00.000Z',
     };
     mockExistsSync.mockReturnValue(true);
@@ -159,7 +159,7 @@ describe('getActiveContext()', () => {
     const emptyProjectId = {
       projectId: '',
       projectName: 'Test',
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
       setAt: '2024-01-01T00:00:00.000Z',
     };
     mockExistsSync.mockReturnValue(true);
@@ -194,8 +194,8 @@ describe('setActiveContext()', () => {
     const input = {
       projectId: 'proj-new',
       projectName: 'New Project',
-      hyveId: 'landing-page',
-      hyveName: 'Landing Page Canvas',
+      canvasTypeId: 'landing-page',
+      canvasTypeName: 'Landing Page Canvas',
     };
 
     const result = setActiveContext(input);
@@ -211,15 +211,15 @@ describe('setActiveContext()', () => {
     const parsed = JSON.parse(content as string);
     expect(parsed.projectId).toBe('proj-new');
     expect(parsed.projectName).toBe('New Project');
-    expect(parsed.hyveId).toBe('landing-page');
-    expect(parsed.hyveName).toBe('Landing Page Canvas');
+    expect(parsed.canvasTypeId).toBe('landing-page');
+    expect(parsed.canvasTypeName).toBe('Landing Page Canvas');
     expect(parsed.setAt).toBeTruthy();
 
     // Verify return value matches written content
     expect(result.projectId).toBe('proj-new');
     expect(result.projectName).toBe('New Project');
-    expect(result.hyveId).toBe('landing-page');
-    expect(result.hyveName).toBe('Landing Page Canvas');
+    expect(result.canvasTypeId).toBe('landing-page');
+    expect(result.canvasTypeName).toBe('Landing Page Canvas');
   });
 
   it('returns the saved context with setAt timestamp', () => {
@@ -228,7 +228,7 @@ describe('setActiveContext()', () => {
     const result = setActiveContext({
       projectId: 'proj-time',
       projectName: 'Time Test',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
     });
 
     const after = new Date().toISOString();
@@ -243,7 +243,7 @@ describe('setActiveContext()', () => {
     setActiveContext({
       projectId: 'proj-pretty',
       projectName: 'Pretty Print',
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
     });
 
     const [, content] = mockWriteFileSync.mock.calls[0];
@@ -252,15 +252,15 @@ describe('setActiveContext()', () => {
     expect(content).toBe(JSON.stringify(parsed, null, 2));
   });
 
-  it('works without optional hyveName', () => {
+  it('works without optional canvasTypeName', () => {
     const result = setActiveContext({
-      projectId: 'proj-no-hyve-name',
+      projectId: 'proj-no-canvas-type-name',
       projectName: 'No Hyve Name',
-      hyveId: 'drawings',
+      canvasTypeId: 'drawings',
     });
 
-    expect(result.hyveName).toBeUndefined();
-    expect(result.projectId).toBe('proj-no-hyve-name');
+    expect(result.canvasTypeName).toBeUndefined();
+    expect(result.projectId).toBe('proj-no-canvas-type-name');
   });
 
   it('validates context with Zod before writing (rejects invalid)', () => {
@@ -270,7 +270,7 @@ describe('setActiveContext()', () => {
       setActiveContext({
         projectId: '',
         projectName: 'Test',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
       });
     }).toThrow();
 
@@ -283,7 +283,7 @@ describe('setActiveContext()', () => {
       setActiveContext({
         projectId: 'proj-123',
         projectName: '',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
       });
     }).toThrow();
 
@@ -298,7 +298,7 @@ describe('setActiveContext()', () => {
     setActiveContext({
       projectId: 'proj-order',
       projectName: 'Order Test',
-      hyveId: 'cad',
+      canvasTypeId: 'cad',
     });
 
     expect(callOrder).toEqual(['ensureCliDir', 'writeFileSync']);
@@ -356,7 +356,7 @@ describe('hasActiveContext()', () => {
   });
 
   it('returns false when context file exists but fails validation', () => {
-    const invalidContext = { projectId: 'p', hyveId: 'h' }; // missing projectName and setAt
+    const invalidContext = { projectId: 'p', canvasTypeId: 'h' }; // missing projectName and setAt
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(JSON.stringify(invalidContext));
 

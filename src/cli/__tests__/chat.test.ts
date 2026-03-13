@@ -88,7 +88,7 @@ async function run(args: string[]): Promise<void> {
 function makeMockSession(overrides?: Record<string, unknown>) {
   return {
     sessionId: 'sess_abc123',
-    hyveId: undefined,
+    canvasTypeId: undefined,
     provider: 'anthropic',
     model: 'claude-sonnet',
     temperature: 0.7,
@@ -152,7 +152,7 @@ describe('registerChatCommand', () => {
       const chat = program.commands.find((c) => c.name() === 'chat')!;
       const optionNames = chat.options.map((o) => o.long);
 
-      expect(optionNames).toContain('--hyve');
+      expect(optionNames).toContain('--canvas-type');
       expect(optionNames).toContain('--agent');
       expect(optionNames).toContain('--model');
       expect(optionNames).toContain('--provider');
@@ -205,7 +205,7 @@ describe('registerChatCommand', () => {
         {
           sessionId: 'sess_001',
           title: 'Docker Setup Help',
-          hyveId: 'app-builder',
+          canvasTypeId: 'app-builder',
           messageCount: 12,
           createdAt: '2025-01-15T10:00:00Z',
           updatedAt: '2025-01-15T11:00:00Z',
@@ -213,7 +213,7 @@ describe('registerChatCommand', () => {
         {
           sessionId: 'sess_002',
           title: 'Landing Page Design',
-          hyveId: undefined,
+          canvasTypeId: undefined,
           messageCount: 5,
           createdAt: '2025-01-14T08:00:00Z',
           updatedAt: '2025-01-14T09:00:00Z',
@@ -319,7 +319,7 @@ describe('registerChatCommand', () => {
 
       expect(mockCreateSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          hyveId: undefined,
+          canvasTypeId: undefined,
           agentId: undefined,
           provider: undefined,
           model: undefined,
@@ -333,13 +333,13 @@ describe('registerChatCommand', () => {
     });
 
     it('passes options through to createSession', async () => {
-      const session = makeMockSession({ hyveId: 'app-builder' });
+      const session = makeMockSession({ canvasTypeId: 'app-builder' });
       mockCreateSession.mockReturnValue(session);
       mockSendMessage.mockResolvedValue('Response');
 
       await run([
         'chat', 'Build a page',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--model', 'gpt-4o',
         '--provider', 'openai',
         '--temperature', '0.5',
@@ -348,7 +348,7 @@ describe('registerChatCommand', () => {
 
       expect(mockCreateSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          hyveId: 'app-builder',
+          canvasTypeId: 'app-builder',
           model: 'gpt-4o',
           provider: 'openai',
           temperature: 0.5,

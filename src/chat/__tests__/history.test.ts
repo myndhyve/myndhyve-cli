@@ -146,11 +146,11 @@ describe('saveConversation()', () => {
     expect(() => saveConversation({ sessionId: '', title: 'Bad' })).toThrow();
   });
 
-  it('saves conversation with optional fields (hyveId, model, provider)', () => {
+  it('saves conversation with optional fields (canvasTypeId, model, provider)', () => {
     mockExistsSync.mockReturnValue(true);
 
     const conv = makeConversation({
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       model: 'claude-opus-4-6',
       provider: 'anthropic',
       agentId: 'agent-123',
@@ -159,7 +159,7 @@ describe('saveConversation()', () => {
 
     const [, content] = mockWriteFileSync.mock.calls[0];
     const parsed = JSON.parse(content as string);
-    expect(parsed.hyveId).toBe('landing-page');
+    expect(parsed.canvasTypeId).toBe('landing-page');
     expect(parsed.model).toBe('claude-opus-4-6');
     expect(parsed.provider).toBe('anthropic');
     expect(parsed.agentId).toBe('agent-123');
@@ -231,7 +231,7 @@ describe('listConversations()', () => {
     const newConv = makeConversation({
       sessionId: 'new',
       title: 'New conversation',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       updatedAt: '2025-01-20T10:00:00.000Z',
     });
 
@@ -247,7 +247,7 @@ describe('listConversations()', () => {
     // Most recent first
     expect(result[0].sessionId).toBe('new');
     expect(result[0].title).toBe('New conversation');
-    expect(result[0].hyveId).toBe('app-builder');
+    expect(result[0].canvasTypeId).toBe('app-builder');
     expect(result[0].messageCount).toBe(2);
     expect(result[1].sessionId).toBe('old');
     expect(result[1].title).toBe('Old conversation');

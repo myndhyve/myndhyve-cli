@@ -38,7 +38,7 @@ export interface JobSchedule {
 export interface WorkflowAction {
   type: 'workflow';
   workflowId: string;
-  hyveId: string;
+  canvasTypeId: string;
   input?: Record<string, unknown>;
 }
 

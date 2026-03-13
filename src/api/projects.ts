@@ -28,7 +28,7 @@ export interface ProjectSummary {
   id: string;
   name: string;
   slug: string;
-  hyveId: string;
+  canvasTypeId: string;
   status: string;
   type: string;
   description?: string;
@@ -53,7 +53,7 @@ export interface ProjectDetail extends ProjectSummary {
 /** Options for creating a new project. */
 export interface CreateProjectOptions {
   name: string;
-  hyveId: string;
+  canvasTypeId: string;
   description?: string;
   type?: string;
   tags?: string[];
@@ -78,14 +78,14 @@ const COLLECTION = 'projects';
  */
 export async function listProjects(
   userId: string,
-  options?: { hyveId?: string; status?: string }
+  options?: { canvasTypeId?: string; status?: string }
 ): Promise<ProjectSummary[]> {
   const filters: QueryFilter[] = [
     { field: 'ownerId', op: 'EQUAL', value: userId },
   ];
 
-  if (options?.hyveId) {
-    filters.push({ field: 'hyveId', op: 'EQUAL', value: options.hyveId });
+  if (options?.canvasTypeId) {
+    filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
   }
 
   if (options?.status) {
@@ -139,7 +139,7 @@ export async function createProject(
     name: options.name,
     slug,
     description: options.description || '',
-    hyveId: options.hyveId,
+    hyveId: options.canvasTypeId,
     ownerId: userId,
     ownerType: 'user',
     type: options.type || 'general',
@@ -242,7 +242,7 @@ function toProjectSummary(doc: Record<string, unknown>): ProjectSummary {
     id: doc.id as string,
     name: (doc.name as string) || 'Untitled',
     slug: (doc.slug as string) || '',
-    hyveId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.hyveId as string) || '',
     status: (doc.status as string) || 'draft',
     type: (doc.type as string) || 'general',
     description: doc.description as string | undefined,

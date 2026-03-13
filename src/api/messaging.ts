@@ -91,7 +91,7 @@ export interface PolicySummary {
   requireMention: boolean;
   allowedUsers: string[];
   allowedChannels: string[];
-  channelHyveBindings: Record<string, string>;
+  channelCanvasTypeBindings: Record<string, string>;
   channelWorkflowBindings: Record<string, string[]>;
   createdAt?: string;
   updatedAt?: string;
@@ -121,7 +121,7 @@ export interface RoutingCondition {
   value: string;
 }
 
-export type RoutingTargetType = 'hyve' | 'workflow' | 'agent' | 'escalation';
+export type RoutingTargetType = 'canvasType' | 'workflow' | 'agent' | 'escalation';
 
 export interface RoutingTarget {
   type: RoutingTargetType;
@@ -164,7 +164,7 @@ export interface SessionSummary {
   peerDisplay?: string;
   conversationKind: string;
   conversationId: string;
-  linkedHyveId?: string;
+  linkedCanvasTypeId?: string;
   linkedAgentId?: string;
   linkedIdentityId?: string;
   messageCount: number;
@@ -712,7 +712,7 @@ function toPolicySummary(doc: Record<string, unknown>): PolicySummary {
     requireMention: (doc.requireMention as boolean) ?? true,
     allowedUsers: (doc.allowedUsers as string[]) || [],
     allowedChannels: (doc.allowedChannels as string[]) || [],
-    channelHyveBindings: (doc.channelHyveBindings as Record<string, string>) || {},
+    channelCanvasTypeBindings: (doc.channelHyveBindings as Record<string, string>) || {},
     channelWorkflowBindings: (doc.channelWorkflowBindings as Record<string, string[]>) || {},
     createdAt: doc.createdAt as string | undefined,
     updatedAt: doc.updatedAt as string | undefined,
@@ -725,7 +725,7 @@ function toRoutingRuleSummary(doc: Record<string, unknown>): RoutingRuleSummary 
     name: (doc.name as string) || 'Unnamed',
     priority: (doc.priority as number) || 0,
     conditions: (doc.conditions as RoutingCondition[]) || [],
-    target: (doc.target as RoutingTarget) || { type: 'hyve', targetId: '' },
+    target: (doc.target as RoutingTarget) || { type: 'canvasType', targetId: '' },
     enabled: (doc.enabled as boolean) ?? true,
     connectorId: doc.connectorId as string | undefined,
     createdAt: doc.createdAt as string | undefined,
@@ -741,7 +741,7 @@ function toSessionSummary(doc: Record<string, unknown>): SessionSummary {
     peerDisplay: doc.peerDisplay as string | undefined,
     conversationKind: (doc.conversationKind as string) || 'dm',
     conversationId: (doc.conversationId as string) || '',
-    linkedHyveId: doc.linkedHyveId as string | undefined,
+    linkedCanvasTypeId: doc.linkedHyveId as string | undefined,
     linkedAgentId: doc.linkedAgentId as string | undefined,
     linkedIdentityId: doc.linkedIdentityId as string | undefined,
     messageCount: (doc.messageCount as number) || 0,

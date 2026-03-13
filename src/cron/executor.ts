@@ -80,13 +80,13 @@ export async function executeAction(
 async function executeWorkflow(action: WorkflowAction): Promise<string> {
   log.debug('Executing workflow action', {
     workflowId: action.workflowId,
-    hyveId: action.hyveId,
+    canvasTypeId: action.canvasTypeId,
   });
 
   const userId = await getAuthUserId();
   const { createRun } = await import('../api/workflows.js');
 
-  const run = await createRun(userId, action.hyveId, action.workflowId, {
+  const run = await createRun(userId, action.canvasTypeId, action.workflowId, {
     triggerType: 'schedule',
     inputData: action.input,
   });

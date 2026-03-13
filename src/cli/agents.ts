@@ -2,9 +2,9 @@
  * MyndHyve CLI — Agent Commands
  *
  * Commander subcommand group for automation agent management:
- *   myndhyve-cli agents list [--hyve=<hyveId>]
+ *   myndhyve-cli agents list [--canvas-type=<canvasTypeId>]
  *   myndhyve-cli agents info <agent-id>
- *   myndhyve-cli agents create --hyve=<hyveId> --name="..." [--model=...]
+ *   myndhyve-cli agents create --canvas-type=<canvasTypeId> --name="..." [--model=...]
  *   myndhyve-cli agents update <agent-id> --data '{...}'
  *   myndhyve-cli agents enable <agent-id>
  *   myndhyve-cli agents disable <agent-id>
@@ -38,7 +38,7 @@ export function registerAgentCommands(program: Command): void {
   agents
     .command('list')
     .description('List automation agents')
-    .option('--hyve <hyveId>', 'Filter by hyve ID')
+    .option('--canvas-type <canvasTypeId>', 'Filter by canvas type ID')
     .option('--enabled', 'Show only enabled agents')
     .option('--disabled', 'Show only disabled agents')
     .option('--format <format>', 'Output format (table, json)', 'table')
@@ -49,7 +49,7 @@ export function registerAgentCommands(program: Command): void {
       try {
         const enabled = opts.enabled ? true : opts.disabled ? false : undefined;
         const agentList = await listAgents(auth.uid, {
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           enabled,
         });
 
@@ -60,7 +60,7 @@ export function registerAgentCommands(program: Command): void {
 
         if (agentList.length === 0) {
           console.log('\n  No agents found.');
-          console.log('  Create one: myndhyve-cli agents create --hyve=app-builder --name="My Agent"');
+          console.log('  Create one: myndhyve-cli agents create --canvas-type=app-builder --name="My Agent"');
           console.log('');
           return;
         }
@@ -70,7 +70,7 @@ export function registerAgentCommands(program: Command): void {
           '  ' +
             'ID'.padEnd(24) +
             'Name'.padEnd(22) +
-            'Hyve'.padEnd(16) +
+            'Canvas Type'.padEnd(16) +
             'Model'.padEnd(20) +
             'Status'
         );
@@ -84,7 +84,7 @@ export function registerAgentCommands(program: Command): void {
             '  ' +
               truncate(agent.id, 22).padEnd(24) +
               truncate(agent.name, 20).padEnd(22) +
-              truncate(agent.hyveId, 14).padEnd(16) +
+              truncate(agent.canvasTypeId, 14).padEnd(16) +
               truncate(model, 18).padEnd(20) +
               status
           );
@@ -126,7 +126,7 @@ export function registerAgentCommands(program: Command): void {
         console.log(`\n  ${agent.name}`);
         console.log('  ' + '\u2500'.repeat(50));
         console.log(`  ID:            ${agent.id}`);
-        console.log(`  Hyve:          ${agent.hyveId}`);
+        console.log(`  Canvas Type:   ${agent.canvasTypeId}`);
         console.log(`  Description:   ${agent.description || '-'}`);
         console.log(`  Status:        ${agent.enabled ? 'Enabled' : 'Disabled'}`);
         console.log(`  Provider:      ${agent.model.provider}`);
@@ -166,7 +166,7 @@ export function registerAgentCommands(program: Command): void {
   agents
     .command('create')
     .description('Create a new automation agent')
-    .requiredOption('--hyve <hyveId>', 'Hyve ID to create agent for')
+    .requiredOption('--canvas-type <canvasTypeId>', 'Canvas type ID to create agent for')
     .requiredOption('--name <name>', 'Agent name')
     .option('--description <desc>', 'Agent description')
     .option('--provider <provider>', 'Model provider (anthropic, openai, gemini)', 'anthropic')
@@ -186,7 +186,7 @@ export function registerAgentCommands(program: Command): void {
         const temperature = parseFloat(opts.temperature);
         const maxTokens = parseInt(opts.maxTokens, 10);
         const agent = await createAgent(auth.uid, agentId, {
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           name: opts.name,
           description: opts.description,
           systemPromptId: opts.promptId,
@@ -208,7 +208,7 @@ export function registerAgentCommands(program: Command): void {
         console.log(`\n  Agent created:`);
         console.log(`  ID:       ${agent.id}`);
         console.log(`  Name:     ${agent.name}`);
-        console.log(`  Hyve:     ${agent.hyveId}`);
+        console.log(`  Canvas Type: ${agent.canvasTypeId}`);
         console.log(`  Provider: ${agent.model.provider}`);
         console.log(`  Model:    ${agent.model.modelId}`);
         console.log('');

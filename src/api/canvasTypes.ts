@@ -1,11 +1,11 @@
 /**
- * MyndHyve CLI — Hyve Document API
+ * MyndHyve CLI — Canvas Type & Canvas API
  *
- * Operations for HyveDocuments (user work items within system hyves)
- * via Firestore REST API. Documents are stored at
+ * Operations for Canvases (user work items within canvas types)
+ * via Firestore REST API. Canvases are stored at
  * `users/{userId}/hyveDocuments/{docId}`.
  *
- * Also provides access to system hyve metadata (hardcoded, same as web app).
+ * Also provides access to canvas type metadata (hardcoded, same as web app).
  */
 
 import {
@@ -16,15 +16,15 @@ import {
 } from './firestore.js';
 import { createLogger } from '../utils/logger.js';
 
-const log = createLogger('HyveAPI');
+const log = createLogger('CanvasTypeAPI');
 
 // ============================================================================
-// SYSTEM HYVE TYPES
+// CANVAS TYPE DEFINITIONS
 // ============================================================================
 
-/** System hyve metadata (mirrors HyveManifestLite from web app). */
-export interface SystemHyve {
-  hyveId: string;
+/** Canvas type metadata (mirrors HyveManifestLite from web app). */
+export interface CanvasType {
+  canvasTypeId: string;
   name: string;
   description: string;
   icon: string;
@@ -36,12 +36,12 @@ export interface SystemHyve {
 }
 
 /**
- * System hyves — hardcoded to match the web app's `src/hyves/manifests.ts`.
+ * Canvas types — hardcoded to match the web app's `src/hyves/manifests.ts`.
  * These are platform-level apps, not user-created content.
  */
-export const SYSTEM_HYVES: SystemHyve[] = [
+export const CANVAS_TYPES: CanvasType[] = [
   {
-    hyveId: 'app-builder',
+    canvasTypeId: 'app-builder',
     name: 'App Builder',
     description: 'AI-assisted application development - from idea to code. Generate PRDs, design screens, and build complete applications.',
     icon: 'Layers',
@@ -52,7 +52,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-app-builder',
   },
   {
-    hyveId: 'slides',
+    canvasTypeId: 'slides',
     name: 'Slides',
     description: 'AI-assisted presentation creation - from outline to polished deck. Generate slides, apply themes, and create compelling presentations.',
     icon: 'Presentation',
@@ -63,7 +63,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-slides',
   },
   {
-    hyveId: 'drawings',
+    canvasTypeId: 'drawings',
     name: 'Drawings',
     description: 'AI-assisted digital illustration - from sketch to finished artwork. Create drawings with intelligent brush tools and color suggestions.',
     icon: 'PenTool',
@@ -74,7 +74,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-drawings',
   },
   {
-    hyveId: 'hyve-maker',
+    canvasTypeId: 'hyve-maker',
     name: 'Hyve Maker',
     description: 'Build custom Hyves through AI-assisted design. Create PRDs, design workflows, and generate prompts through conversational interaction.',
     icon: 'Puzzle',
@@ -85,7 +85,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-hyve-maker',
   },
   {
-    hyveId: 'hyve-builder',
+    canvasTypeId: 'hyve-builder',
     name: 'Hyve Builder',
     description: 'AI-assisted Hyve creation using the workflow engine. Create PRDs, prompts, workflows, schemas, and integrations through step-by-step approval.',
     icon: 'Puzzle',
@@ -96,7 +96,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-hyve-builder',
   },
   {
-    hyveId: 'cad',
+    canvasTypeId: 'cad',
     name: 'CAD Designer',
     description: '3D CAD design with parametric dimensions and constraints. Create 3D models with precision using primitives, transforms, and constraints.',
     icon: 'Box',
@@ -107,7 +107,7 @@ export const SYSTEM_HYVES: SystemHyve[] = [
     helpTopicId: 'hyve-cad',
   },
   {
-    hyveId: 'landing-page',
+    canvasTypeId: 'landing-page',
     name: 'Launch Studio',
     description: 'Build startup launch funnels with drag-and-drop sections, AI-assisted content, responsive design, and lead capture forms.',
     icon: 'Globe',
@@ -120,45 +120,45 @@ export const SYSTEM_HYVES: SystemHyve[] = [
 ];
 
 // ============================================================================
-// SYSTEM HYVE FUNCTIONS
+// CANVAS TYPE FUNCTIONS
 // ============================================================================
 
 /**
- * List all system hyves.
+ * List all canvas types.
  *
- * @param includeInternal - Whether to include internal-visibility hyves
- * @returns Array of system hyve metadata
+ * @param includeInternal - Whether to include internal-visibility canvas types
+ * @returns Array of canvas type metadata
  */
-export function listSystemHyves(includeInternal = false): SystemHyve[] {
-  if (includeInternal) return [...SYSTEM_HYVES];
-  return SYSTEM_HYVES.filter((h) => h.visibility === 'public');
+export function listCanvasTypes(includeInternal = false): CanvasType[] {
+  if (includeInternal) return [...CANVAS_TYPES];
+  return CANVAS_TYPES.filter((ct) => ct.visibility === 'public');
 }
 
 /**
- * Get a system hyve by ID.
+ * Get a canvas type by ID.
  *
- * @param hyveId - The hyve ID
- * @returns System hyve metadata or null if not found
+ * @param canvasTypeId - The canvas type ID
+ * @returns Canvas type metadata or null if not found
  */
-export function getSystemHyve(hyveId: string): SystemHyve | null {
-  return SYSTEM_HYVES.find((h) => h.hyveId === hyveId) || null;
+export function getCanvasType(canvasTypeId: string): CanvasType | null {
+  return CANVAS_TYPES.find((ct) => ct.canvasTypeId === canvasTypeId) || null;
 }
 
 /**
- * Check if a hyve ID corresponds to a valid system hyve.
+ * Check if an ID corresponds to a valid canvas type.
  */
-export function isValidSystemHyveId(hyveId: string): boolean {
-  return SYSTEM_HYVES.some((h) => h.hyveId === hyveId);
+export function isValidCanvasTypeId(canvasTypeId: string): boolean {
+  return CANVAS_TYPES.some((ct) => ct.canvasTypeId === canvasTypeId);
 }
 
 // ============================================================================
-// HYVE DOCUMENT TYPES
+// CANVAS TYPES (SUMMARY & DETAIL)
 // ============================================================================
 
-/** Lightweight hyve document summary for list display. */
-export interface HyveDocumentSummary {
+/** Lightweight canvas summary for list display. */
+export interface CanvasSummary {
   id: string;
-  hyveId: string;
+  canvasTypeId: string;
   name: string;
   slug: string;
   status: string;
@@ -169,8 +169,8 @@ export interface HyveDocumentSummary {
   lastOpenedAt?: string;
 }
 
-/** Full hyve document detail. */
-export interface HyveDocumentDetail extends HyveDocumentSummary {
+/** Full canvas detail. */
+export interface CanvasDetail extends CanvasSummary {
   ownerId: string;
   ownerType: string;
   description?: string;
@@ -182,29 +182,29 @@ export interface HyveDocumentDetail extends HyveDocumentSummary {
 }
 
 // ============================================================================
-// HYVE DOCUMENT API
+// CANVAS API
 // ============================================================================
 
 /**
- * List hyve documents for a user.
+ * List canvases for a user.
  *
  * @param userId - The authenticated user's UID
  * @param options - Optional filters
- * @returns Array of hyve document summaries
+ * @returns Array of canvas summaries
  */
-export async function listHyveDocuments(
+export async function listCanvases(
   userId: string,
-  options?: { hyveId?: string; status?: string; pinned?: boolean }
-): Promise<HyveDocumentSummary[]> {
+  options?: { canvasTypeId?: string; status?: string; pinned?: boolean }
+): Promise<CanvasSummary[]> {
   const collectionPath = `users/${userId}/hyveDocuments`;
 
-  log.debug('Listing hyve documents', { userId, options });
+  log.debug('Listing canvases', { userId, options });
 
   // Use query if filters are needed, otherwise list all
-  if (options?.hyveId || options?.status || options?.pinned !== undefined) {
+  if (options?.canvasTypeId || options?.status || options?.pinned !== undefined) {
     const filters: QueryFilter[] = [];
-    if (options.hyveId) {
-      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.hyveId });
+    if (options.canvasTypeId) {
+      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
     }
     if (options.status) {
       filters.push({ field: 'status', op: 'EQUAL', value: options.status });
@@ -217,43 +217,43 @@ export async function listHyveDocuments(
       limit: 100,
     });
 
-    return results.map(toDocumentSummary);
+    return results.map(toCanvasSummary);
   }
 
-  // No filters — list all documents
+  // No filters — list all canvases
   const { documents } = await listDocuments(collectionPath, { pageSize: 100 });
-  return documents.map(toDocumentSummary);
+  return documents.map(toCanvasSummary);
 }
 
 /**
- * Get full hyve document details by ID.
+ * Get full canvas details by ID.
  *
  * @param userId - The user's UID
- * @param documentId - The hyve document ID
- * @returns Document detail or null if not found
+ * @param canvasId - The canvas ID
+ * @returns Canvas detail or null if not found
  */
-export async function getHyveDocument(
+export async function getCanvas(
   userId: string,
-  documentId: string
-): Promise<HyveDocumentDetail | null> {
+  canvasId: string
+): Promise<CanvasDetail | null> {
   const collectionPath = `users/${userId}/hyveDocuments`;
 
-  log.debug('Getting hyve document', { userId, documentId });
+  log.debug('Getting canvas', { userId, canvasId });
 
-  const doc = await getDocument(collectionPath, documentId);
+  const doc = await getDocument(collectionPath, canvasId);
   if (!doc) return null;
 
-  return toDocumentDetail(doc);
+  return toCanvasDetail(doc);
 }
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function toDocumentSummary(doc: Record<string, unknown>): HyveDocumentSummary {
+function toCanvasSummary(doc: Record<string, unknown>): CanvasSummary {
   return {
     id: doc.id as string,
-    hyveId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.hyveId as string) || '',
     name: (doc.name as string) || 'Untitled',
     slug: (doc.slug as string) || '',
     status: (doc.status as string) || 'draft',
@@ -265,8 +265,8 @@ function toDocumentSummary(doc: Record<string, unknown>): HyveDocumentSummary {
   };
 }
 
-function toDocumentDetail(doc: Record<string, unknown>): HyveDocumentDetail {
-  const summary = toDocumentSummary(doc);
+function toCanvasDetail(doc: Record<string, unknown>): CanvasDetail {
+  const summary = toCanvasSummary(doc);
   return {
     ...summary,
     ownerId: (doc.ownerId as string) || '',

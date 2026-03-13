@@ -75,7 +75,7 @@ describe('CronExecutor', () => {
   describe('auth', () => {
     it('throws when not authenticated', async () => {
       mockLoadCredentials.mockReturnValue(null);
-      const action: JobAction = { type: 'workflow', workflowId: 'wf-1', hyveId: 'lp' };
+      const action: JobAction = { type: 'workflow', workflowId: 'wf-1', canvasTypeId: 'lp' };
 
       await expect(executeAction(action, DEFAULT_SCHEDULER_CONFIG)).rejects.toThrow(
         'Not authenticated',
@@ -92,7 +92,7 @@ describe('CronExecutor', () => {
       const action: JobAction = {
         type: 'workflow',
         workflowId: 'wf-1',
-        hyveId: 'landing-page',
+        canvasTypeId: 'landing-page',
         input: { key: 'val' },
       };
 

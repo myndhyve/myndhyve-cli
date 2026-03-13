@@ -79,7 +79,7 @@ describe('registerCompletionCommand', () => {
       await run(['completion', 'bash']);
 
       const output = stdoutWriteSpy.mock.calls.map((c) => c[0]).join('');
-      const topLevelCommands = ['auth', 'chat', 'projects', 'hyves', 'messaging', 'workflows', 'relay', 'dev'];
+      const topLevelCommands = ['auth', 'chat', 'projects', 'canvas-types', 'messaging', 'workflows', 'relay', 'dev'];
       for (const cmd of topLevelCommands) {
         expect(output).toContain(cmd);
       }

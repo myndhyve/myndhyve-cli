@@ -3,7 +3,7 @@
  *
  * Commander subcommand group for project management:
  *   myndhyve-cli projects list
- *   myndhyve-cli projects create <name> --hyve=<hyveId>
+ *   myndhyve-cli projects create <name> --canvas-type=<canvasTypeId>
  *   myndhyve-cli projects info <project-id>
  *   myndhyve-cli projects open <project-id>
  *   myndhyve-cli projects delete <project-id>
@@ -16,7 +16,7 @@ import {
   createProject,
   deleteProjectById,
 } from '../api/projects.js';
-import { listSystemHyves, getSystemHyve, isValidSystemHyveId } from '../api/hyves.js';
+import { listCanvasTypes, getCanvasType, isValidCanvasTypeId } from '../api/canvasTypes.js';
 import { setActiveContext } from '../context.js';
 import {
   requireAuth,
@@ -37,7 +37,7 @@ export function registerProjectCommands(program: Command): void {
     .addHelpText('after', `
 Examples:
   $ myndhyve-cli projects list
-  $ myndhyve-cli projects create "My App" --hyve=app-builder
+  $ myndhyve-cli projects create "My App" --canvas-type=app-builder
   $ myndhyve-cli projects info <project-id>
   $ myndhyve-cli projects delete <project-id>`);
 
@@ -46,7 +46,7 @@ Examples:
   projects
     .command('list')
     .description('List all your projects')
-    .option('--hyve <hyveId>', 'Filter by hyve type')
+    .option('--canvas-type <canvasTypeId>', 'Filter by canvas type')
     .option('--status <status>', 'Filter by status (draft, in_progress, completed)')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
@@ -58,7 +58,7 @@ Examples:
 
       try {
         const results = await listProjects(auth.uid, {
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           status: opts.status,
         });
 
@@ -71,18 +71,18 @@ Examples:
 
         if (results.length === 0) {
           console.log('\n  No projects found.');
-          console.log('  Create one with: myndhyve-cli projects create "My Project" --hyve=app-builder\n');
+          console.log('  Create one with: myndhyve-cli projects create "My Project" --canvas-type=app-builder\n');
           return;
         }
 
         console.log(`\n  Projects (${results.length})\n`);
-        const cols: Array<[string, number]> = [['ID', 24], ['Name', 30], ['Hyve', 18], ['Status', 14], ['Updated', 14]];
+        const cols: Array<[string, number]> = [['ID', 24], ['Name', 30], ['Canvas Type', 18], ['Status', 14], ['Updated', 14]];
         console.log(formatTableRow(cols));
         console.log('  ' + '\u2500'.repeat(Math.min(100, (process.stdout.columns || 100) - 4)));
 
         for (const proj of results) {
-          const hyve = getSystemHyve(proj.hyveId);
-          const hyveName = hyve?.name || proj.hyveId;
+          const canvasType = getCanvasType(proj.canvasTypeId);
+          const canvasTypeName = canvasType?.name || proj.canvasTypeId;
           const updated = proj.updatedAt
             ? formatRelativeTime(proj.updatedAt)
             : '\u2014';
@@ -90,7 +90,7 @@ Examples:
           console.log(formatTableRow([
             [proj.id, 24],
             [proj.name, 30],
-            [hyveName, 18],
+            [canvasTypeName, 18],
             [proj.status, 14],
             [updated, 14],
           ]));
@@ -108,7 +108,7 @@ Examples:
   projects
     .command('create <name>')
     .description('Create a new project')
-    .requiredOption('--hyve <hyveId>', 'Hyve type (e.g., app-builder, landing-page)')
+    .requiredOption('--canvas-type <canvasTypeId>', 'Canvas type (e.g., app-builder, landing-page)')
     .option('--description <desc>', 'Project description')
     .option('--type <type>', 'Project type (general, app, design, etc.)', 'general')
     .option('--tags <tags>', 'Comma-separated tags')
@@ -118,13 +118,13 @@ Examples:
       const auth = requireAuth();
       if (!auth) return;
 
-      // Validate hyve ID
-      if (!isValidSystemHyveId(opts.hyve)) {
-        const available = listSystemHyves().map((h) => h.hyveId).join(', ');
+      // Validate canvas type ID
+      if (!isValidCanvasTypeId(opts.canvasType)) {
+        const available = listCanvasTypes().map((h) => h.canvasTypeId).join(', ');
         printErrorResult({
-          code: 'INVALID_HYVE',
-          message: `Unknown hyve "${opts.hyve}".`,
-          suggestion: `Available hyves: ${available}. Run \`myndhyve-cli hyves list\` to see all options.`,
+          code: 'INVALID_CANVAS_TYPE',
+          message: `Unknown canvas type "${opts.canvasType}".`,
+          suggestion: `Available canvas types: ${available}. Run \`myndhyve-cli canvas-types list\` to see all options.`,
         });
         process.exitCode = ExitCode.NOT_FOUND;
         return;
@@ -137,7 +137,7 @@ Examples:
 
         const project = await createProject(auth.uid, {
           name,
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           description: opts.description,
           type: opts.type,
           tags,
@@ -146,22 +146,22 @@ Examples:
         if (opts.format === 'json') {
           console.log(JSON.stringify(project, null, 2));
         } else {
-          const hyve = getSystemHyve(opts.hyve);
+          const canvasType = getCanvasType(opts.canvasType);
           console.log(`\n  Project created successfully!`);
-          console.log(`  ID:    ${project.id}`);
-          console.log(`  Name:  ${project.name}`);
-          console.log(`  Hyve:  ${hyve?.name || opts.hyve}`);
-          console.log(`  Slug:  ${project.slug}`);
+          console.log(`  ID:           ${project.id}`);
+          console.log(`  Name:         ${project.name}`);
+          console.log(`  Canvas Type:  ${canvasType?.name || opts.canvasType}`);
+          console.log(`  Slug:         ${project.slug}`);
         }
 
         // Optionally set as active project
         if (opts.use) {
-          const hyve = getSystemHyve(opts.hyve);
+          const canvasType = getCanvasType(opts.canvasType);
           setActiveContext({
             projectId: project.id,
             projectName: project.name,
-            hyveId: opts.hyve,
-            hyveName: hyve?.name,
+            canvasTypeId: opts.canvasType,
+            canvasTypeName: canvasType?.name,
           });
           console.log(`  Active: Yes (set as current project)`);
         }
@@ -200,14 +200,14 @@ Examples:
           return;
         }
 
-        const hyve = getSystemHyve(project.hyveId);
+        const canvasType = getCanvasType(project.canvasTypeId);
         const metadata = project.metadata as Record<string, unknown>;
 
         console.log(`\n  Project: ${project.name}`);
         console.log('  ' + '─'.repeat(50));
         console.log(`  ID:            ${project.id}`);
         console.log(`  Slug:          ${project.slug}`);
-        console.log(`  Hyve:          ${hyve?.name || project.hyveId}`);
+        console.log(`  Canvas Type:   ${canvasType?.name || project.canvasTypeId}`);
         console.log(`  Type:          ${project.type}`);
         console.log(`  Status:        ${project.status}`);
 
@@ -259,10 +259,10 @@ Examples:
           return;
         }
 
-        const hyve = getSystemHyve(project.hyveId);
-        const url = `https://app.myndhyve.com/hyve/${project.hyveId}/docs/${project.id}`;
+        const canvasType = getCanvasType(project.canvasTypeId);
+        const url = `https://app.myndhyve.com/canvas/${project.canvasTypeId}/docs/${project.id}`;
 
-        console.log(`\n  Opening "${project.name}" (${hyve?.name || project.hyveId})...`);
+        console.log(`\n  Opening "${project.name}" (${canvasType?.name || project.canvasTypeId})...`);
         console.log(`  URL: ${url}\n`);
 
         // Open in default browser (execFile avoids shell injection)

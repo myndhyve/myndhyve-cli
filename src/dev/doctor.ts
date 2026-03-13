@@ -221,7 +221,7 @@ export function checkActiveContext(): CheckResult {
   return {
     name: 'Active project',
     ok: true,
-    message: `${ctx.projectName} (${ctx.projectId}) in ${ctx.hyveName || ctx.hyveId}`,
+    message: `${ctx.projectName} (${ctx.projectId}) in ${ctx.canvasTypeName || ctx.canvasTypeId}`,
   };
 }
 

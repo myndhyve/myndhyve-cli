@@ -132,7 +132,7 @@ function makeRawRoutingRule(overrides: Record<string, unknown> = {}): Record<str
     conditions: [
       { type: 'channel', operator: 'equals', value: 'slack' },
     ],
-    target: { type: 'hyve', targetId: 'hyve_app_builder' },
+    target: { type: 'canvasType', targetId: 'hyve_app_builder' },
     enabled: true,
     connectorId: 'conn_slack_001',
     createdAt: '2025-06-01T10:00:00.000Z',
@@ -473,7 +473,7 @@ describe('getPolicy', () => {
       requireMention: true,
       allowedUsers: ['U111', 'U222'],
       allowedChannels: ['C001', 'C002'],
-      channelHyveBindings: { C001: 'hyve_lp' },
+      channelCanvasTypeBindings: { C001: 'hyve_lp' },
       channelWorkflowBindings: { C001: ['wf_1', 'wf_2'] },
       createdAt: '2025-06-01T10:00:00.000Z',
       updatedAt: '2025-06-01T12:00:00.000Z',
@@ -492,7 +492,7 @@ describe('getPolicy', () => {
     expect(result!.requireMention).toBe(true);
     expect(result!.allowedUsers).toEqual([]);
     expect(result!.allowedChannels).toEqual([]);
-    expect(result!.channelHyveBindings).toEqual({});
+    expect(result!.channelCanvasTypeBindings).toEqual({});
     expect(result!.channelWorkflowBindings).toEqual({});
   });
 
@@ -686,7 +686,7 @@ describe('listRoutingRules', () => {
     expect(results[0].name).toBe('Unnamed');
     expect(results[0].priority).toBe(0);
     expect(results[0].conditions).toEqual([]);
-    expect(results[0].target).toEqual({ type: 'hyve', targetId: '' });
+    expect(results[0].target).toEqual({ type: 'canvasType', targetId: '' });
     expect(results[0].enabled).toBe(true);
     expect(results[0].connectorId).toBeUndefined();
   });
@@ -719,7 +719,7 @@ describe('createRoutingRule', () => {
       name: 'New Rule',
       priority: 5,
       conditions: [],
-      target: { type: 'hyve', targetId: 'hyve_lp' },
+      target: { type: 'canvasType', targetId: 'hyve_lp' },
     });
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
@@ -732,7 +732,7 @@ describe('createRoutingRule', () => {
       name: 'Test Rule',
       priority: 1,
       conditions: [],
-      target: { type: 'hyve', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'hyve_1' },
     });
 
     const [, ruleId] = mockCreateDocument.mock.calls[0];
@@ -771,7 +771,7 @@ describe('createRoutingRule', () => {
       name: 'Default enabled',
       priority: 1,
       conditions: [],
-      target: { type: 'hyve', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'hyve_1' },
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -783,7 +783,7 @@ describe('createRoutingRule', () => {
       name: 'No connector',
       priority: 1,
       conditions: [],
-      target: { type: 'hyve', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'hyve_1' },
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -896,7 +896,7 @@ describe('listSessions', () => {
       peerDisplay: 'Alice',
       conversationKind: 'dm',
       conversationId: 'D001',
-      linkedHyveId: 'hyve_lp',
+      linkedCanvasTypeId: 'hyve_lp',
       linkedAgentId: 'agent_001',
       linkedIdentityId: 'ident_001',
       messageCount: 42,
@@ -940,7 +940,7 @@ describe('listSessions', () => {
     expect(results[0].conversationId).toBe('');
     expect(results[0].messageCount).toBe(0);
     expect(results[0].peerDisplay).toBeUndefined();
-    expect(results[0].linkedHyveId).toBeUndefined();
+    expect(results[0].linkedCanvasTypeId).toBeUndefined();
     expect(results[0].linkedAgentId).toBeUndefined();
     expect(results[0].linkedIdentityId).toBeUndefined();
     expect(results[0].lastMessageAt).toBeUndefined();
@@ -1488,7 +1488,7 @@ describe('collection paths', () => {
   it('createRoutingRule uses users/{userId}/messagingRoutingRules', async () => {
     mockCreateDocument.mockResolvedValue({ id: 'r1' });
     await createRoutingRule('uid_123', {
-      name: 'R', priority: 1, conditions: [], target: { type: 'hyve', targetId: 'h1' },
+      name: 'R', priority: 1, conditions: [], target: { type: 'canvasType', targetId: 'h1' },
     });
     expect(mockCreateDocument.mock.calls[0][0]).toBe('users/uid_123/messagingRoutingRules');
   });

@@ -527,8 +527,8 @@ describe('checkActiveContext()', () => {
     mockGetActiveContext.mockReturnValue({
       projectId: 'proj-123',
       projectName: 'My Campaign',
-      hyveId: 'landing-page',
-      hyveName: 'Landing Page',
+      canvasTypeId: 'landing-page',
+      canvasTypeName: 'Landing Page',
       setAt: '2024-06-15T10:00:00.000Z',
     });
 
@@ -542,11 +542,11 @@ describe('checkActiveContext()', () => {
     expect(result.fix).toBeUndefined();
   });
 
-  it('falls back to hyveId when hyveName is missing', () => {
+  it('falls back to canvasTypeId when canvasTypeName is missing', () => {
     mockGetActiveContext.mockReturnValue({
       projectId: 'proj-456',
-      projectName: 'No Hyve Name Project',
-      hyveId: 'app-builder',
+      projectName: 'No Canvas Type Name Project',
+      canvasTypeId: 'app-builder',
       setAt: '2024-06-15T10:00:00.000Z',
     });
 
@@ -554,15 +554,15 @@ describe('checkActiveContext()', () => {
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain('app-builder');
-    expect(result.message).toContain('No Hyve Name Project');
+    expect(result.message).toContain('No Canvas Type Name Project');
   });
 
   it('includes both project name and ID in parentheses', () => {
     mockGetActiveContext.mockReturnValue({
       projectId: 'proj-789',
       projectName: 'Test Project',
-      hyveId: 'slides',
-      hyveName: 'Slides',
+      canvasTypeId: 'slides',
+      canvasTypeName: 'Slides',
       setAt: '2024-01-01T00:00:00.000Z',
     });
 
@@ -722,8 +722,8 @@ describe('runDoctorChecks()', () => {
     mockGetActiveContext.mockReturnValue({
       projectId: 'proj-1',
       projectName: 'Test',
-      hyveId: 'app-builder',
-      hyveName: 'App Builder',
+      canvasTypeId: 'app-builder',
+      canvasTypeName: 'App Builder',
       setAt: '2024-06-15T10:00:00.000Z',
     });
 

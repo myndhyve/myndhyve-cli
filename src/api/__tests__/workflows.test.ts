@@ -80,7 +80,7 @@ beforeEach(() => {
 // ── Test data fixtures ──────────────────────────────────────────────────────
 
 const USER_ID = 'user-abc123';
-const HYVE_ID = 'app-builder';
+const CANVAS_TYPE_ID = 'app-builder';
 
 const mockWorkflowDoc: Record<string, unknown> = {
   id: 'wf-1',
@@ -107,7 +107,7 @@ const mockWorkflowDoc: Record<string, unknown> = {
 const mockRunDoc: Record<string, unknown> = {
   id: 'run_abc123',
   userId: USER_ID,
-  hyveId: HYVE_ID,
+  hyveId: CANVAS_TYPE_ID,
   workflowId: 'wf-1',
   workflowName: 'App Builder Workflow',
   status: 'running',
@@ -130,7 +130,7 @@ const mockRunDoc: Record<string, unknown> = {
 const mockWaitingRunDoc: Record<string, unknown> = {
   id: 'run_waiting123',
   userId: USER_ID,
-  hyveId: HYVE_ID,
+  hyveId: CANVAS_TYPE_ID,
   workflowId: 'wf-1',
   status: 'waiting-approval',
   triggerType: 'manual',
@@ -165,11 +165,11 @@ describe('listWorkflows()', () => {
   it('queries the correct collection path', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listWorkflows(HYVE_ID);
+    await listWorkflows(CANVAS_TYPE_ID);
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `hyves/${HYVE_ID}/workflows`,
+      `hyves/${CANVAS_TYPE_ID}/workflows`,
       { pageSize: 50 }
     );
   });
@@ -179,7 +179,7 @@ describe('listWorkflows()', () => {
       documents: [mockWorkflowDoc],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual<WorkflowSummary>({
@@ -198,7 +198,7 @@ describe('listWorkflows()', () => {
   it('returns empty array when no workflows exist', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results).toEqual([]);
   });
@@ -218,7 +218,7 @@ describe('listWorkflows()', () => {
       documents: [mockWorkflowDoc, secondDoc],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results).toHaveLength(2);
     expect(results[0].id).toBe('wf-1');
@@ -229,7 +229,7 @@ describe('listWorkflows()', () => {
     expect(results[1].enabled).toBe(false);
   });
 
-  it('uses different hyve IDs in the collection path', async () => {
+  it('uses different canvas type IDs in the collection path', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
     await listWorkflows('landing-page');
@@ -245,11 +245,11 @@ describe('getWorkflow()', () => {
   it('queries the correct collection path and document ID', async () => {
     mockGetDocument.mockResolvedValue(mockWorkflowDoc);
 
-    await getWorkflow(HYVE_ID, 'wf-1');
+    await getWorkflow(CANVAS_TYPE_ID, 'wf-1');
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `hyves/${HYVE_ID}/workflows`,
+      `hyves/${CANVAS_TYPE_ID}/workflows`,
       'wf-1'
     );
   });
@@ -257,11 +257,11 @@ describe('getWorkflow()', () => {
   it('returns WorkflowDetail with nodes, edges, and triggers', async () => {
     mockGetDocument.mockResolvedValue(mockWorkflowDoc);
 
-    const result = await getWorkflow(HYVE_ID, 'wf-1');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-1');
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('wf-1');
-    expect(result!.hyveId).toBe(HYVE_ID);
+    expect(result!.canvasTypeId).toBe(CANVAS_TYPE_ID);
     expect(result!.name).toBe('App Builder Workflow');
     expect(result!.description).toBe('Creates apps step by step');
     expect(result!.version).toBe(2);
@@ -305,7 +305,7 @@ describe('getWorkflow()', () => {
   it('returns null when workflow not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    const result = await getWorkflow(HYVE_ID, 'nonexistent');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'nonexistent');
 
     expect(result).toBeNull();
   });
@@ -313,7 +313,7 @@ describe('getWorkflow()', () => {
   it('includes summary fields in detail (triggerTypes, nodeCount)', async () => {
     mockGetDocument.mockResolvedValue(mockWorkflowDoc);
 
-    const result = await getWorkflow(HYVE_ID, 'wf-1');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-1');
 
     expect(result!.triggerTypes).toEqual(['manual', 'chat-message']);
     expect(result!.nodeCount).toBe(2);
@@ -327,17 +327,17 @@ describe('getWorkflow()', () => {
 // ============================================================================
 
 describe('listRuns()', () => {
-  it('always uses runQuery with userId+hyveId base filters', async () => {
+  it('always uses runQuery with userId+canvasTypeId base filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID);
+    await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
     expect(collectionPath).toBe('runs');
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
+      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
     ]);
     expect(options).toEqual({
       orderBy: 'startedAt',
@@ -350,13 +350,13 @@ describe('listRuns()', () => {
   it('adds status filter to base filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, { status: 'running' });
+    await listRuns(USER_ID, CANVAS_TYPE_ID, { status: 'running' });
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
+      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'status', op: 'EQUAL', value: 'running' },
     ]);
   });
@@ -364,13 +364,13 @@ describe('listRuns()', () => {
   it('adds workflowId filter to base filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, { workflowId: 'wf-1' });
+    await listRuns(USER_ID, CANVAS_TYPE_ID, { workflowId: 'wf-1' });
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
+      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
   });
@@ -378,13 +378,13 @@ describe('listRuns()', () => {
   it('combines status and workflowId filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, { status: 'completed', workflowId: 'wf-1' });
+    await listRuns(USER_ID, CANVAS_TYPE_ID, { status: 'completed', workflowId: 'wf-1' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(4);
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: HYVE_ID },
+      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'status', op: 'EQUAL', value: 'completed' },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
@@ -393,7 +393,7 @@ describe('listRuns()', () => {
   it('passes custom limit to runQuery', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, { status: 'running', limit: 10 });
+    await listRuns(USER_ID, CANVAS_TYPE_ID, { status: 'running', limit: 10 });
 
     const [, , options] = mockRunQuery.mock.calls[0];
     expect(options.limit).toBe(10);
@@ -402,7 +402,7 @@ describe('listRuns()', () => {
   it('passes custom limit when no extra filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, { limit: 25 });
+    await listRuns(USER_ID, CANVAS_TYPE_ID, { limit: 25 });
 
     const [, , options] = mockRunQuery.mock.calls[0];
     expect(options.limit).toBe(25);
@@ -411,7 +411,7 @@ describe('listRuns()', () => {
   it('maps results to RunSummary[]', async () => {
     mockRunQuery.mockResolvedValue([mockRunDoc]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual<RunSummary>({
@@ -433,7 +433,7 @@ describe('listRuns()', () => {
   it('returns empty array when no runs exist', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results).toEqual([]);
   });
@@ -441,11 +441,11 @@ describe('listRuns()', () => {
   it('uses empty options with base filters only', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listRuns(USER_ID, HYVE_ID, {});
+    await listRuns(USER_ID, CANVAS_TYPE_ID, {});
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [, filters] = mockRunQuery.mock.calls[0];
-    expect(filters).toHaveLength(2); // userId + hyveId only
+    expect(filters).toHaveLength(2); // userId + canvasTypeId only
   });
 });
 
@@ -453,7 +453,7 @@ describe('getRun()', () => {
   it('queries the correct collection path and document ID', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    await getRun(USER_ID, HYVE_ID, 'run_abc123');
+    await getRun(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
@@ -465,11 +465,11 @@ describe('getRun()', () => {
   it('returns RunDetail with nodeStates', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run_abc123');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe('run_abc123');
-    expect(result!.hyveId).toBe(HYVE_ID);
+    expect(result!.canvasTypeId).toBe(CANVAS_TYPE_ID);
     expect(result!.userId).toBe(USER_ID);
     expect(result!.workflowId).toBe('wf-1');
     expect(result!.workflowName).toBe('App Builder Workflow');
@@ -502,7 +502,7 @@ describe('getRun()', () => {
   it('returns null when run not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    const result = await getRun(USER_ID, HYVE_ID, 'nonexistent');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'nonexistent');
 
     expect(result).toBeNull();
   });
@@ -510,7 +510,7 @@ describe('getRun()', () => {
   it('includes summary fields currentNodeId/currentNodeLabel in detail', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run_abc123');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(result!.currentNodeId).toBe('node-2');
     expect(result!.currentNodeLabel).toBe('Generate Plan');
@@ -528,7 +528,7 @@ describe('createRun()', () => {
   });
 
   it('creates run at the correct collection path', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1');
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1');
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
     const [collectionPath] = mockCreateDocument.mock.calls[0];
@@ -536,7 +536,7 @@ describe('createRun()', () => {
   });
 
   it('generates a run ID with run_ prefix', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1');
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1');
 
     const [, runId] = mockCreateDocument.mock.calls[0];
     expect(runId).toMatch(/^run_/);
@@ -545,11 +545,11 @@ describe('createRun()', () => {
   });
 
   it('creates with status "pending" and triggerType "manual" by default', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1');
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1');
 
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.userId).toBe(USER_ID);
-    expect(data.hyveId).toBe(HYVE_ID);
+    expect(data.hyveId).toBe(CANVAS_TYPE_ID);
     expect(data.workflowId).toBe('wf-1');
     expect(data.status).toBe('pending');
     expect(data.triggerType).toBe('manual');
@@ -561,7 +561,7 @@ describe('createRun()', () => {
   });
 
   it('includes timestamps (startedAt, createdAt, updatedAt)', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1');
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1');
 
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(typeof data.startedAt).toBe('string');
@@ -578,7 +578,7 @@ describe('createRun()', () => {
   });
 
   it('passes through inputData when provided', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1', {
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1', {
       inputData: { topic: 'Task Manager', complexity: 'medium' },
     });
 
@@ -587,7 +587,7 @@ describe('createRun()', () => {
   });
 
   it('uses custom triggerType when provided', async () => {
-    await createRun(USER_ID, HYVE_ID, 'wf-1', {
+    await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1', {
       triggerType: 'chat-message',
     });
 
@@ -596,7 +596,7 @@ describe('createRun()', () => {
   });
 
   it('returns a RunSummary from the created document', async () => {
-    const result = await createRun(USER_ID, HYVE_ID, 'wf-1');
+    const result = await createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1');
 
     expect(result.id).toMatch(/^run_/);
     expect(result.workflowId).toBe('wf-1');
@@ -611,7 +611,7 @@ describe('getRunLogs()', () => {
   it('queries the correct collection path', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    await getRunLogs(USER_ID, HYVE_ID, 'run_abc123');
+    await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
@@ -623,7 +623,7 @@ describe('getRunLogs()', () => {
   it('extracts logs from run document and maps to RunLogEntry[]', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run_abc123');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(logs).not.toBeNull();
     expect(logs).toHaveLength(1);
@@ -640,7 +640,7 @@ describe('getRunLogs()', () => {
   it('returns null if run not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'nonexistent');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'nonexistent');
 
     expect(logs).toBeNull();
   });
@@ -648,7 +648,7 @@ describe('getRunLogs()', () => {
   it('returns empty array when run has no logs', async () => {
     mockGetDocument.mockResolvedValue({ id: 'run-no-logs', logs: [] });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-no-logs');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-no-logs');
 
     expect(logs).toEqual([]);
   });
@@ -656,7 +656,7 @@ describe('getRunLogs()', () => {
   it('returns empty array when run document has no logs field', async () => {
     mockGetDocument.mockResolvedValue({ id: 'run-missing-logs' });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-missing-logs');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-missing-logs');
 
     expect(logs).toEqual([]);
   });
@@ -688,7 +688,7 @@ describe('getRunLogs()', () => {
       ],
     });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-full-logs');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-full-logs');
 
     expect(logs).toHaveLength(3);
     expect(logs![0].nodeLabel).toBe('PRD Gen');
@@ -725,7 +725,7 @@ describe('approveRun()', () => {
       },
     });
 
-    const result = await approveRun(USER_ID, HYVE_ID, 'run_waiting123');
+    const result = await approveRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123');
 
     // Verify getDocument call
     expect(mockGetDocument).toHaveBeenCalledWith(
@@ -759,7 +759,7 @@ describe('approveRun()', () => {
     expect(payload['nodeStates.node-2.approval.feedback']).toBeUndefined();
 
     // Returns a RunDetail
-    expect(result.hyveId).toBe(HYVE_ID);
+    expect(result.canvasTypeId).toBe(CANVAS_TYPE_ID);
     expect(result.userId).toBe(USER_ID);
   });
 
@@ -767,7 +767,7 @@ describe('approveRun()', () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({ ...mockWaitingRunDoc, status: 'running' });
 
-    await approveRun(USER_ID, HYVE_ID, 'run_waiting123', 'Looks great, approved!');
+    await approveRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123', 'Looks great, approved!');
 
     const [, , payload, fieldPaths] = mockUpdateDocument.mock.calls[0];
     expect(payload['nodeStates.node-2.approval.feedback']).toBe('Looks great, approved!');
@@ -777,7 +777,7 @@ describe('approveRun()', () => {
   it('throws if run not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    await expect(approveRun(USER_ID, HYVE_ID, 'nonexistent')).rejects.toThrow(
+    await expect(approveRun(USER_ID, CANVAS_TYPE_ID, 'nonexistent')).rejects.toThrow(
       'Run "nonexistent" not found'
     );
 
@@ -787,7 +787,7 @@ describe('approveRun()', () => {
   it('throws if run is not waiting-approval', async () => {
     mockGetDocument.mockResolvedValue({ ...mockRunDoc, status: 'running' });
 
-    await expect(approveRun(USER_ID, HYVE_ID, 'run_abc123')).rejects.toThrow(
+    await expect(approveRun(USER_ID, CANVAS_TYPE_ID, 'run_abc123')).rejects.toThrow(
       'Run "run_abc123" is not awaiting approval (status: running)'
     );
 
@@ -804,7 +804,7 @@ describe('approveRun()', () => {
       },
     });
 
-    await expect(approveRun(USER_ID, HYVE_ID, 'run_no_waiting')).rejects.toThrow(
+    await expect(approveRun(USER_ID, CANVAS_TYPE_ID, 'run_no_waiting')).rejects.toThrow(
       'No node found awaiting approval in run "run_no_waiting"'
     );
 
@@ -818,7 +818,7 @@ describe('approveRun()', () => {
       nodeStates: {},
     });
 
-    await expect(approveRun(USER_ID, HYVE_ID, 'run_empty_nodes')).rejects.toThrow(
+    await expect(approveRun(USER_ID, CANVAS_TYPE_ID, 'run_empty_nodes')).rejects.toThrow(
       'No node found awaiting approval'
     );
   });
@@ -829,7 +829,7 @@ describe('rejectRun()', () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({ ...mockWaitingRunDoc, status: 'failed' });
 
-    await rejectRun(USER_ID, HYVE_ID, 'run_waiting123', 'Needs more detail');
+    await rejectRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123', 'Needs more detail');
 
     const [, , payload] = mockUpdateDocument.mock.calls[0];
     expect(payload['nodeStates.node-2.approval.decision']).toBe('rejected');
@@ -842,7 +842,7 @@ describe('rejectRun()', () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({ ...mockWaitingRunDoc, status: 'failed' });
 
-    await rejectRun(USER_ID, HYVE_ID, 'run_waiting123');
+    await rejectRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123');
 
     const [, , payload] = mockUpdateDocument.mock.calls[0];
     expect(payload['nodeStates.node-2.approval.decision']).toBe('rejected');
@@ -852,7 +852,7 @@ describe('rejectRun()', () => {
   it('throws if run not found', async () => {
     mockGetDocument.mockResolvedValue(null);
 
-    await expect(rejectRun(USER_ID, HYVE_ID, 'nonexistent')).rejects.toThrow(
+    await expect(rejectRun(USER_ID, CANVAS_TYPE_ID, 'nonexistent')).rejects.toThrow(
       'Run "nonexistent" not found'
     );
   });
@@ -863,7 +863,7 @@ describe('reviseRun()', () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockResolvedValue({ ...mockWaitingRunDoc, status: 'failed' });
 
-    await reviseRun(USER_ID, HYVE_ID, 'run_waiting123', 'Please add more features to the plan');
+    await reviseRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123', 'Please add more features to the plan');
 
     const [, , payload] = mockUpdateDocument.mock.calls[0];
     expect(payload['nodeStates.node-2.approval.decision']).toBe('rejected');
@@ -879,9 +879,9 @@ describe('reviseRun()', () => {
       status: 'failed',
     });
 
-    const result = await reviseRun(USER_ID, HYVE_ID, 'run_waiting123', 'Revise this');
+    const result = await reviseRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123', 'Revise this');
 
-    expect(result.hyveId).toBe(HYVE_ID);
+    expect(result.canvasTypeId).toBe(CANVAS_TYPE_ID);
     expect(result.userId).toBe(USER_ID);
     expect(result.id).toBe('run_waiting123');
   });
@@ -1032,7 +1032,7 @@ describe('toWorkflowSummary (tested via listWorkflows)', () => {
       documents: [{ id: 'wf-sparse' }],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results[0].id).toBe('wf-sparse');
     expect(results[0].name).toBe('Unnamed Workflow');
@@ -1050,7 +1050,7 @@ describe('toWorkflowSummary (tested via listWorkflows)', () => {
       documents: [{ id: 'wf-no-enabled', name: 'Test' }],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results[0].enabled).toBe(true);
   });
@@ -1060,7 +1060,7 @@ describe('toWorkflowSummary (tested via listWorkflows)', () => {
       documents: [{ id: 'wf-disabled', name: 'Disabled', enabled: false }],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results[0].enabled).toBe(false);
   });
@@ -1077,7 +1077,7 @@ describe('toWorkflowSummary (tested via listWorkflows)', () => {
       }],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results[0].nodeCount).toBe(3);
   });
@@ -1094,7 +1094,7 @@ describe('toWorkflowSummary (tested via listWorkflows)', () => {
       }],
     });
 
-    const results = await listWorkflows(HYVE_ID);
+    const results = await listWorkflows(CANVAS_TYPE_ID);
 
     expect(results[0].triggerTypes).toEqual(['webhook', 'schedule', 'manual']);
   });
@@ -1107,7 +1107,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       name: 'Empty Workflow',
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-empty');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-empty');
 
     expect(result!.nodes).toEqual([]);
     expect(result!.edges).toEqual([]);
@@ -1124,7 +1124,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-approval');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-approval');
 
     expect(result!.nodes[0].requiresApproval).toBe(false);
     expect(result!.nodes[1].requiresApproval).toBe(true);
@@ -1138,7 +1138,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-data-approval');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-data-approval');
 
     expect(result!.nodes[0].requiresApproval).toBe(true);
   });
@@ -1151,7 +1151,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-no-approval');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-no-approval');
 
     expect(result!.nodes[0].requiresApproval).toBe(false);
   });
@@ -1164,7 +1164,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-data-label');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-data-label');
 
     expect(result!.nodes[0].label).toBe('From Data');
   });
@@ -1177,7 +1177,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-no-label');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-no-label');
 
     expect(result!.nodes[0].label).toBe('Unnamed');
   });
@@ -1191,7 +1191,7 @@ describe('toWorkflowDetail (tested via getWorkflow)', () => {
       ],
     });
 
-    const result = await getWorkflow(HYVE_ID, 'wf-edge-labels');
+    const result = await getWorkflow(CANVAS_TYPE_ID, 'wf-edge-labels');
 
     expect(result!.edges[0].label).toBe('on success');
     expect(result!.edges[1].label).toBeUndefined();
@@ -1202,7 +1202,7 @@ describe('toRunSummary (tested via listRuns)', () => {
   it('finds currentNodeId from running node', async () => {
     mockRunQuery.mockResolvedValue([mockRunDoc]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results[0].currentNodeId).toBe('node-2');
     expect(results[0].currentNodeLabel).toBe('Generate Plan');
@@ -1211,7 +1211,7 @@ describe('toRunSummary (tested via listRuns)', () => {
   it('finds currentNodeId from waiting-approval node', async () => {
     mockRunQuery.mockResolvedValue([mockWaitingRunDoc]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results[0].currentNodeId).toBe('node-2');
     expect(results[0].currentNodeLabel).toBe('Review Plan');
@@ -1227,7 +1227,7 @@ describe('toRunSummary (tested via listRuns)', () => {
       },
     }]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results[0].currentNodeId).toBeUndefined();
     expect(results[0].currentNodeLabel).toBeUndefined();
@@ -1236,7 +1236,7 @@ describe('toRunSummary (tested via listRuns)', () => {
   it('handles missing fields with defaults', async () => {
     mockRunQuery.mockResolvedValue([{ id: 'run-sparse' }]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results[0].id).toBe('run-sparse');
     expect(results[0].workflowId).toBe('');
@@ -1261,7 +1261,7 @@ describe('toRunSummary (tested via listRuns)', () => {
       nodeStates: {},
     }]);
 
-    const results = await listRuns(USER_ID, HYVE_ID);
+    const results = await listRuns(USER_ID, CANVAS_TYPE_ID);
 
     expect(results[0].completedAt).toBe('2025-01-15T10:05:00Z');
     expect(results[0].durationMs).toBe(300000);
@@ -1272,7 +1272,7 @@ describe('toRunDetail (tested via getRun)', () => {
   it('converts nodeStates from object to NodeRunState array', async () => {
     mockGetDocument.mockResolvedValue(mockRunDoc);
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run_abc123');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run_abc123');
 
     expect(Array.isArray(result!.nodeStates)).toBe(true);
     expect(result!.nodeStates).toHaveLength(2);
@@ -1285,7 +1285,7 @@ describe('toRunDetail (tested via getRun)', () => {
   it('includes approval info in node state', async () => {
     mockGetDocument.mockResolvedValue(mockWaitingRunDoc);
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run_waiting123');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123');
 
     const waitingNode = result!.nodeStates.find((ns) => ns.nodeId === 'node-2');
     expect(waitingNode).toBeDefined();
@@ -1301,7 +1301,7 @@ describe('toRunDetail (tested via getRun)', () => {
       nodeStates: {},
     });
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run-empty');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-empty');
 
     expect(result!.nodeStates).toEqual([]);
   });
@@ -1312,7 +1312,7 @@ describe('toRunDetail (tested via getRun)', () => {
       status: 'pending',
     });
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run-no-states');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-no-states');
 
     expect(result!.nodeStates).toEqual([]);
   });
@@ -1325,7 +1325,7 @@ describe('toRunDetail (tested via getRun)', () => {
       nodeStates: {},
     });
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run-failed');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-failed');
 
     expect(result!.error).toBe('Timeout after 30000ms');
   });
@@ -1337,7 +1337,7 @@ describe('toRunDetail (tested via getRun)', () => {
       nodeStates: {},
     });
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run-with-input');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-with-input');
 
     expect(result!.inputData).toEqual({
       topic: 'E-commerce',
@@ -1354,7 +1354,7 @@ describe('toRunDetail (tested via getRun)', () => {
       },
     });
 
-    const result = await getRun(USER_ID, HYVE_ID, 'run-node-error');
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-node-error');
 
     expect(result!.nodeStates[0].error).toBe('API rate limit exceeded');
     expect(result!.nodeStates[0].status).toBe('failed');
@@ -1375,7 +1375,7 @@ describe('toRunLogEntry (tested via getRunLogs)', () => {
       }],
     });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-full-log');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-full-log');
 
     expect(logs![0]).toEqual<RunLogEntry>({
       timestamp: '2025-01-15T10:00:00Z',
@@ -1393,7 +1393,7 @@ describe('toRunLogEntry (tested via getRunLogs)', () => {
       logs: [{ message: 'Something happened' }],
     });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-no-level');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-no-level');
 
     expect(logs![0].level).toBe('info');
   });
@@ -1404,7 +1404,7 @@ describe('toRunLogEntry (tested via getRunLogs)', () => {
       logs: [{ level: 'error' }],
     });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-no-message');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-no-message');
 
     expect(logs![0].message).toBe('');
   });
@@ -1415,7 +1415,7 @@ describe('toRunLogEntry (tested via getRunLogs)', () => {
       logs: [{ message: 'Logged' }],
     });
 
-    const logs = await getRunLogs(USER_ID, HYVE_ID, 'run-no-ts');
+    const logs = await getRunLogs(USER_ID, CANVAS_TYPE_ID, 'run-no-ts');
 
     // Should be a valid ISO timestamp (fallback to new Date().toISOString())
     expect(typeof logs![0].timestamp).toBe('string');
@@ -1498,26 +1498,26 @@ describe('error propagation', () => {
   it('listWorkflows propagates errors from listDocuments', async () => {
     mockListDocuments.mockRejectedValue(new Error('Network error'));
 
-    await expect(listWorkflows(HYVE_ID)).rejects.toThrow('Network error');
+    await expect(listWorkflows(CANVAS_TYPE_ID)).rejects.toThrow('Network error');
   });
 
   it('getWorkflow propagates errors from getDocument', async () => {
     mockGetDocument.mockRejectedValue(new Error('Permission denied'));
 
-    await expect(getWorkflow(HYVE_ID, 'wf-1')).rejects.toThrow('Permission denied');
+    await expect(getWorkflow(CANVAS_TYPE_ID, 'wf-1')).rejects.toThrow('Permission denied');
   });
 
   it('createRun propagates errors from createDocument', async () => {
     mockCreateDocument.mockRejectedValue(new Error('Quota exceeded'));
 
-    await expect(createRun(USER_ID, HYVE_ID, 'wf-1')).rejects.toThrow('Quota exceeded');
+    await expect(createRun(USER_ID, CANVAS_TYPE_ID, 'wf-1')).rejects.toThrow('Quota exceeded');
   });
 
   it('approveRun propagates errors from updateDocument', async () => {
     mockGetDocument.mockResolvedValue({ ...mockWaitingRunDoc });
     mockUpdateDocument.mockRejectedValue(new Error('Write conflict'));
 
-    await expect(approveRun(USER_ID, HYVE_ID, 'run_waiting123')).rejects.toThrow('Write conflict');
+    await expect(approveRun(USER_ID, CANVAS_TYPE_ID, 'run_waiting123')).rejects.toThrow('Write conflict');
   });
 
   it('getArtifact propagates errors from getDocument', async () => {

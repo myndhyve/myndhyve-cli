@@ -22,7 +22,7 @@ _myndhyve_cli_completions() {
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
   # Top-level commands
-  commands="auth chat projects hyves messaging workflows relay dev status use unuse whoami completion update"
+  commands="auth chat projects canvas-types messaging workflows relay dev status use unuse whoami completion update"
 
   # Subcommands by parent
   case "\${COMP_WORDS[1]}" in
@@ -38,7 +38,7 @@ _myndhyve_cli_completions() {
       COMPREPLY=( $(compgen -W "list create info open delete" -- "$cur") )
       return 0
       ;;
-    hyves)
+    canvas-types)
       COMPREPLY=( $(compgen -W "list info docs" -- "$cur") )
       return 0
       ;;
@@ -106,7 +106,7 @@ _myndhyve-cli() {
     'auth:Authenticate with MyndHyve'
     'chat:Chat with AI agents'
     'projects:Manage projects'
-    'hyves:Explore system hyves'
+    'canvas-types:Explore canvas types'
     'messaging:Manage messaging connectors, policies, and routing'
     'workflows:Manage and run workflows'
     'relay:Bridge messaging platforms to MyndHyve'
@@ -248,7 +248,7 @@ complete -c myndhyve-cli -f
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'auth' -d 'Authenticate with MyndHyve'
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'chat' -d 'Chat with AI agents'
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'projects' -d 'Manage projects'
-complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'hyves' -d 'List system hyves'
+complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'canvas-types' -d 'List canvas types'
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'messaging' -d 'Manage messaging'
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'workflows' -d 'Manage workflows'
 complete -c myndhyve-cli -n '__fish_use_subcommand' -a 'relay' -d 'Bridge messaging platforms'
@@ -292,10 +292,10 @@ complete -c myndhyve-cli -n '__fish_seen_subcommand_from projects' -a 'info' -d 
 complete -c myndhyve-cli -n '__fish_seen_subcommand_from projects' -a 'open' -d 'Open in browser'
 complete -c myndhyve-cli -n '__fish_seen_subcommand_from projects' -a 'delete' -d 'Delete project'
 
-# hyves subcommands
-complete -c myndhyve-cli -n '__fish_seen_subcommand_from hyves' -a 'list' -d 'List system hyves'
-complete -c myndhyve-cli -n '__fish_seen_subcommand_from hyves' -a 'info' -d 'Show hyve details'
-complete -c myndhyve-cli -n '__fish_seen_subcommand_from hyves' -a 'docs' -d 'List hyve documents'
+# canvas-types subcommands
+complete -c myndhyve-cli -n '__fish_seen_subcommand_from canvas-types' -a 'list' -d 'List canvas types'
+complete -c myndhyve-cli -n '__fish_seen_subcommand_from canvas-types' -a 'info' -d 'Show canvas type details'
+complete -c myndhyve-cli -n '__fish_seen_subcommand_from canvas-types' -a 'docs' -d 'List canvases'
 
 # messaging subcommands
 complete -c myndhyve-cli -n '__fish_seen_subcommand_from messaging' -a 'connectors' -d 'Manage connectors'

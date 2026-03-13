@@ -2,7 +2,7 @@
  * MyndHyve CLI — Kanban Commands
  *
  * Commander subcommand group for kanban board management:
- *   myndhyve-cli kanban boards [--hyve=<hyveId>]
+ *   myndhyve-cli kanban boards [--canvas-type=<canvasTypeId>]
  *   myndhyve-cli kanban board <board-id>
  *   myndhyve-cli kanban create --name="..."
  *   myndhyve-cli kanban tasks <board-id> [--status=<status>]
@@ -35,7 +35,7 @@ export function registerKanbanCommands(program: Command): void {
   kanban
     .command('boards')
     .description('List kanban boards')
-    .option('--hyve <hyveId>', 'Filter by hyve ID')
+    .option('--canvas-type <canvasTypeId>', 'Filter by canvas type ID')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
       const auth = requireAuth();
@@ -43,7 +43,7 @@ export function registerKanbanCommands(program: Command): void {
 
       try {
         const boards = await listBoards(auth.uid, {
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
         });
 
         if (opts.format === 'json') {
@@ -65,7 +65,7 @@ export function registerKanbanCommands(program: Command): void {
             'Name'.padEnd(24) +
             'Columns'.padEnd(10) +
             'Tasks'.padEnd(10) +
-            'Hyve'
+            'Canvas Type'
         );
         console.log('  ' + '\u2500'.repeat(80));
 
@@ -76,7 +76,7 @@ export function registerKanbanCommands(program: Command): void {
               truncate(board.name, 22).padEnd(24) +
               String(board.columnCount).padEnd(10) +
               String(board.taskCount).padEnd(10) +
-              (board.hyveId || '-')
+              (board.canvasTypeId || '-')
           );
         }
 
@@ -116,7 +116,7 @@ export function registerKanbanCommands(program: Command): void {
         console.log(`\n  ${board.name}`);
         console.log('  ' + '\u2500'.repeat(50));
         console.log(`  ID:          ${board.id}`);
-        if (board.hyveId) console.log(`  Hyve:        ${board.hyveId}`);
+        if (board.canvasTypeId) console.log(`  Canvas Type: ${board.canvasTypeId}`);
         if (board.description) console.log(`  Description: ${board.description}`);
         console.log(`  Tasks:       ${board.taskCount}`);
         console.log(`  View:        ${board.config.defaultView}`);
@@ -150,7 +150,7 @@ export function registerKanbanCommands(program: Command): void {
     .command('create')
     .description('Create a new kanban board')
     .requiredOption('--name <name>', 'Board name')
-    .option('--hyve <hyveId>', 'Associate with a hyve')
+    .option('--canvas-type <canvasTypeId>', 'Associate with a canvas type')
     .option('--description <desc>', 'Board description')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
@@ -161,7 +161,7 @@ export function registerKanbanCommands(program: Command): void {
         const boardId = `board-${Date.now().toString(36)}`;
         const board = await createBoard(auth.uid, boardId, {
           name: opts.name,
-          hyveId: opts.hyve,
+          canvasTypeId: opts.canvasType,
           description: opts.description,
         });
 

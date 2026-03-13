@@ -81,8 +81,8 @@ const AUTH_USER = { uid: 'user-123', email: 'dev@myndhyve.com' };
 const DEFAULT_CONTEXT = {
   projectId: 'proj-123',
   projectName: 'My Project',
-  hyveId: 'landing-page',
-  hyveName: 'Landing Page',
+  canvasTypeId: 'landing-page',
+  canvasTypeName: 'Landing Page',
   setAt: '2025-01-15T10:00:00Z',
 };
 
@@ -125,7 +125,7 @@ const mockWorkflowSummaryDisabled = {
 
 const mockWorkflowDetail = {
   ...mockWorkflowSummary,
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   nodes: [
     { id: 'node-1', type: 'ai-generate', label: 'Generate PRD', requiresApproval: false },
     { id: 'node-2', type: 'approval', label: 'Review PRD', requiresApproval: true },
@@ -153,7 +153,7 @@ const mockRunSummary = {
 
 const mockRunDetail = {
   ...mockRunSummary,
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   userId: 'user-123',
   nodeStates: [
     { nodeId: 'node-1', status: 'completed', label: 'Generate PRD' },
@@ -188,7 +188,7 @@ const mockWaitingRunDetail = {
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   userId: 'user-123',
   startedAt: '2025-01-15T10:00:00Z',
   nodeStates: [
@@ -263,7 +263,7 @@ describe('registerWorkflowCommands', () => {
     // Default: auth success
     mockRequireAuth.mockReturnValue(AUTH_USER);
 
-    // Default: active context with hyveId
+    // Default: active context with canvasTypeId
     mockGetActiveContext.mockReturnValue(DEFAULT_CONTEXT);
 
     // truncate passthrough
@@ -417,15 +417,15 @@ describe('registerWorkflowCommands', () => {
   // ==========================================================================
 
   describe('resolveHyveId', () => {
-    it('uses --hyve flag when provided', async () => {
+    it('uses --canvas-type flag when provided', async () => {
       mockListWorkflows.mockResolvedValue([]);
 
-      await run(['workflows', 'list', '--hyve', 'app-builder']);
+      await run(['workflows', 'list', '--canvas-type', 'app-builder']);
 
       expect(mockListWorkflows).toHaveBeenCalledWith('app-builder');
     });
 
-    it('falls back to active context hyveId', async () => {
+    it('falls back to active context canvasTypeId', async () => {
       mockListWorkflows.mockResolvedValue([]);
 
       await run(['workflows', 'list']);
@@ -433,19 +433,19 @@ describe('registerWorkflowCommands', () => {
       expect(mockListWorkflows).toHaveBeenCalledWith('landing-page');
     });
 
-    it('shows error when no hyve and no context', async () => {
+    it('shows error when no canvas type and no context', async () => {
       mockGetActiveContext.mockReturnValue(null);
 
       await run(['workflows', 'list']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('No hyve ID specified');
-      expect(output).toContain('--hyve=<hyveId>');
+      expect(output).toContain('No canvas type ID specified');
+      expect(output).toContain('--canvas-type=<canvasTypeId>');
       expect(process.exitCode).toBe(2); // USAGE_ERROR
       expect(mockListWorkflows).not.toHaveBeenCalled();
     });
 
-    it('shows error when context exists but has no hyveId', async () => {
+    it('shows error when context exists but has no canvasTypeId', async () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-123',
         projectName: 'My Project',
@@ -454,15 +454,15 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'list']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('No hyve ID specified');
+      expect(output).toContain('No canvas type ID specified');
       expect(process.exitCode).toBe(2); // USAGE_ERROR
       expect(mockListWorkflows).not.toHaveBeenCalled();
     });
 
-    it('prefers --hyve flag over active context', async () => {
+    it('prefers --canvas-type flag over active context', async () => {
       mockListWorkflows.mockResolvedValue([]);
 
-      await run(['workflows', 'list', '--hyve', 'app-builder']);
+      await run(['workflows', 'list', '--canvas-type', 'app-builder']);
 
       expect(mockListWorkflows).toHaveBeenCalledWith('app-builder');
       expect(mockGetActiveContext).not.toHaveBeenCalled();
@@ -474,7 +474,7 @@ describe('registerWorkflowCommands', () => {
   // ==========================================================================
 
   describe('workflows list', () => {
-    it('lists workflows from active hyve context', async () => {
+    it('lists workflows from active canvas type context', async () => {
       mockListWorkflows.mockResolvedValue([mockWorkflowSummary]);
 
       await run(['workflows', 'list']);
@@ -486,10 +486,10 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('App Builder Workflow');
     });
 
-    it('lists workflows from --hyve flag', async () => {
+    it('lists workflows from --canvas-type flag', async () => {
       mockListWorkflows.mockResolvedValue([mockWorkflowSummary]);
 
-      await run(['workflows', 'list', '--hyve', 'app-builder']);
+      await run(['workflows', 'list', '--canvas-type', 'app-builder']);
 
       expect(mockListWorkflows).toHaveBeenCalledWith('app-builder');
     });
@@ -500,7 +500,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'list']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('No workflows found for hyve "landing-page"');
+      expect(output).toContain('No workflows found for canvas type "landing-page"');
       expect(output).toContain('Workflows are configured in the web app');
     });
 
@@ -579,11 +579,11 @@ describe('registerWorkflowCommands', () => {
       expect(mockGetWorkflow).toHaveBeenCalledWith('landing-page', 'wf-1');
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('App Builder Workflow');
-      expect(output).toContain('ID:          wf-1');
-      expect(output).toContain('Hyve:        landing-page');
-      expect(output).toContain('Version:     2');
-      expect(output).toContain('Status:      enabled');
-      expect(output).toContain('Description: Creates apps');
+      expect(output).toContain('ID:           wf-1');
+      expect(output).toContain('Canvas Type:  landing-page');
+      expect(output).toContain('Version:      2');
+      expect(output).toContain('Status:       enabled');
+      expect(output).toContain('Description:  Creates apps');
 
       // Triggers
       expect(output).toContain('Triggers:');
@@ -601,7 +601,7 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('node-2');
 
       // Run hint
-      expect(output).toContain('myndhyve-cli workflows run wf-1 --hyve=landing-page');
+      expect(output).toContain('myndhyve-cli workflows run wf-1 --canvas-type=landing-page');
     });
 
     it('shows edge labels when present', async () => {
@@ -619,7 +619,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'info', 'wf-missing']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Workflow "wf-missing" not found in hyve "landing-page"');
+      expect(output).toContain('Workflow "wf-missing" not found in canvas type "landing-page"');
       expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
@@ -629,7 +629,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'info', 'wf-1']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Status:      disabled');
+      expect(output).toContain('Status:       disabled');
     });
 
     it('omits description when not present', async () => {
@@ -661,10 +661,10 @@ describe('registerWorkflowCommands', () => {
       expect(mockPrintError).toHaveBeenCalledWith('Failed to get workflow info', expect.any(Error));
     });
 
-    it('uses --hyve flag for lookup', async () => {
+    it('uses --canvas-type flag for lookup', async () => {
       mockGetWorkflow.mockResolvedValue(mockWorkflowDetail);
 
-      await run(['workflows', 'info', 'wf-1', '--hyve', 'app-builder']);
+      await run(['workflows', 'info', 'wf-1', '--canvas-type', 'app-builder']);
 
       expect(mockGetWorkflow).toHaveBeenCalledWith('app-builder', 'wf-1');
     });
@@ -692,8 +692,8 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('Run ID:     run_abc123');
       expect(output).toContain('Workflow:   App Builder Workflow');
       expect(output).toContain('Status:     running');
-      expect(output).toContain('myndhyve-cli workflows status run_abc123 --hyve=landing-page');
-      expect(output).toContain('myndhyve-cli workflows logs run_abc123 --hyve=landing-page');
+      expect(output).toContain('myndhyve-cli workflows status run_abc123 --canvas-type=landing-page');
+      expect(output).toContain('myndhyve-cli workflows logs run_abc123 --canvas-type=landing-page');
     });
 
     it('passes parsed --input JSON to createRun', async () => {
@@ -724,7 +724,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'run', 'wf-missing']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Workflow "wf-missing" not found in hyve "landing-page"');
+      expect(output).toContain('Workflow "wf-missing" not found in canvas type "landing-page"');
       expect(process.exitCode).toBe(3); // NOT_FOUND
       expect(mockCreateRun).not.toHaveBeenCalled();
     });
@@ -759,11 +759,11 @@ describe('registerWorkflowCommands', () => {
       expect(mockPrintError).toHaveBeenCalledWith('Failed to trigger workflow run', expect.any(Error));
     });
 
-    it('uses --hyve flag', async () => {
+    it('uses --canvas-type flag', async () => {
       mockGetWorkflow.mockResolvedValue(mockWorkflowDetail);
       mockCreateRun.mockResolvedValue(mockRunSummary);
 
-      await run(['workflows', 'run', 'wf-1', '--hyve', 'app-builder']);
+      await run(['workflows', 'run', 'wf-1', '--canvas-type', 'app-builder']);
 
       expect(mockGetWorkflow).toHaveBeenCalledWith('app-builder', 'wf-1');
       expect(mockCreateRun).toHaveBeenCalledWith(
@@ -842,8 +842,8 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'status', 'run_waiting123']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('myndhyve-cli workflows approve run_waiting123 --hyve=landing-page');
-      expect(output).toContain('myndhyve-cli workflows reject run_waiting123 --hyve=landing-page');
+      expect(output).toContain('myndhyve-cli workflows approve run_waiting123 --canvas-type=landing-page');
+      expect(output).toContain('myndhyve-cli workflows reject run_waiting123 --canvas-type=landing-page');
       expect(output).toContain('myndhyve-cli workflows revise run_waiting123');
     });
 
@@ -1309,10 +1309,10 @@ describe('registerWorkflowCommands', () => {
       expect(mockPrintError).toHaveBeenCalledWith('Failed to approve run', expect.any(Error));
     });
 
-    it('uses --hyve flag', async () => {
+    it('uses --canvas-type flag', async () => {
       mockApproveRun.mockResolvedValue({ ...mockRunDetail, status: 'running' });
 
-      await run(['workflows', 'approve', 'run_waiting123', '--hyve', 'app-builder']);
+      await run(['workflows', 'approve', 'run_waiting123', '--canvas-type', 'app-builder']);
 
       expect(mockApproveRun).toHaveBeenCalledWith(
         'user-123',

@@ -35,7 +35,7 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 export const ConversationSchema = z.object({
   sessionId: z.string().min(1),
   title: z.string(),
-  hyveId: z.string().optional(),
+  canvasTypeId: z.string().optional(),
   agentId: z.string().optional(),
   model: z.string().optional(),
   provider: z.string().optional(),
@@ -50,7 +50,7 @@ export type Conversation = z.infer<typeof ConversationSchema>;
 export interface ConversationSummary {
   sessionId: string;
   title: string;
-  hyveId?: string;
+  canvasTypeId?: string;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
@@ -136,7 +136,7 @@ export function listConversations(): ConversationSummary[] {
       summaries.push({
         sessionId: conv.sessionId,
         title: conv.title,
-        hyveId: conv.hyveId,
+        canvasTypeId: conv.canvasTypeId,
         messageCount: conv.messages.length,
         createdAt: conv.createdAt,
         updatedAt: conv.updatedAt,

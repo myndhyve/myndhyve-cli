@@ -331,12 +331,12 @@ function registerPolicyCommands(messaging: Command): void {
           console.log(`  Allowed Channels: ${policy.allowedChannels.join(', ')}`);
         }
 
-        const hyveBindings = Object.entries(policy.channelHyveBindings);
-        if (hyveBindings.length > 0) {
+        const canvasTypeBindings = Object.entries(policy.channelCanvasTypeBindings);
+        if (canvasTypeBindings.length > 0) {
           console.log('');
-          console.log('  Hyve Bindings:');
-          for (const [ch, hyveId] of hyveBindings) {
-            console.log(`    ${ch} \u2192 ${hyveId}`);
+          console.log('  Canvas Type Bindings:');
+          for (const [ch, canvasTypeId] of canvasTypeBindings) {
+            console.log(`    ${ch} \u2192 ${canvasTypeId}`);
           }
         }
 
@@ -501,7 +501,7 @@ function registerRoutingCommands(messaging: Command): void {
     .description('Create a new routing rule')
     .requiredOption('--name <name>', 'Rule name')
     .requiredOption('--condition <condition>', 'Condition (e.g., "channel:equals:slack", "identity-property:tier:equals:vip")')
-    .requiredOption('--target <target>', 'Target (e.g., "workflow:my-workflow-id", "hyve:app-builder")')
+    .requiredOption('--target <target>', 'Target (e.g., "workflow:my-workflow-id", "canvasType:app-builder")')
     .option('--priority <n>', 'Priority (lower = higher priority)', '50')
     .option('--disabled', 'Create the rule in disabled state')
     .option('--connector <id>', 'Limit rule to a specific connector')
@@ -528,7 +528,7 @@ function registerRoutingCommands(messaging: Command): void {
         printErrorResult({
           code: 'INVALID_FORMAT',
           message: `Invalid target format "${opts.target}".`,
-          suggestion: 'Format: type:targetId. Types: hyve, workflow, agent, escalation. Example: workflow:my-workflow-id',
+          suggestion: 'Format: type:targetId. Types: canvasType, workflow, agent, escalation. Example: workflow:my-workflow-id',
         });
         process.exitCode = ExitCode.USAGE_ERROR;
         return;
@@ -782,8 +782,8 @@ function registerSessionCommands(messaging: Command): void {
         console.log(`  Conversation:  ${session.conversationKind} (${session.conversationId})`);
         console.log(`  Messages:      ${session.messageCount}`);
 
-        if (session.linkedHyveId) {
-          console.log(`  Linked Hyve:   ${session.linkedHyveId}`);
+        if (session.linkedCanvasTypeId) {
+          console.log(`  Canvas Type:   ${session.linkedCanvasTypeId}`);
         }
         if (session.linkedAgentId) {
           console.log(`  Linked Agent:  ${session.linkedAgentId}`);
@@ -1078,7 +1078,7 @@ function parseTarget(input: string): RoutingTarget | null {
   const type = input.substring(0, colonIdx);
   const targetId = input.substring(colonIdx + 1);
 
-  const validTypes = ['hyve', 'workflow', 'agent', 'escalation'];
+  const validTypes = ['canvasType', 'workflow', 'agent', 'escalation'];
   if (!validTypes.includes(type) || !targetId) return null;
 
   return {

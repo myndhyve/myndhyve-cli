@@ -67,7 +67,7 @@ const AUTH_USER = { uid: 'user_abc', email: 'test@test.com' };
 
 const SAMPLE_AGENT_SUMMARY = {
   id: 'agent-abc123',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   name: 'Build Agent',
   description: 'Builds things',
   enabled: true,
@@ -79,7 +79,7 @@ const SAMPLE_AGENT_SUMMARY = {
 
 const SAMPLE_AGENT_SUMMARY_2 = {
   id: 'agent-xyz789',
-  hyveId: 'landing-page',
+  canvasTypeId: 'landing-page',
   name: 'LP Agent',
   description: 'Landing page helper',
   enabled: false,
@@ -91,7 +91,7 @@ const SAMPLE_AGENT_SUMMARY_2 = {
 
 const SAMPLE_AGENT_DETAIL = {
   id: 'agent-abc123',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   name: 'Build Agent',
   description: 'Builds things',
   enabled: true,
@@ -115,7 +115,7 @@ const SAMPLE_AGENT_DETAIL = {
 
 const SAMPLE_AGENT_DETAIL_MINIMAL = {
   id: 'agent-min',
-  hyveId: 'app-builder',
+  canvasTypeId: 'app-builder',
   name: 'Minimal Agent',
   description: '',
   enabled: false,
@@ -227,7 +227,7 @@ describe('registerAgentCommands', () => {
       await run(['agents', 'list']);
 
       expect(mockListAgents).toHaveBeenCalledWith('user_abc', {
-        hyveId: undefined,
+        canvasTypeId: undefined,
         enabled: undefined,
       });
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
@@ -257,13 +257,13 @@ describe('registerAgentCommands', () => {
       expect(output).toContain('myndhyve-cli agents create');
     });
 
-    it('passes --hyve filter to API', async () => {
+    it('passes --canvas-type filter to API', async () => {
       mockListAgents.mockResolvedValue([]);
 
-      await run(['agents', 'list', '--hyve', 'app-builder']);
+      await run(['agents', 'list', '--canvas-type', 'app-builder']);
 
       expect(mockListAgents).toHaveBeenCalledWith('user_abc', {
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         enabled: undefined,
       });
     });
@@ -274,7 +274,7 @@ describe('registerAgentCommands', () => {
       await run(['agents', 'list', '--enabled']);
 
       expect(mockListAgents).toHaveBeenCalledWith('user_abc', {
-        hyveId: undefined,
+        canvasTypeId: undefined,
         enabled: true,
       });
     });
@@ -285,7 +285,7 @@ describe('registerAgentCommands', () => {
       await run(['agents', 'list', '--disabled']);
 
       expect(mockListAgents).toHaveBeenCalledWith('user_abc', {
-        hyveId: undefined,
+        canvasTypeId: undefined,
         enabled: false,
       });
     });
@@ -341,7 +341,7 @@ describe('registerAgentCommands', () => {
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Build Agent');
       expect(output).toContain('ID:            agent-abc123');
-      expect(output).toContain('Hyve:          app-builder');
+      expect(output).toContain('Canvas Type:   app-builder');
       expect(output).toContain('Status:        Enabled');
       expect(output).toContain('Provider:      anthropic');
       expect(output).toContain('Model:         claude-sonnet-4-20250514');
@@ -451,17 +451,17 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'New Agent',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
-      await run(['agents', 'create', '--hyve', 'app-builder', '--name', 'New Agent']);
+      await run(['agents', 'create', '--canvas-type', 'app-builder', '--name', 'New Agent']);
 
       expect(mockCreateAgent).toHaveBeenCalledWith(
         'user_abc',
         expect.stringMatching(/^agent-/),
         expect.objectContaining({
-          hyveId: 'app-builder',
+          canvasTypeId: 'app-builder',
           name: 'New Agent',
           model: expect.objectContaining({
             provider: 'anthropic',
@@ -483,13 +483,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'GPT Agent',
-        hyveId: 'landing-page',
+        canvasTypeId: 'landing-page',
         model: { provider: 'openai', modelId: 'gpt-4o' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'landing-page',
+        '--canvas-type', 'landing-page',
         '--name', 'GPT Agent',
         '--provider', 'openai',
         '--model', 'gpt-4o',
@@ -511,13 +511,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Hot Agent',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Hot Agent',
         '--temperature', '0.9',
       ]);
@@ -535,13 +535,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Bad Temp',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Bad Temp',
         '--temperature', 'notanumber',
       ]);
@@ -559,13 +559,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Big Agent',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Big Agent',
         '--max-tokens', '8192',
       ]);
@@ -583,13 +583,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Bad Tokens',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Bad Tokens',
         '--max-tokens', 'abc',
       ]);
@@ -607,13 +607,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'WF Agent',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'WF Agent',
         '--workflows', 'wf-1, wf-2,wf-3',
       ]);
@@ -631,13 +631,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Tagged',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Tagged',
         '--tags', 'alpha, beta ,gamma',
       ]);
@@ -655,13 +655,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'Prompted',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       });
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'Prompted',
         '--prompt-id', 'my-prompt',
       ]);
@@ -679,14 +679,14 @@ describe('registerAgentCommands', () => {
       const created = {
         id: 'agent-new',
         name: 'JSON Agent',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         model: { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514' },
       };
       mockCreateAgent.mockResolvedValue(created);
 
       await run([
         'agents', 'create',
-        '--hyve', 'app-builder',
+        '--canvas-type', 'app-builder',
         '--name', 'JSON Agent',
         '--format', 'json',
       ]);
@@ -698,7 +698,7 @@ describe('registerAgentCommands', () => {
     it('returns early when auth fails', async () => {
       mockRequireAuth.mockReturnValue(null);
 
-      await run(['agents', 'create', '--hyve', 'app-builder', '--name', 'No Auth']);
+      await run(['agents', 'create', '--canvas-type', 'app-builder', '--name', 'No Auth']);
 
       expect(mockCreateAgent).not.toHaveBeenCalled();
     });
@@ -706,7 +706,7 @@ describe('registerAgentCommands', () => {
     it('calls printError on API failure', async () => {
       mockCreateAgent.mockRejectedValue(new Error('Quota exceeded'));
 
-      await run(['agents', 'create', '--hyve', 'app-builder', '--name', 'Fail Agent']);
+      await run(['agents', 'create', '--canvas-type', 'app-builder', '--name', 'Fail Agent']);
 
       expect(mockPrintError).toHaveBeenCalledWith('Failed to create agent', expect.any(Error));
     });

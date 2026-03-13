@@ -5,7 +5,7 @@
  *   myndhyve-cli cron start [--foreground] [--allow-shell]
  *   myndhyve-cli cron stop
  *   myndhyve-cli cron status [--format=<format>]
- *   myndhyve-cli cron add --name="..." --cron="..." --workflow=<id> --hyve=<id>
+ *   myndhyve-cli cron add --name="..." --cron="..." --workflow=<id> --canvas-type=<id>
  *   myndhyve-cli cron list [--enabled] [--disabled]
  *   myndhyve-cli cron info <job-id>
  *   myndhyve-cli cron edit <job-id> [--name=<name>] [--enabled=<bool>] ...
@@ -149,7 +149,7 @@ export function registerCronCommands(program: Command): void {
     .option('--crm-sync', 'Run a CRM sync')
     .option('--shell <cmd>', 'Run a shell command')
     .option('--http <url>', 'Make an HTTP request')
-    .option('--hyve <id>', 'Hyve ID (required for --workflow)')
+    .option('--canvas-type <id>', 'Canvas type ID (required for --workflow)')
     .option('--message <text>', 'Message text (required for --agent)')
     .option('--collections <list>', 'Comma-separated collection names (for --crm-sync)')
     .option('--method <method>', 'HTTP method (for --http, default GET)', 'GET')
@@ -201,11 +201,11 @@ export function registerCronCommands(program: Command): void {
       }
 
       // Validate action dependencies
-      if (opts.workflow && !opts.hyve) {
+      if (opts.workflow && !opts.canvasType) {
         printErrorResult({
           code: 'INVALID_ARGUMENT',
-          message: '--workflow requires --hyve.',
-          suggestion: 'Example: --workflow abc123 --hyve landing-page',
+          message: '--workflow requires --canvas-type.',
+          suggestion: 'Example: --workflow abc123 --canvas-type landing-page',
         });
         process.exitCode = ExitCode.USAGE_ERROR;
         return;
@@ -233,7 +233,7 @@ export function registerCronCommands(program: Command): void {
       // Build action
       let action: JobAction;
       if (opts.workflow) {
-        action = { type: 'workflow', workflowId: opts.workflow, hyveId: opts.hyve };
+        action = { type: 'workflow', workflowId: opts.workflow, canvasTypeId: opts.canvasType };
       } else if (opts.agent) {
         action = { type: 'agent', agentId: opts.agent, message: opts.message };
       } else if (opts.crmSync) {
@@ -307,7 +307,7 @@ export function registerCronCommands(program: Command): void {
       }
 
       if (jobs.length === 0) {
-        console.log('\n  No cron jobs. Create one: myndhyve-cli cron add --name \'...\' --cron \'...\' --workflow <id> --hyve <id>');
+        console.log('\n  No cron jobs. Create one: myndhyve-cli cron add --name \'...\' --cron \'...\' --workflow <id> --canvas-type <id>');
         console.log('');
         return;
       }

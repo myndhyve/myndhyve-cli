@@ -515,7 +515,7 @@ describe('registerMessagingCommands', () => {
         requireMention: true,
         allowedUsers: ['U001', 'U002'],
         allowedChannels: ['C001'],
-        channelHyveBindings: {},
+        channelCanvasTypeBindings: {},
         channelWorkflowBindings: {},
       });
 
@@ -542,7 +542,7 @@ describe('registerMessagingCommands', () => {
         requireMention: false,
         allowedUsers: [],
         allowedChannels: [],
-        channelHyveBindings: {},
+        channelCanvasTypeBindings: {},
         channelWorkflowBindings: {},
       });
 
@@ -554,7 +554,7 @@ describe('registerMessagingCommands', () => {
       expect(output).not.toContain('Allowed Channels');
     });
 
-    it('displays hyve bindings when present', async () => {
+    it('displays canvas type bindings when present', async () => {
       mockGetPolicy.mockResolvedValue({
         id: 'pol_1',
         connectorId: 'conn_1',
@@ -564,14 +564,14 @@ describe('registerMessagingCommands', () => {
         requireMention: false,
         allowedUsers: [],
         allowedChannels: [],
-        channelHyveBindings: { '#general': 'app-builder', '#marketing': 'landing-page' },
+        channelCanvasTypeBindings: { '#general': 'app-builder', '#marketing': 'landing-page' },
         channelWorkflowBindings: {},
       });
 
       await run(['messaging', 'policies', 'get', 'conn_1']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Hyve Bindings:');
+      expect(output).toContain('Canvas Type Bindings:');
       expect(output).toContain('#general');
       expect(output).toContain('app-builder');
       expect(output).toContain('#marketing');
@@ -588,7 +588,7 @@ describe('registerMessagingCommands', () => {
         requireMention: false,
         allowedUsers: [],
         allowedChannels: [],
-        channelHyveBindings: {},
+        channelCanvasTypeBindings: {},
         channelWorkflowBindings: { '#support': ['wf_triage', 'wf_escalate'] },
       });
 
@@ -610,7 +610,7 @@ describe('registerMessagingCommands', () => {
         requireMention: true,
         allowedUsers: [],
         allowedChannels: [],
-        channelHyveBindings: {},
+        channelCanvasTypeBindings: {},
         channelWorkflowBindings: {},
       };
       mockGetPolicy.mockResolvedValue(policy);
@@ -789,7 +789,7 @@ describe('registerMessagingCommands', () => {
           name: 'Slack to App Builder',
           priority: 10,
           conditions: [{ type: 'channel', operator: 'equals', value: 'slack' }],
-          target: { type: 'hyve', targetId: 'app-builder' },
+          target: { type: 'canvasType', targetId: 'app-builder' },
           enabled: true,
         },
         {
@@ -818,7 +818,7 @@ describe('registerMessagingCommands', () => {
           name: 'Test',
           priority: 10,
           conditions: [{ type: 'identity-property', field: 'tier', operator: 'equals', value: 'vip' }],
-          target: { type: 'hyve', targetId: 'x' },
+          target: { type: 'canvasType', targetId: 'x' },
           enabled: true,
         },
       ]);
@@ -836,7 +836,7 @@ describe('registerMessagingCommands', () => {
           name: 'Test',
           priority: 10,
           conditions: [],
-          target: { type: 'hyve', targetId: 'x' },
+          target: { type: 'canvasType', targetId: 'x' },
           enabled: true,
         },
       ];
@@ -865,7 +865,7 @@ describe('registerMessagingCommands', () => {
     it('returns early when auth fails', async () => {
       mockRequireAuth.mockReturnValue(null);
 
-      await run(['messaging', 'routing', 'add', '--name', 'test', '--condition', 'channel:equals:slack', '--target', 'hyve:app-builder']);
+      await run(['messaging', 'routing', 'add', '--name', 'test', '--condition', 'channel:equals:slack', '--target', 'canvasType:app-builder']);
 
       expect(mockCreateRoutingRule).not.toHaveBeenCalled();
     });
@@ -875,7 +875,7 @@ describe('registerMessagingCommands', () => {
         id: 'rule_new',
         name: 'Slack Route',
         priority: 50,
-        target: { type: 'hyve', targetId: 'app-builder' },
+        target: { type: 'canvasType', targetId: 'app-builder' },
         enabled: true,
       });
 
@@ -883,14 +883,14 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'Slack Route',
         '--condition', 'channel:equals:slack',
-        '--target', 'hyve:app-builder',
+        '--target', 'canvasType:app-builder',
       ]);
 
       expect(mockCreateRoutingRule).toHaveBeenCalledWith('user_abc', {
         name: 'Slack Route',
         priority: 50,
         conditions: [{ type: 'channel', operator: 'equals', value: 'slack' }],
-        target: { type: 'hyve', targetId: 'app-builder' },
+        target: { type: 'canvasType', targetId: 'app-builder' },
         enabled: true,
         connectorId: undefined,
       });
@@ -979,7 +979,7 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'Bad',
         '--condition', 'channel:slack',
-        '--target', 'hyve:app-builder',
+        '--target', 'canvasType:app-builder',
       ]);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
@@ -993,7 +993,7 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'Bad',
         '--condition', 'channel:extra:equals:slack',
-        '--target', 'hyve:app-builder',
+        '--target', 'canvasType:app-builder',
       ]);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
@@ -1033,7 +1033,7 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'Bad',
         '--condition', 'channel:equals:slack',
-        '--target', 'hyve:',
+        '--target', 'canvasType:',
       ]);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
@@ -1046,7 +1046,7 @@ describe('registerMessagingCommands', () => {
         id: 'rule_j',
         name: 'JSON',
         priority: 50,
-        target: { type: 'hyve', targetId: 'x' },
+        target: { type: 'canvasType', targetId: 'x' },
         enabled: true,
       };
       mockCreateRoutingRule.mockResolvedValue(rule);
@@ -1055,7 +1055,7 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'JSON',
         '--condition', 'channel:equals:slack',
-        '--target', 'hyve:x',
+        '--target', 'canvasType:x',
         '--format', 'json',
       ]);
 
@@ -1070,7 +1070,7 @@ describe('registerMessagingCommands', () => {
         'messaging', 'routing', 'add',
         '--name', 'Test',
         '--condition', 'channel:equals:slack',
-        '--target', 'hyve:x',
+        '--target', 'canvasType:x',
       ]);
 
       expect(mockPrintError).toHaveBeenCalledWith('Failed to create routing rule', expect.any(Error));
@@ -1441,7 +1441,7 @@ describe('registerMessagingCommands', () => {
         conversationKind: 'dm',
         conversationId: 'conv_abc',
         messageCount: 42,
-        linkedHyveId: 'app-builder',
+        linkedCanvasTypeId: 'app-builder',
         linkedAgentId: 'agent_1',
         linkedIdentityId: 'id_xyz',
         lastMessageAt: '2025-01-15T10:00:00Z',
@@ -1458,7 +1458,7 @@ describe('registerMessagingCommands', () => {
       expect(output).toContain('Peer ID:       U12345');
       expect(output).toContain('Conversation:  dm (conv_abc)');
       expect(output).toContain('Messages:      42');
-      expect(output).toContain('Linked Hyve:   app-builder');
+      expect(output).toContain('Canvas Type:   app-builder');
       expect(output).toContain('Linked Agent:  agent_1');
       expect(output).toContain('Identity:      id_xyz');
     });
@@ -1476,7 +1476,7 @@ describe('registerMessagingCommands', () => {
       await run(['messaging', 'sessions', 'inspect', 'sess_bare']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).not.toContain('Linked Hyve');
+      expect(output).not.toContain('Canvas Type');
       expect(output).not.toContain('Linked Agent');
       expect(output).not.toContain('Identity');
       expect(output).not.toContain('Last Message');

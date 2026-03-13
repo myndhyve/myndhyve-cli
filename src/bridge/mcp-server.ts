@@ -52,9 +52,9 @@ export async function startMCPServer(
   const api = {
     getProject: async () => (await import('../api/projects.js')).getProject,
     listProjects: async () => (await import('../api/projects.js')).listProjects,
-    getHyveDocument: async () => (await import('../api/hyves.js')).getHyveDocument,
-    listHyveDocuments: async () => (await import('../api/hyves.js')).listHyveDocuments,
-    getSystemHyve: async () => (await import('../api/hyves.js')).getSystemHyve,
+    getCanvas: async () => (await import('../api/canvasTypes.js')).getCanvas,
+    listCanvases: async () => (await import('../api/canvasTypes.js')).listCanvases,
+    getCanvasType: async () => (await import('../api/canvasTypes.js')).getCanvasType,
     listWorkflows: async () => (await import('../api/workflows.js')).listWorkflows,
     getDocument: async () => (await import('../api/firestore.js')).getDocument,
     listDocuments: async () => (await import('../api/firestore.js')).listDocuments,
@@ -100,7 +100,7 @@ export async function startMCPServer(
           id: project.id,
           name: project.name,
           description: project.description,
-          hyveId: project.hyveId,
+          canvasTypeId: project.canvasTypeId,
           status: project.status,
           tags: project.tags,
         },
@@ -496,15 +496,15 @@ export async function startMCPServer(
     async (uri) => {
       const getProject = await api.getProject();
       const project = await getProject(config.projectId);
-      const getHyve = await api.getSystemHyve();
-      const hyve = getHyve(config.hyveId);
+      const getCanvasTypeFn = await api.getCanvasType();
+      const canvasType = getCanvasTypeFn(config.canvasTypeId);
 
       return {
         contents: [{
           uri: uri.toString(),
           text: JSON.stringify({
             project,
-            hyve: hyve ? { hyveId: hyve.hyveId, name: hyve.name, description: hyve.description } : null,
+            canvasType: canvasType ? { canvasTypeId: canvasType.canvasTypeId, name: canvasType.name, description: canvasType.description } : null,
             bridge: {
               sessionId: config.sessionId,
               framework: config.framework,

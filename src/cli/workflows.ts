@@ -55,13 +55,13 @@ const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
 export function registerWorkflowCommands(program: Command): void {
   const workflows = program
     .command('workflows')
-    .description('Manage and run hyve workflows')
+    .description('Manage and run canvas type workflows')
     .addHelpText('after', `
 Examples:
-  $ myndhyve-cli workflows list --hyve=app-builder
-  $ myndhyve-cli workflows run <workflow-id> --hyve=app-builder
-  $ myndhyve-cli workflows status <run-id> --hyve=app-builder
-  $ myndhyve-cli workflows approve <run-id> --hyve=app-builder`);
+  $ myndhyve-cli workflows list --canvas-type=app-builder
+  $ myndhyve-cli workflows run <workflow-id> --canvas-type=app-builder
+  $ myndhyve-cli workflows status <run-id> --canvas-type=app-builder
+  $ myndhyve-cli workflows approve <run-id> --canvas-type=app-builder`);
 
   registerListCommand(workflows);
   registerInfoCommand(workflows);
@@ -80,18 +80,18 @@ Examples:
 function registerListCommand(workflows: Command): void {
   workflows
     .command('list')
-    .description('List available workflows for a hyve')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .description('List available workflows for a canvas type')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const results = await listWorkflows(hyveId);
+        const results = await listWorkflows(canvasTypeId);
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(results, null, 2));
@@ -99,12 +99,12 @@ function registerListCommand(workflows: Command): void {
         }
 
         if (results.length === 0) {
-          console.log(`\n  No workflows found for hyve "${hyveId}".`);
+          console.log(`\n  No workflows found for canvas type "${canvasTypeId}".`);
           console.log('  Workflows are configured in the web app.\n');
           return;
         }
 
-        console.log(`\n  Workflows for "${hyveId}" (${results.length})\n`);
+        console.log(`\n  Workflows for "${canvasTypeId}" (${results.length})\n`);
         console.log(
           '  ' +
             'ID'.padEnd(24) +
@@ -144,22 +144,22 @@ function registerInfoCommand(workflows: Command): void {
   workflows
     .command('info <workflow-id>')
     .description('Show detailed information about a workflow')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (workflowId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const workflow = await getWorkflow(hyveId, workflowId);
+        const workflow = await getWorkflow(canvasTypeId, workflowId);
 
         if (!workflow) {
           printErrorResult({
             code: 'NOT_FOUND',
-            message: `Workflow "${workflowId}" not found in hyve "${hyveId}".`,
+            message: `Workflow "${workflowId}" not found in canvas type "${canvasTypeId}".`,
           });
           process.exitCode = ExitCode.NOT_FOUND;
           return;
@@ -172,13 +172,13 @@ function registerInfoCommand(workflows: Command): void {
 
         console.log(`\n  ${workflow.name}`);
         console.log('  ' + '\u2500'.repeat(60));
-        console.log(`  ID:          ${workflow.id}`);
-        console.log(`  Hyve:        ${workflow.hyveId}`);
-        console.log(`  Version:     ${workflow.version}`);
-        console.log(`  Status:      ${workflow.enabled ? 'enabled' : 'disabled'}`);
+        console.log(`  ID:           ${workflow.id}`);
+        console.log(`  Canvas Type:  ${workflow.canvasTypeId}`);
+        console.log(`  Version:      ${workflow.version}`);
+        console.log(`  Status:       ${workflow.enabled ? 'enabled' : 'disabled'}`);
 
         if (workflow.description) {
-          console.log(`  Description: ${workflow.description}`);
+          console.log(`  Description:  ${workflow.description}`);
         }
 
         // Triggers
@@ -212,7 +212,7 @@ function registerInfoCommand(workflows: Command): void {
         }
 
         console.log('');
-        console.log(`  Run this workflow: myndhyve-cli workflows run ${workflow.id} --hyve=${workflow.hyveId}`);
+        console.log(`  Run this workflow: myndhyve-cli workflows run ${workflow.id} --canvas-type=${workflow.canvasTypeId}`);
         console.log('');
       } catch (error) {
         printError('Failed to get workflow info', error);
@@ -228,15 +228,15 @@ function registerRunCommand(workflows: Command): void {
   workflows
     .command('run <workflow-id>')
     .description('Trigger a workflow run')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--input <json>', 'Input data as JSON string')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (workflowId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       // Parse and validate input data if provided
       let inputData: Record<string, unknown> | undefined;
@@ -266,11 +266,11 @@ function registerRunCommand(workflows: Command): void {
 
       try {
         // Verify workflow exists
-        const workflow = await getWorkflow(hyveId, workflowId);
+        const workflow = await getWorkflow(canvasTypeId, workflowId);
         if (!workflow) {
           printErrorResult({
             code: 'NOT_FOUND',
-            message: `Workflow "${workflowId}" not found in hyve "${hyveId}".`,
+            message: `Workflow "${workflowId}" not found in canvas type "${canvasTypeId}".`,
           });
           process.exitCode = ExitCode.NOT_FOUND;
           return;
@@ -285,7 +285,7 @@ function registerRunCommand(workflows: Command): void {
           return;
         }
 
-        const run = await createRun(auth.uid, hyveId, workflowId, {
+        const run = await createRun(auth.uid, canvasTypeId, workflowId, {
           inputData,
           triggerType: 'manual',
         });
@@ -300,8 +300,8 @@ function registerRunCommand(workflows: Command): void {
         console.log(`  Workflow:   ${workflow.name}`);
         console.log(`  Status:     ${run.status}`);
         console.log('');
-        console.log(`  Check status: myndhyve-cli workflows status ${run.id} --hyve=${hyveId}`);
-        console.log(`  View logs:    myndhyve-cli workflows logs ${run.id} --hyve=${hyveId}`);
+        console.log(`  Check status: myndhyve-cli workflows status ${run.id} --canvas-type=${canvasTypeId}`);
+        console.log(`  View logs:    myndhyve-cli workflows logs ${run.id} --canvas-type=${canvasTypeId}`);
         console.log('');
       } catch (error) {
         printError('Failed to trigger workflow run', error);
@@ -317,17 +317,17 @@ function registerStatusCommand(workflows: Command): void {
   workflows
     .command('status <run-id>')
     .description('Show workflow run status and progress')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (runId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const run = await getRun(auth.uid, hyveId, runId);
+        const run = await getRun(auth.uid, canvasTypeId, runId);
 
         if (!run) {
           printErrorResult({
@@ -392,9 +392,9 @@ function registerStatusCommand(workflows: Command): void {
         // Show approval hint if waiting
         if (run.status === 'waiting-approval') {
           console.log('');
-          console.log(`  Approve: myndhyve-cli workflows approve ${run.id} --hyve=${hyveId}`);
-          console.log(`  Reject:  myndhyve-cli workflows reject ${run.id} --hyve=${hyveId}`);
-          console.log(`  Revise:  myndhyve-cli workflows revise ${run.id} --feedback="..." --hyve=${hyveId}`);
+          console.log(`  Approve: myndhyve-cli workflows approve ${run.id} --canvas-type=${canvasTypeId}`);
+          console.log(`  Reject:  myndhyve-cli workflows reject ${run.id} --canvas-type=${canvasTypeId}`);
+          console.log(`  Revise:  myndhyve-cli workflows revise ${run.id} --feedback="..." --canvas-type=${canvasTypeId}`);
         }
 
         console.log('');
@@ -412,7 +412,7 @@ function registerLogsCommand(workflows: Command): void {
   workflows
     .command('logs <run-id>')
     .description('View workflow run execution logs')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--limit <n>', 'Max log entries to show', '100')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .option('-f, --follow', 'Follow log output in real-time (polls every 2.5s)')
@@ -420,14 +420,14 @@ function registerLogsCommand(workflows: Command): void {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       const limit = parseLimit(opts.limit);
       if (limit === null) return;
 
       try {
-        const logs = await getRunLogs(auth.uid, hyveId, runId);
+        const logs = await getRunLogs(auth.uid, canvasTypeId, runId);
 
         if (logs === null) {
           printErrorResult({
@@ -459,7 +459,7 @@ function registerLogsCommand(workflows: Command): void {
           }
 
           // Check initial run status
-          const initialRun = await getRun(auth.uid, hyveId, runId);
+          const initialRun = await getRun(auth.uid, canvasTypeId, runId);
           if (initialRun && TERMINAL_STATUSES.has(initialRun.status)) {
             console.log(`\n  Run reached terminal state: ${initialRun.status}\n`);
             return;
@@ -469,7 +469,7 @@ function registerLogsCommand(workflows: Command): void {
           while (true) {
             await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-            const freshLogs = await getRunLogs(auth.uid, hyveId, runId);
+            const freshLogs = await getRunLogs(auth.uid, canvasTypeId, runId);
             if (freshLogs && freshLogs.length > lastLogCount) {
               const newEntries = freshLogs.slice(lastLogCount);
               for (const entry of newEntries) {
@@ -483,7 +483,7 @@ function registerLogsCommand(workflows: Command): void {
             }
 
             // Check run status
-            const run = await getRun(auth.uid, hyveId, runId);
+            const run = await getRun(auth.uid, canvasTypeId, runId);
             if (run && TERMINAL_STATUSES.has(run.status)) {
               console.log(`\n  Run reached terminal state: ${run.status}\n`);
               break;
@@ -653,18 +653,18 @@ function registerApprovalCommands(workflows: Command): void {
   workflows
     .command('approve <run-id>')
     .description('Approve a workflow run that is waiting for approval')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--feedback <text>', 'Optional feedback message')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (runId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const result = await approveRun(auth.uid, hyveId, runId, opts.feedback);
+        const result = await approveRun(auth.uid, canvasTypeId, runId, opts.feedback);
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(result, null, 2));
@@ -687,18 +687,18 @@ function registerApprovalCommands(workflows: Command): void {
   workflows
     .command('reject <run-id>')
     .description('Reject a workflow run that is waiting for approval')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--reason <text>', 'Rejection reason')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (runId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const result = await rejectRun(auth.uid, hyveId, runId, opts.reason);
+        const result = await rejectRun(auth.uid, canvasTypeId, runId, opts.reason);
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(result, null, 2));
@@ -721,18 +721,18 @@ function registerApprovalCommands(workflows: Command): void {
   workflows
     .command('revise <run-id>')
     .description('Request revisions on a workflow run waiting for approval')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .requiredOption('--feedback <text>', 'Revision feedback (required)')
     .option('--format <format>', 'Output format (table, json)', 'table')
     .action(async (runId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       try {
-        const result = await reviseRun(auth.uid, hyveId, runId, opts.feedback);
+        const result = await reviseRun(auth.uid, canvasTypeId, runId, opts.feedback);
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(result, null, 2));
@@ -757,7 +757,7 @@ function registerRunsCommand(workflows: Command): void {
   workflows
     .command('runs')
     .description('List workflow runs')
-    .option('--hyve <hyveId>', 'Hyve ID (defaults to active project\'s hyve)')
+    .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--status <status>', 'Filter by status')
     .option('--workflow <workflowId>', 'Filter by workflow ID')
     .option('--limit <n>', 'Max runs to show', '25')
@@ -766,8 +766,8 @@ function registerRunsCommand(workflows: Command): void {
       const auth = requireAuth();
       if (!auth) return;
 
-      const hyveId = resolveHyveId(opts.hyve);
-      if (!hyveId) return;
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
 
       if (opts.status && !validateRunStatus(opts.status)) return;
 
@@ -775,7 +775,7 @@ function registerRunsCommand(workflows: Command): void {
       if (limit === null) return;
 
       try {
-        const results = await listRuns(auth.uid, hyveId, {
+        const results = await listRuns(auth.uid, canvasTypeId, {
           status: opts.status,
           workflowId: opts.workflow,
           limit,
@@ -832,19 +832,19 @@ function registerRunsCommand(workflows: Command): void {
 // ============================================================================
 
 /**
- * Resolve the hyve ID from --hyve flag or active project context.
- * Prints an error and sets exitCode if no hyve ID is available.
+ * Resolve the canvas type ID from --canvas-type flag or active project context.
+ * Prints an error and sets exitCode if no canvas type ID is available.
  */
-function resolveHyveId(flagValue?: string): string | null {
+function resolveCanvasTypeId(flagValue?: string): string | null {
   if (flagValue) return flagValue;
 
   const ctx = getActiveContext();
-  if (ctx?.hyveId) return ctx.hyveId;
+  if (ctx?.canvasTypeId) return ctx.canvasTypeId;
 
   printErrorResult({
-    code: 'MISSING_HYVE_ID',
-    message: 'No hyve ID specified.',
-    suggestion: 'Use --hyve=<hyveId> or set an active project with `myndhyve-cli use <project-id>`.',
+    code: 'MISSING_CANVAS_TYPE_ID',
+    message: 'No canvas type ID specified.',
+    suggestion: 'Use --canvas-type=<canvasTypeId> or set an active project with `myndhyve-cli use <project-id>`.',
   });
   process.exitCode = ExitCode.USAGE_ERROR;
   return null;

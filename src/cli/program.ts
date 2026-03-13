@@ -18,7 +18,8 @@ import { uninstallCommand } from './uninstall.js';
 import { registerAuthCommands } from './auth.js';
 import { registerChatCommand } from './chat.js';
 import { registerProjectCommands } from './projects.js';
-import { registerHyveCommands, registerContextCommands } from './hyves.js';
+import { registerCanvasTypeCommands, registerContextCommands } from './canvasTypes.js';
+import { registerCanvasCommands } from './canvas.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerCrmCommands } from './crm.js';
@@ -29,6 +30,7 @@ import { registerDevCommands } from './dev.js';
 import { registerBridgeCommands } from './bridge.js';
 import { registerA2ACommands } from './a2a.js';
 import { registerMCPClientCommands } from './mcp-client.js';
+import { registerPromptCommands } from './prompts.js';
 import { registerCompletionCommand } from './completion.js';
 import { registerUpdateCommand } from './update.js';
 import { applyGlobalOptions } from './global-options.js';
@@ -66,9 +68,13 @@ export function createProgram(): Command {
 
   registerProjectCommands(program);
 
-  // ── Hyve Management ───────────────────────────────────────────────────
+  // ── Canvas Type Management ──────────────────────────────────────────────
 
-  registerHyveCommands(program);
+  registerCanvasTypeCommands(program);
+
+  // ── Canvas Runtime Management ─────────────────────────────────────────────
+
+  registerCanvasCommands(program);
 
   // ── Context Commands (use, unuse, whoami) ─────────────────────────────
 
@@ -93,6 +99,10 @@ export function createProgram(): Command {
   // ── Kanban ────────────────────────────────────────────────────────────
 
   registerKanbanCommands(program);
+
+  // ── Prompt Management ──────────────────────────────────────────────────
+
+  registerPromptCommands(program);
 
   // ── Cron Scheduler ──────────────────────────────────────────────────────
 

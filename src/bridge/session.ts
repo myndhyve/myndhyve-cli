@@ -126,7 +126,7 @@ function sessionPath(userId: string, sessionId: string): string {
 export async function createSession(opts: {
   projectRoot: string;
   projectId: string;
-  hyveId: string;
+  canvasTypeId: string;
   framework: ExportFramework;
   syncDirection?: SyncDirection;
 }): Promise<BridgeSession> {
@@ -137,7 +137,7 @@ export async function createSession(opts: {
   const session: Omit<BridgeSession, 'id'> = {
     userId,
     projectId: opts.projectId,
-    hyveId: opts.hyveId,
+    canvasTypeId: opts.canvasTypeId,
     localPath: opts.projectRoot,
     framework: opts.framework,
     cliVersion: CLI_VERSION,
@@ -168,7 +168,7 @@ export async function createSession(opts: {
   const localConfig: BridgeLocalConfig = {
     sessionId,
     projectId: opts.projectId,
-    hyveId: opts.hyveId,
+    canvasTypeId: opts.canvasTypeId,
     framework: opts.framework,
     userId,
     linkedAt: now,

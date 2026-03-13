@@ -118,7 +118,7 @@ describe('listBoards()', () => {
     expect(boards[0]).toEqual<BoardSummary>({
       id: 'board-1',
       name: 'Sprint Board',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       columnCount: 5,
       taskCount: 2,
       createdAt: '2024-06-01T00:00:00Z',
@@ -129,7 +129,7 @@ describe('listBoards()', () => {
     expect(boards[1].taskCount).toBe(0);
   });
 
-  it('filters by hyveId client-side', async () => {
+  it('filters by canvasTypeId client-side', async () => {
     mockListDocuments.mockResolvedValue({
       documents: [
         { id: 'board-1', name: 'LP Board', hyveId: 'landing-page', columns: [], tasks: {} },
@@ -138,7 +138,7 @@ describe('listBoards()', () => {
       ],
     });
 
-    const boards = await listBoards(userId, { hyveId: 'landing-page' });
+    const boards = await listBoards(userId, { canvasTypeId: 'landing-page' });
 
     expect(boards).toHaveLength(2);
     expect(boards[0].id).toBe('board-1');
@@ -153,14 +153,14 @@ describe('listBoards()', () => {
     expect(boards).toEqual([]);
   });
 
-  it('returns empty array when hyveId filter matches nothing', async () => {
+  it('returns empty array when canvasTypeId filter matches nothing', async () => {
     mockListDocuments.mockResolvedValue({
       documents: [
         { id: 'board-1', name: 'Board', hyveId: 'app-builder', columns: [], tasks: {} },
       ],
     });
 
-    const boards = await listBoards(userId, { hyveId: 'nonexistent' });
+    const boards = await listBoards(userId, { canvasTypeId: 'nonexistent' });
 
     expect(boards).toEqual([]);
   });
@@ -249,7 +249,7 @@ describe('getBoard()', () => {
     // Summary fields
     expect(board!.id).toBe('board-123');
     expect(board!.name).toBe('Sprint Board');
-    expect(board!.hyveId).toBe('landing-page');
+    expect(board!.canvasTypeId).toBe('landing-page');
     expect(board!.columnCount).toBe(5);
     expect(board!.taskCount).toBe(3);
     expect(board!.createdAt).toBe('2024-06-01T00:00:00Z');
@@ -399,7 +399,7 @@ describe('createBoard()', () => {
     expect(board.createdAt).toBe(data.createdAt);
   });
 
-  it('passes hyveId and description when provided', async () => {
+  it('passes canvasTypeId and description when provided', async () => {
     mockCreateDocument.mockImplementation(
       (_path: string, _id: string, data: Record<string, unknown>) =>
         Promise.resolve({ id: boardId, ...data })
@@ -407,7 +407,7 @@ describe('createBoard()', () => {
 
     await createBoard(userId, boardId, {
       name: 'LP Tasks',
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       description: 'Tasks for the landing page',
     });
 
@@ -416,7 +416,7 @@ describe('createBoard()', () => {
     expect(data.description).toBe('Tasks for the landing page');
   });
 
-  it('sets hyveId to null when not provided', async () => {
+  it('sets canvasTypeId to null when not provided', async () => {
     mockCreateDocument.mockImplementation(
       (_path: string, _id: string, data: Record<string, unknown>) =>
         Promise.resolve({ id: boardId, ...data })

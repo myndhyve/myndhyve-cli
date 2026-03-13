@@ -4,7 +4,7 @@
  * Interactive AI chat from the terminal with streaming responses.
  *
  * Modes:
- *   Interactive:  myndhyve-cli chat [--hyve=X] [--model=Y]
+ *   Interactive:  myndhyve-cli chat [--canvas-type=X] [--model=Y]
  *   One-shot:     myndhyve-cli chat "Build me a landing page"
  *   Pipe:         echo "question" | myndhyve-cli chat --pipe
  *   Resume:       myndhyve-cli chat --resume [sessionId]
@@ -19,7 +19,7 @@ import { createInterface } from 'node:readline';
 // ============================================================================
 
 interface ChatOptions {
-  hyve?: string;
+  canvasType?: string;
   agent?: string;
   model?: string;
   provider?: string;
@@ -103,8 +103,8 @@ async function interactiveMode(
   }
 
   // Create session
-  const session = createSession({
-    hyveId: options.hyve,
+  const session = await createSession({
+    canvasTypeId: options.canvasType,
     agentId: options.agent,
     provider: options.provider,
     model: options.model,
@@ -114,8 +114,8 @@ async function interactiveMode(
   });
 
   // Print header
-  const agentLabel = session.hyveId
-    ? session.hyveId
+  const agentLabel = session.canvasTypeId
+    ? session.canvasTypeId
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ')
@@ -228,8 +228,8 @@ async function oneShotMode(
   );
   const ora = (await import('ora')).default;
 
-  const session = createSession({
-    hyveId: options.hyve,
+  const session = await createSession({
+    canvasTypeId: options.canvasType,
     agentId: options.agent,
     provider: options.provider,
     model: options.model,
@@ -294,8 +294,8 @@ async function pipeMode(options: ChatOptions): Promise<void> {
     return;
   }
 
-  const session = createSession({
-    hyveId: options.hyve,
+  const session = await createSession({
+    canvasTypeId: options.canvasType,
     agentId: options.agent,
     provider: options.provider,
     model: options.model,
@@ -350,11 +350,11 @@ async function showHistory(chalk: ChalkInstance): Promise<void> {
   const displayed = conversations.slice(0, maxDisplay);
   for (const conv of displayed) {
     const ago = formatTimeSince(new Date(conv.updatedAt));
-    const hyveLabel = conv.hyveId ? chalk.dim(` [${conv.hyveId}]`) : '';
+    const canvasTypeLabel = conv.canvasTypeId ? chalk.dim(` [${conv.canvasTypeId}]`) : '';
     const msgCount = chalk.dim(`${conv.messageCount} msgs`);
 
     console.log(
-      `  ${chalk.bold(conv.title)}${hyveLabel}`
+      `  ${chalk.bold(conv.title)}${canvasTypeLabel}`
     );
     console.log(
       `  ${chalk.dim(conv.sessionId)} · ${msgCount} · ${chalk.dim(ago + ' ago')}`
@@ -465,14 +465,14 @@ async function handleSlashCommand(
     case 'info':
       console.log();
       console.log(chalk.bold.cyan('  Session Info'));
-      console.log(chalk.dim('  Session:  ') + session.sessionId);
-      console.log(chalk.dim('  Provider: ') + session.provider);
-      console.log(chalk.dim('  Model:    ') + session.model);
-      console.log(chalk.dim('  Temp:     ') + session.temperature);
-      if (session.hyveId) {
-        console.log(chalk.dim('  Hyve:     ') + session.hyveId);
+      console.log(chalk.dim('  Session:      ') + session.sessionId);
+      console.log(chalk.dim('  Provider:     ') + session.provider);
+      console.log(chalk.dim('  Model:        ') + session.model);
+      console.log(chalk.dim('  Temp:         ') + session.temperature);
+      if (session.canvasTypeId) {
+        console.log(chalk.dim('  Canvas Type:  ') + session.canvasTypeId);
       }
-      console.log(chalk.dim('  Messages: ') + session.messages.length);
+      console.log(chalk.dim('  Messages:     ') + session.messages.length);
       console.log();
       return 'handled';
 
@@ -510,8 +510,8 @@ export function registerChatCommand(program: Command): void {
     .command('chat')
     .description('Chat with MyndHyve AI agents')
     .argument('[message]', 'One-shot message (non-interactive)')
-    .option('--hyve <id>', 'System hyve ID (app-builder, landing-page, hyve-maker)')
-    .option('--agent <name>', 'Agent name (alias for --hyve)')
+    .option('--canvas-type <id>', 'Canvas type ID (app-builder, landing-page, hyve-maker)')
+    .option('--agent <name>', 'Agent name (alias for --canvas-type)')
     .option('--model <id>', 'Model ID or alias (e.g., claude-sonnet, gpt-4o)')
     .option('--provider <name>', 'AI provider (anthropic, openai, gemini, minimax)')
     .option('--temperature <n>', 'Sampling temperature (0-2)')
@@ -521,10 +521,10 @@ export function registerChatCommand(program: Command): void {
     .option('--system <prompt>', 'Custom system prompt')
     .addHelpText('after', `
 Examples:
-  $ myndhyve-cli chat                         Interactive chat
-  $ myndhyve-cli chat "Explain Docker"        One-shot question
-  $ echo "Hi" | myndhyve-cli chat --pipe      Pipe mode
-  $ myndhyve-cli chat --hyve=app-builder      Chat with a specific hyve
-  $ myndhyve-cli chat --resume                Resume last conversation`)
+  $ myndhyve-cli chat                                  Interactive chat
+  $ myndhyve-cli chat "Explain Docker"                 One-shot question
+  $ echo "Hi" | myndhyve-cli chat --pipe               Pipe mode
+  $ myndhyve-cli chat --canvas-type=app-builder        Chat with a specific canvas type
+  $ myndhyve-cli chat --resume                         Resume last conversation`)
     .action(chatCommand);
 }

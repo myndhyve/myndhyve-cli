@@ -922,7 +922,7 @@ describe('registerDevCommands', () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-1',
         projectName: 'My Project',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
       });
 
       await run(['dev', 'config', 'export']);
@@ -932,7 +932,7 @@ describe('registerDevCommands', () => {
       expect(exported.context).toEqual({
         projectId: 'proj-1',
         projectName: 'My Project',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
       });
     });
 
@@ -977,7 +977,7 @@ describe('registerDevCommands', () => {
     it('restores context from export', async () => {
       const exportData = {
         config: { server: { baseUrl: 'https://example.com' } },
-        context: { projectId: 'proj-1', projectName: 'Test', hyveId: 'app-builder' },
+        context: { projectId: 'proj-1', projectName: 'Test', canvasTypeId: 'app-builder' },
       };
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(JSON.stringify(exportData));
@@ -1221,7 +1221,7 @@ describe('registerDevCommands', () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-1',
         projectName: 'Marketing Site',
-        hyveId: 'landing-page',
+        canvasTypeId: 'landing-page',
       });
 
       await run(['dev', 'config', 'validate', '--format', 'json']);

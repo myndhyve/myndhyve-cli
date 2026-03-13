@@ -67,7 +67,7 @@ function makeCronJob(overrides: Partial<CronJob> = {}): CronJob {
     name: 'Test Job',
     enabled: true,
     schedule: { kind: 'cron', expr: '0 9 * * *' },
-    action: { type: 'workflow', workflowId: 'wf-1', hyveId: 'landing-page' },
+    action: { type: 'workflow', workflowId: 'wf-1', canvasTypeId: 'landing-page' },
     createdAt: '2026-03-07T00:00:00.000Z',
     updatedAt: '2026-03-07T00:00:00.000Z',
     consecutiveFailures: 0,
@@ -189,7 +189,7 @@ describe('CronStore', () => {
       mockRandomBytes.mockReturnValue(Buffer.from('112233445566', 'hex'));
 
       const schedule: JobSchedule = { kind: 'cron', expr: '0 9 * * *' };
-      const action: JobAction = { type: 'workflow', workflowId: 'wf-1', hyveId: 'lp' };
+      const action: JobAction = { type: 'workflow', workflowId: 'wf-1', canvasTypeId: 'lp' };
 
       const job = addJob({ name: 'My Job', schedule, action });
 

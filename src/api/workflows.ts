@@ -4,9 +4,9 @@
  * Operations for workflow management and run execution via Firestore REST API.
  *
  * Firestore collections:
- *   hyves/{hyveId}/workflows/{workflowId}   — Workflow definitions
- *   runs/{runId}                             — Workflow runs (root-level)
- *   runs/{runId}/artifacts/{artifactId}      — Run artifacts (nested under runs)
+ *   hyves/{canvasTypeId}/workflows/{workflowId}   — Workflow definitions
+ *   runs/{runId}                                   — Workflow runs (root-level)
+ *   runs/{runId}/artifacts/{artifactId}            — Run artifacts (nested under runs)
  */
 
 import { randomBytes } from 'node:crypto';
@@ -78,7 +78,7 @@ export interface WorkflowNodeSummary {
 
 /** Full workflow detail with nodes and edges. */
 export interface WorkflowDetail extends WorkflowSummary {
-  hyveId: string;
+  canvasTypeId: string;
   nodes: WorkflowNodeSummary[];
   edges: Array<{ source: string; target: string; label?: string }>;
   triggers: Array<{ type: WorkflowTriggerType; config?: Record<string, unknown> }>;
@@ -128,7 +128,7 @@ export interface ApprovalInfo {
 
 /** Full run detail with per-node states, input data, and error info. */
 export interface RunDetail extends RunSummary {
-  hyveId: string;
+  canvasTypeId: string;
   userId: string;
   inputData?: Record<string, unknown>;
   nodeStates: NodeRunState[];
@@ -173,20 +173,20 @@ export interface ArtifactDetail extends ArtifactSummary {
 // ============================================================================
 
 /**
- * List all workflows for a hyve.
+ * List all workflows for a canvas type.
  *
  * Note: Workflows are system-level definitions (not user-scoped). Access is
  * gated by Firestore security rules via the auth token in the REST request.
  *
- * @param hyveId - The system hyve ID (e.g., 'landing-page', 'app-builder')
+ * @param canvasTypeId - The canvas type ID (e.g., 'landing-page', 'app-builder')
  * @returns Array of workflow summaries
  */
 export async function listWorkflows(
-  hyveId: string
+  canvasTypeId: string
 ): Promise<WorkflowSummary[]> {
-  const collectionPath = `hyves/${hyveId}/workflows`;
+  const collectionPath = `hyves/${canvasTypeId}/workflows`;
 
-  log.debug('Listing workflows', { hyveId });
+  log.debug('Listing workflows', { canvasTypeId });
 
   const { documents } = await listDocuments(collectionPath, { pageSize: 50 });
   return documents.map(toWorkflowSummary);
@@ -198,22 +198,22 @@ export async function listWorkflows(
  * Note: Workflows are system-level definitions (not user-scoped). Access is
  * gated by Firestore security rules via the auth token in the REST request.
  *
- * @param hyveId - The system hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param workflowId - The workflow ID
  * @returns Workflow detail or null if not found
  */
 export async function getWorkflow(
-  hyveId: string,
+  canvasTypeId: string,
   workflowId: string
 ): Promise<WorkflowDetail | null> {
-  const collectionPath = `hyves/${hyveId}/workflows`;
+  const collectionPath = `hyves/${canvasTypeId}/workflows`;
 
-  log.debug('Getting workflow', { hyveId, workflowId });
+  log.debug('Getting workflow', { canvasTypeId, workflowId });
 
   const doc = await getDocument(collectionPath, workflowId);
   if (!doc) return null;
 
-  return toWorkflowDetail(doc, hyveId);
+  return toWorkflowDetail(doc, canvasTypeId);
 }
 
 // ============================================================================
@@ -221,27 +221,27 @@ export async function getWorkflow(
 // ============================================================================
 
 /**
- * List workflow runs for a user's hyve.
+ * List workflow runs for a user's canvas type.
  *
  * Runs are stored in the root-level `runs/` collection with `userId` and
- * `hyveId` fields for filtering.
+ * `canvasTypeId` fields for filtering.
  *
  * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param options - Optional filters
  * @returns Array of run summaries, sorted by start time descending
  */
 export async function listRuns(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   options?: { status?: WorkflowRunStatus; workflowId?: string; limit?: number }
 ): Promise<RunSummary[]> {
-  log.debug('Listing runs', { userId, hyveId, options });
+  log.debug('Listing runs', { userId, canvasTypeId, options });
 
-  // Runs are root-level; always filter by userId + hyveId
+  // Runs are root-level; always filter by userId + canvasTypeId
   const filters: QueryFilter[] = [
     { field: 'userId', op: 'EQUAL', value: userId },
-    { field: 'hyveId', op: 'EQUAL', value: hyveId },
+    { field: 'hyveId', op: 'EQUAL', value: canvasTypeId },
   ];
 
   if (options?.status) {
@@ -264,16 +264,16 @@ export async function listRuns(
  * Get full run details by ID.
  *
  * @param userId - The authenticated user's UID (for response enrichment)
- * @param hyveId - The hyve ID (for response enrichment)
+ * @param canvasTypeId - The canvas type ID (for response enrichment)
  * @param runId - The run ID
  * @returns Run detail or null if not found
  */
 export async function getRun(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string
 ): Promise<RunDetail | null> {
-  log.debug('Getting run', { userId, hyveId, runId });
+  log.debug('Getting run', { userId, canvasTypeId, runId });
 
   const doc = await getDocument('runs', runId);
   if (!doc) return null;
@@ -285,25 +285,25 @@ export async function getRun(
  * Create a new workflow run (trigger a workflow).
  *
  * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param workflowId - The workflow to run
  * @param options - Optional input data and trigger info
  * @returns The created run summary
  */
 export async function createRun(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   workflowId: string,
   options?: { inputData?: Record<string, unknown>; triggerType?: string }
 ): Promise<RunSummary> {
   const runId = generateRunId();
   const now = new Date().toISOString();
 
-  log.debug('Creating run', { userId, hyveId, workflowId, runId });
+  log.debug('Creating run', { userId, canvasTypeId, workflowId, runId });
 
   const runData: Record<string, unknown> = {
     userId,
-    hyveId,
+    hyveId: canvasTypeId,
     workflowId,
     status: 'pending',
     triggerType: options?.triggerType || 'manual',
@@ -325,16 +325,16 @@ export async function createRun(
  * Get run logs (extracted from the run document).
  *
  * @param userId - The authenticated user's UID (unused, kept for API compat)
- * @param hyveId - The hyve ID (unused, kept for API compat)
+ * @param canvasTypeId - The canvas type ID (unused, kept for API compat)
  * @param runId - The run ID
  * @returns Array of log entries, or null if run not found
  */
 export async function getRunLogs(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string
 ): Promise<RunLogEntry[] | null> {
-  log.debug('Getting run logs', { userId, hyveId, runId });
+  log.debug('Getting run logs', { userId, canvasTypeId, runId });
 
   const doc = await getDocument('runs', runId);
   if (!doc) return null;
@@ -351,51 +351,51 @@ export async function getRunLogs(
  * Approve a waiting-approval run.
  *
  * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param runId - The run ID
  * @param feedback - Optional feedback message
  */
 export async function approveRun(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string,
   feedback?: string
 ): Promise<RunDetail> {
-  return submitApprovalDecision(userId, hyveId, runId, 'approved', feedback);
+  return submitApprovalDecision(userId, canvasTypeId, runId, 'approved', feedback);
 }
 
 /**
  * Reject a waiting-approval run.
  *
  * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param runId - The run ID
  * @param reason - Optional rejection reason
  */
 export async function rejectRun(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string,
   reason?: string
 ): Promise<RunDetail> {
-  return submitApprovalDecision(userId, hyveId, runId, 'rejected', reason);
+  return submitApprovalDecision(userId, canvasTypeId, runId, 'rejected', reason);
 }
 
 /**
  * Request revisions on a waiting-approval run (reject with feedback).
  *
  * @param userId - The authenticated user's UID
- * @param hyveId - The hyve ID
+ * @param canvasTypeId - The canvas type ID
  * @param runId - The run ID
  * @param feedback - Revision feedback
  */
 export async function reviseRun(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string,
   feedback: string
 ): Promise<RunDetail> {
-  return submitApprovalDecision(userId, hyveId, runId, 'rejected', feedback);
+  return submitApprovalDecision(userId, canvasTypeId, runId, 'rejected', feedback);
 }
 
 /**
@@ -408,12 +408,12 @@ export async function reviseRun(
  */
 async function submitApprovalDecision(
   userId: string,
-  hyveId: string,
+  canvasTypeId: string,
   runId: string,
   decision: 'approved' | 'rejected',
   feedback?: string
 ): Promise<RunDetail> {
-  log.debug('Submitting approval decision', { userId, hyveId, runId, decision });
+  log.debug('Submitting approval decision', { userId, canvasTypeId, runId, decision });
 
   // Get the run to find the waiting node
   const doc = await getDocument('runs', runId);
@@ -551,7 +551,7 @@ function toWorkflowSummary(doc: Record<string, unknown>): WorkflowSummary {
   };
 }
 
-function toWorkflowDetail(doc: Record<string, unknown>, hyveId: string): WorkflowDetail {
+function toWorkflowDetail(doc: Record<string, unknown>, canvasTypeId: string): WorkflowDetail {
   const summary = toWorkflowSummary(doc);
   const rawNodes = (doc.nodes || []) as Array<Record<string, unknown>>;
   const rawEdges = (doc.edges || []) as Array<Record<string, unknown>>;
@@ -581,7 +581,7 @@ function toWorkflowDetail(doc: Record<string, unknown>, hyveId: string): Workflo
 
   return {
     ...summary,
-    hyveId,
+    canvasTypeId,
     nodes,
     edges,
     triggers,
@@ -640,7 +640,7 @@ function toRunDetail(
 
   return {
     ...summary,
-    hyveId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.hyveId as string) || '',
     userId: (doc.userId as string) || '',
     inputData: doc.inputData as Record<string, unknown> | undefined,
     nodeStates,

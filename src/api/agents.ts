@@ -61,7 +61,7 @@ export interface AgentKanbanAccess {
 /** Agent summary for list display. */
 export interface AgentSummary {
   id: string;
-  hyveId: string;
+  canvasTypeId: string;
   name: string;
   description: string;
   enabled: boolean;
@@ -103,16 +103,16 @@ export const DEFAULT_MODEL_CONFIG: AgentModelConfig = {
  */
 export async function listAgents(
   userId: string,
-  options?: { hyveId?: string; enabled?: boolean }
+  options?: { canvasTypeId?: string; enabled?: boolean }
 ): Promise<AgentSummary[]> {
   const path = `users/${userId}/agents`;
 
   log.debug('Listing agents', { userId, options });
 
-  if (options?.hyveId || options?.enabled !== undefined) {
+  if (options?.canvasTypeId || options?.enabled !== undefined) {
     const filters: QueryFilter[] = [];
-    if (options.hyveId) {
-      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.hyveId });
+    if (options.canvasTypeId) {
+      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
     }
     if (options.enabled !== undefined) {
       filters.push({ field: 'enabled', op: 'EQUAL', value: options.enabled });
@@ -150,7 +150,7 @@ export async function createAgent(
   userId: string,
   agentId: string,
   data: {
-    hyveId: string;
+    canvasTypeId: string;
     name: string;
     description?: string;
     systemPromptId?: string;
@@ -163,11 +163,11 @@ export async function createAgent(
 ): Promise<AgentDetail> {
   const path = `users/${userId}/agents`;
 
-  log.debug('Creating agent', { userId, agentId, hyveId: data.hyveId });
+  log.debug('Creating agent', { userId, agentId, canvasTypeId: data.canvasTypeId });
 
   const now = new Date().toISOString();
   const agentData: Record<string, unknown> = {
-    hyveId: data.hyveId,
+    hyveId: data.canvasTypeId,
     name: data.name,
     description: data.description || '',
     systemPromptId: data.systemPromptId || '',
@@ -241,7 +241,7 @@ function toAgentSummary(doc: Record<string, unknown>): AgentSummary {
 
   return {
     id: doc.id as string,
-    hyveId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.hyveId as string) || '',
     name: (doc.name as string) || 'Unnamed Agent',
     description: (doc.description as string) || '',
     enabled: (doc.enabled as boolean) ?? true,

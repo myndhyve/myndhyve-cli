@@ -134,12 +134,12 @@ describe('listAgents()', () => {
     expect(results[1].id).toBe('agent-002');
   });
 
-  it('filters by hyveId using runQuery', async () => {
+  it('filters by canvasTypeId using runQuery', async () => {
     mockRunQuery.mockResolvedValue([
       makeAgentDoc({ hyveId: 'app-builder' }),
     ]);
 
-    const results = await listAgents(userId, { hyveId: 'app-builder' });
+    const results = await listAgents(userId, { canvasTypeId: 'app-builder' });
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
@@ -150,7 +150,7 @@ describe('listAgents()', () => {
     expect(options).toEqual({ limit: 100 });
     expect(mockListDocuments).not.toHaveBeenCalled();
     expect(results).toHaveLength(1);
-    expect(results[0].hyveId).toBe('app-builder');
+    expect(results[0].canvasTypeId).toBe('app-builder');
   });
 
   it('filters by enabled=true using runQuery', async () => {
@@ -180,10 +180,10 @@ describe('listAgents()', () => {
     ]);
   });
 
-  it('combines hyveId and enabled filters', async () => {
+  it('combines canvasTypeId and enabled filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listAgents(userId, { hyveId: 'slides', enabled: true });
+    await listAgents(userId, { canvasTypeId: 'slides', enabled: true });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(2);
@@ -213,7 +213,7 @@ describe('listAgents()', () => {
   it('returns empty array from query when no matches', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    const results = await listAgents(userId, { hyveId: 'nonexistent' });
+    const results = await listAgents(userId, { canvasTypeId: 'nonexistent' });
 
     expect(results).toEqual([]);
   });
@@ -233,7 +233,7 @@ describe('Agent summary mapping', () => {
 
     expect(summary).toEqual<AgentSummary>({
       id: agentId,
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       name: 'SEO Agent',
       description: 'Optimizes landing pages for search',
       enabled: true,
@@ -291,7 +291,7 @@ describe('Agent summary mapping', () => {
     const [summary] = await listAgents(userId);
 
     expect(summary.id).toBe('agent-sparse');
-    expect(summary.hyveId).toBe('');
+    expect(summary.canvasTypeId).toBe('');
     expect(summary.name).toBe('Unnamed Agent');
     expect(summary.description).toBe('');
     expect(summary.enabled).toBe(true);
@@ -324,7 +324,7 @@ describe('getAgent()', () => {
 
     expect(agent).not.toBeNull();
     expect(agent!.id).toBe(agentId);
-    expect(agent!.hyveId).toBe('landing-page');
+    expect(agent!.canvasTypeId).toBe('landing-page');
     expect(agent!.name).toBe('SEO Agent');
     expect(agent!.description).toBe('Optimizes landing pages for search');
     expect(agent!.enabled).toBe(true);
@@ -402,7 +402,7 @@ describe('getAgent()', () => {
 
     // Verify summary fields are present in the detail result
     expect(agent!.id).toBe(agentId);
-    expect(agent!.hyveId).toBe('landing-page');
+    expect(agent!.canvasTypeId).toBe('landing-page');
     expect(agent!.name).toBe('SEO Agent');
     expect(agent!.provider).toBe('anthropic');
     expect(agent!.modelId).toBe('claude-sonnet-4-20250514');
@@ -431,7 +431,7 @@ describe('createAgent()', () => {
     }));
 
     const agent = await createAgent(userId, agentId, {
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       name: 'SEO Agent',
       description: 'Optimizes pages',
       model: { provider: 'openai', modelId: 'gpt-4o' },
@@ -471,7 +471,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       name: 'Basic Agent',
     });
 
@@ -486,7 +486,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
       name: 'Slides Agent',
     });
 
@@ -501,7 +501,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
       name: 'Disabled Agent',
       enabled: false,
     });
@@ -517,7 +517,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      hyveId: 'cad',
+      canvasTypeId: 'cad',
       name: 'Minimal Agent',
     });
 
@@ -536,7 +536,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      hyveId: 'landing-page',
+      canvasTypeId: 'landing-page',
       name: 'Tuned Agent',
       model: { temperature: 0.3 },
     });
