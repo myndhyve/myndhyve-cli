@@ -143,7 +143,10 @@ export class CanvasApiClient {
     sessionKey: string,
     options: { limit?: number; offset?: number } = {}
   ): Promise<CanvasSessionHistoryResponse> {
-    return this.client.get(`/canvas-api/v1/sessions/${sessionKey}/history`, options);
+    const query: Record<string, string> = {};
+    if (options.limit != null) query.limit = String(options.limit);
+    if (options.offset != null) query.offset = String(options.offset);
+    return this.client.get(`/canvas-api/v1/sessions/${sessionKey}/history`, query);
   }
 
   // ==========================================================================

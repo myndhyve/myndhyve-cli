@@ -19,242 +19,187 @@
  */
 
 import type { Command } from 'commander';
-import { getAuthStatus } from '../auth/index.js';
 import { MyndHyveClient } from '../api/client.js';
 import { CanvasApiClient } from '../api/canvas.js';
-import { getActiveContext, setActiveContext } from '../context.js';
-import { requireAuth, printError, printSuccess, printWarning } from './helpers.js';
-import { ExitCode, printErrorResult, printSuccessResult } from '../utils/output.js';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-interface CanvasSessionOptions {
-  tenantId?: string;
-  projectId?: string;
-  canvasId?: string;
-  canvasType?: string;
-  surface?: string;
-  sessionScope?: string;
-  title?: string;
-  primaryAgentId?: string;
-  queueMode?: string;
-}
-
-interface QueueEvent {
-  id: string;
-  type: string;
-  data: unknown;
-  queuedAt: string;
-  source: string;
-  priority: string;
-}
-
-interface QueueStatus {
-  queueMode: string;
-  queuedEvents: QueueEvent[];
-  isLocked: boolean;
-  lockHolder: string | null;
-}
+import { getActiveContext } from '../context.js';
+import { requireAuth, printError } from './helpers.js';
+import { ExitCode, printErrorResult, printSuccess, printResult } from '../utils/output.js';
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-/**
- * Get canvas API client
- */
 function getCanvasClient(): CanvasApiClient {
-  const authStatus = getAuthStatus();
-  if (!authStatus?.idToken) {
-    throw new Error('Not authenticated. Please run: myndhyve-cli login');
-  }
-
   const client = new MyndHyveClient({
     baseUrl: process.env.MYNDHYVE_API_BASE_URL || 'https://us-central1-myndhyve.cloudfunctions.net',
   });
-
   return new CanvasApiClient(client);
 }
 
-/**
- * Get current session key from context or create default
- */
 function getCurrentSessionKey(): string | null {
   const context = getActiveContext();
   if (context?.sessionKey) {
     return context.sessionKey;
   }
-  
-  // Try to construct from context
   if (context?.projectId && context?.canvasId) {
     return `default/${context.projectId}/${context.canvasId}/cli/main`;
   }
-  
   return null;
-}
-
-/**
- * Save context with session information
- */
-function saveContext(context: any): void {
-  setActiveContext(context);
 }
 
 // ============================================================================
 // SESSION COMMANDS
 // ============================================================================
 
-/**
- * Create a new canvas session
- */
-async function createCanvasSession(options: CanvasSessionOptions): Promise<void> {
+async function createCanvasSession(opts: {
+  tenant?: string;
+  project?: string;
+  canvas?: string;
+  type?: string;
+  surface?: string;
+  scope?: string;
+  title?: string;
+  agent?: string;
+  queueMode?: string;
+}): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
+  const context = getActiveContext();
+  if (!context?.projectId) {
+    printErrorResult({
+      code: 'NO_PROJECT',
+      message: 'No active project. Use: myndhyve-cli use <project-id>',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  const canvasId = opts.canvas || context.canvasId;
+  if (!canvasId) {
+    printErrorResult({
+      code: 'MISSING_CANVAS',
+      message: 'Canvas ID required. Use --canvas=<canvas-id> or set active canvas context.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
   try {
-    const context = getActiveContext();
-    if (!context?.projectId) {
-      printError('No active project. Use: myndhyve-cli use <project-id>');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
-
     const client = getCanvasClient();
-    
-    const sessionData = {
-      tenantId: options.tenantId || 'default',
-      projectId: options.projectId || context.projectId,
-      canvasId: options.canvasId || context.canvasId,
-      canvasType: options.canvasType || 'landing-page',
-      surface: options.surface || 'cli',
-      sessionScope: options.sessionScope || 'main',
-      title: options.title,
-      primaryAgentId: options.primaryAgentId,
-      queueMode: options.queueMode || 'followup', // CLI defaults to followup mode
-    };
-
-    if (!sessionData.canvasId) {
-      printError('Canvas ID required. Use --canvas=<canvas-id> or set active canvas context');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
-
-    const result = await client.createSession(sessionData);
-
-    printSuccessResult('Canvas session created', {
-      sessionKey: result.sessionKey,
-      sessionId: result.sessionId,
-      canvasType: result.canvasMetadata.canvasType,
-      queueMode: result.canvasMetadata.executionState.queueMode,
+    const result = await client.createSession({
+      tenantId: opts.tenant || 'default',
+      projectId: opts.project || context.projectId,
+      canvasId,
+      canvasType: opts.type || 'landing-page',
+      surface: opts.surface || 'cli',
+      sessionScope: opts.scope || 'main',
+      title: opts.title,
+      primaryAgentId: opts.agent,
+      queueMode: opts.queueMode || 'followup',
     });
 
-    // Store session key in context for future commands
-    if (context) {
-      context.sessionKey = result.sessionKey;
-      context.canvasId = result.canvasMetadata.canvasId;
-      saveContext(context);
-    }
-    
+    printResult(result, () => {
+      printSuccess('Canvas session created');
+      console.log(`  Session key: ${result.sessionKey}`);
+      console.log(`  Session ID:  ${result.sessionId}`);
+      console.log(`  Canvas type: ${result.canvasMetadata.canvasType}`);
+      console.log(`  Queue mode:  ${result.canvasMetadata.executionState.queueMode}`);
+    });
   } catch (error) {
-    printErrorResult('Failed to create canvas session', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Create canvas session', error);
   }
 }
 
-/**
- * Use a canvas session
- */
 async function useCanvasSession(sessionKey: string): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
   try {
     const client = getCanvasClient();
     const result = await client.getSession(sessionKey);
-    
-    const context = getActiveContext();
-    if (context) {
-      context.sessionKey = sessionKey;
-      context.canvasId = result.canvasMetadata.canvasId;
-      context.projectId = result.projectId;
-      saveContext(context);
-    }
 
-    printSuccessResult('Canvas session activated', {
-      sessionKey,
-      canvasId: result.canvasMetadata.canvasId,
-      canvasType: result.canvasMetadata.canvasType,
-      queueMode: result.canvasMetadata.executionState.queueMode,
-      isActive: result.runtimeState.isActive,
+    printResult(result, () => {
+      printSuccess('Canvas session activated');
+      console.log(`  Session key: ${sessionKey}`);
+      console.log(`  Canvas ID:   ${result.canvasMetadata.canvasId}`);
+      console.log(`  Canvas type: ${result.canvasMetadata.canvasType}`);
+      console.log(`  Queue mode:  ${result.canvasMetadata.executionState.queueMode}`);
+      console.log(`  Active:      ${result.runtimeState.isActive}`);
     });
-    
   } catch (error) {
-    printErrorResult('Failed to activate canvas session', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Activate canvas session', error);
   }
 }
 
-/**
- * Show session history
- */
-async function showSessionHistory(sessionKey?: string, options: { limit?: number; offset?: number } = {}): Promise<void> {
-  try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+async function showSessionHistory(opts: { session?: string; limit?: string; offset?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
 
-    const params = new URLSearchParams();
-    if (options.limit) params.append('limit', options.limit.toString());
-    if (options.offset) params.append('offset', options.offset.toString());
-
-    const result = await canvasApiRequest(`/sessions/${targetSessionKey}/history?${params}`);
-    
-    console.log(`\n📜 Session History: ${targetSessionKey}`);
-    console.log(`📊 Total messages: ${result.total}`);
-    console.log(`📄 Showing ${result.messages.length} messages (offset ${result.offset})`);
-    console.log('');
-
-    if (result.messages.length === 0) {
-      console.log('No messages found.');
-      return;
-    }
-
-    result.messages.forEach((msg: any, index: number) => {
-      const timestamp = new Date(msg.timestamp).toLocaleString();
-      const role = msg.role === 'user' ? '👤' : msg.role === 'assistant' ? '🤖' : '⚙️';
-      const status = msg.status === 'complete' ? '✅' : msg.status === 'error' ? '❌' : '⏳';
-      
-      console.log(`${role} ${status} [${result.offset + index + 1}] ${timestamp}`);
-      console.log(`   ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}`);
-      console.log('');
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
     });
-    
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  try {
+    const client = getCanvasClient();
+    const result = await client.getSessionHistory(targetSessionKey, {
+      limit: opts.limit ? parseInt(opts.limit, 10) : undefined,
+      offset: opts.offset ? parseInt(opts.offset, 10) : undefined,
+    });
+
+    printResult(result, () => {
+      console.log(`\n  Session History: ${targetSessionKey}`);
+      console.log(`  Total messages: ${result.total}`);
+      console.log(`  Showing ${result.messages.length} messages (offset ${result.offset})\n`);
+
+      if (result.messages.length === 0) {
+        console.log('  No messages found.');
+        return;
+      }
+
+      result.messages.forEach((msg, index) => {
+        const timestamp = new Date(msg.timestamp).toLocaleString();
+        const roleIcon = msg.role === 'user' ? 'U' : msg.role === 'assistant' ? 'A' : 'S';
+        const statusIcon = msg.status === 'complete' ? '+' : msg.status === 'error' ? 'x' : '~';
+        console.log(`  [${statusIcon}] ${roleIcon} [${result.offset + index + 1}] ${timestamp}`);
+        console.log(`      ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}\n`);
+      });
+    });
   } catch (error) {
-    printErrorResult('Failed to get session history', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Get session history', error);
   }
 }
 
-/**
- * Reset a canvas session
- */
-async function resetCanvasSession(sessionKey?: string): Promise<void> {
+async function resetCanvasSession(opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
   try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+    const client = getCanvasClient();
+    const result = await client.resetSession(targetSessionKey);
 
-    const result = await canvasApiRequest(`/sessions/${targetSessionKey}/reset`, {
-      method: 'POST',
+    printResult(result, () => {
+      printSuccess(`Canvas session reset: ${targetSessionKey}`);
+      console.log(`  New session ID: ${result.sessionId}`);
     });
-
-    printSuccessResult('Canvas session reset', {
-      sessionKey: targetSessionKey,
-      sessionId: result.sessionId,
-      message: result.message,
-    });
-    
   } catch (error) {
-    printErrorResult('Failed to reset canvas session', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Reset canvas session', error);
   }
 }
 
@@ -262,74 +207,81 @@ async function resetCanvasSession(sessionKey?: string): Promise<void> {
 // QUEUE COMMANDS
 // ============================================================================
 
-/**
- * Get queue status
- */
-async function getQueueStatus(sessionKey?: string): Promise<void> {
-  try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+async function getQueueStatus(opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
 
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  try {
     const client = getCanvasClient();
     const status = await client.getQueueStatus(targetSessionKey);
-    
-    console.log(`\n📊 Queue Status: ${targetSessionKey}`);
-    console.log(`🔄 Queue Mode: ${status.queueMode}`);
-    console.log(`🔒 Is Locked: ${status.isLocked ? 'Yes' : 'No'}`);
-    if (status.lockHolder) {
-      console.log(`🏃 Lock Holder: ${status.lockHolder}`);
-    }
-    console.log(`📋 Queued Events: ${status.queuedEvents.length}`);
-    console.log('');
 
-    if (status.queuedEvents.length > 0) {
-      console.log('Queued Events:');
-      status.queuedEvents.forEach((event, index) => {
-        const timestamp = new Date(event.queuedAt).toLocaleString();
-        console.log(`  ${index + 1}. ${event.type} (${event.priority}) - ${event.source} - ${timestamp}`);
-      });
-    } else {
-      console.log('No queued events.');
-    }
-    
+    printResult(status, () => {
+      console.log(`\n  Queue Status: ${targetSessionKey}`);
+      console.log(`  Queue Mode:   ${status.queueMode}`);
+      console.log(`  Is Locked:    ${status.isLocked ? 'Yes' : 'No'}`);
+      if (status.lockHolder) {
+        console.log(`  Lock Holder:  ${status.lockHolder}`);
+      }
+      console.log(`  Queued Events: ${status.queuedEvents.length}\n`);
+
+      if (status.queuedEvents.length > 0) {
+        console.log('  Queued Events:');
+        status.queuedEvents.forEach((event, index) => {
+          const timestamp = new Date(event.queuedAt).toLocaleString();
+          console.log(`    ${index + 1}. ${event.type} (${event.priority}) - ${event.source} - ${timestamp}`);
+        });
+      } else {
+        console.log('  No queued events.');
+      }
+    });
   } catch (error) {
-    printErrorResult('Failed to get queue status', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Get queue status', error);
   }
 }
 
-/**
- * Set queue mode
- */
-async function setQueueMode(mode: string, sessionKey?: string): Promise<void> {
+async function setQueueMode(mode: string, opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
+  const validModes = ['collect', 'followup', 'steer', 'interrupt'];
+  if (!validModes.includes(mode)) {
+    printErrorResult({
+      code: 'INVALID_MODE',
+      message: `Invalid queue mode. Must be one of: ${validModes.join(', ')}`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
   try {
-    const validModes = ['collect', 'followup', 'steer', 'interrupt'];
-    if (!validModes.includes(mode)) {
-      printError(`Invalid queue mode. Must be one of: ${validModes.join(', ')}`);
-      process.exit(ExitCode.USAGE_ERROR);
-    }
-
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
-
     const client = getCanvasClient();
     const result = await client.setQueueMode(targetSessionKey, mode);
 
-    printSuccessResult('Queue mode updated', {
-      sessionKey: targetSessionKey,
-      queueMode: mode,
-      message: result.message,
+    printResult(result, () => {
+      printSuccess(`Queue mode set to '${mode}' for ${targetSessionKey}`);
     });
-    
   } catch (error) {
-    printErrorResult('Failed to set queue mode', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Set queue mode', error);
   }
 }
 
@@ -337,86 +289,75 @@ async function setQueueMode(mode: string, sessionKey?: string): Promise<void> {
 // AGENT COMMANDS
 // ============================================================================
 
-/**
- * Send message to canvas agent
- */
-async function sendAgentMessage(message: string, sessionKey?: string): Promise<void> {
+async function sendAgentMessage(message: string, opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
   try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+    const client = getCanvasClient();
+    await client.sendAgentMessage(targetSessionKey, message);
 
-    // This would integrate with the canvas workflow system
-    // For now, we'll queue the message as a user event
-    const result = await canvasApiRequest(`/sessions/${targetSessionKey}/queue-mode`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        queueMode: 'interrupt', // User messages should be processed immediately
-      }),
-    });
-
-    printSuccessResult('Message sent to canvas agent', {
-      sessionKey: targetSessionKey,
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      queueMode: 'interrupt',
-    });
-    
+    printSuccess(`Message sent to canvas agent in session ${targetSessionKey}`);
   } catch (error) {
-    printErrorResult('Failed to send message', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Send agent message', error);
   }
 }
 
-/**
- * Steer active canvas agent run
- */
-async function steerAgent(message: string, sessionKey?: string): Promise<void> {
-  try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+async function steerAgent(message: string, opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
 
-    // This would integrate with canvas workflow steering
-    printWarning('Agent steering not yet implemented in CLI');
-    console.log('🔄 Steering would be sent to active run in session:', targetSessionKey);
-    console.log('💬 Message:', message);
-    
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  try {
+    const client = getCanvasClient();
+    await client.steerAgent(targetSessionKey, message);
+
+    printSuccess(`Steering sent to active run in session ${targetSessionKey}`);
   } catch (error) {
-    printErrorResult('Failed to steer agent', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Steer agent', error);
   }
 }
 
-/**
- * Cancel active canvas agent run
- */
-async function cancelAgentRun(sessionKey?: string): Promise<void> {
+async function cancelAgentRun(opts: { session?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
+  const targetSessionKey = opts.session || getCurrentSessionKey();
+  if (!targetSessionKey) {
+    printErrorResult({
+      code: 'NO_SESSION',
+      message: 'No session specified. Use --session=<session-key> or activate a session first.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
   try {
-    const targetSessionKey = sessionKey || getCurrentSessionKey();
-    if (!targetSessionKey) {
-      printError('No session specified. Use --session=<session-key> or activate a session first');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+    const client = getCanvasClient();
+    await client.cancelAgentRun(targetSessionKey);
 
-    // Set queue mode to interrupt to cancel current run
-    const result = await canvasApiRequest(`/sessions/${targetSessionKey}/queue-mode`, {
-      method: 'POST',
-      body: JSON.stringify({ queueMode: 'interrupt' }),
-    });
-
-    printSuccessResult('Agent run cancelled', {
-      sessionKey: targetSessionKey,
-      queueMode: 'interrupt',
-      message: result.message,
-    });
-    
+    printSuccess(`Agent run cancelled in session ${targetSessionKey}`);
   } catch (error) {
-    printErrorResult('Failed to cancel agent run', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Cancel agent run', error);
   }
 }
 
@@ -424,48 +365,51 @@ async function cancelAgentRun(sessionKey?: string): Promise<void> {
 // RUN COMMANDS
 // ============================================================================
 
-/**
- * Get run status
- */
 async function getRunStatus(runId: string): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
   try {
-    printWarning('Run status command not yet implemented');
-    console.log('🔍 Would show status for run:', runId);
-    console.log('💡 This would integrate with the workflow execution system');
-    
+    const client = getCanvasClient();
+    const result = await client.getRunStatus(runId);
+    printResult(result, () => {
+      console.log(`  Run status for: ${runId}`);
+      console.log(JSON.stringify(result, null, 2));
+    });
   } catch (error) {
-    printErrorResult('Failed to get run status', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Get run status', error);
   }
 }
 
-/**
- * Get run logs
- */
 async function getRunLogs(runId: string): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
   try {
-    printWarning('Run logs command not yet implemented');
-    console.log('📋 Would show logs for run:', runId);
-    console.log('💡 This would integrate with the workflow execution system');
-    
+    const client = getCanvasClient();
+    const result = await client.getRunLogs(runId);
+    printResult(result, () => {
+      console.log(`  Run logs for: ${runId}`);
+      console.log(JSON.stringify(result, null, 2));
+    });
   } catch (error) {
-    printErrorResult('Failed to get run logs', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Get run logs', error);
   }
 }
 
-/**
- * Get run trace
- */
 async function getRunTrace(runId: string): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
+
   try {
-    printWarning('Run trace command not yet implemented');
-    console.log('🔍 Would show execution trace for run:', runId);
-    console.log('💡 This would integrate with the workflow execution system');
-    
+    const client = getCanvasClient();
+    const result = await client.getRunTrace(runId);
+    printResult(result, () => {
+      console.log(`  Run trace for: ${runId}`);
+      console.log(JSON.stringify(result, null, 2));
+    });
   } catch (error) {
-    printErrorResult('Failed to get run trace', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Get run trace', error);
   }
 }
 
@@ -473,54 +417,55 @@ async function getRunTrace(runId: string): Promise<void> {
 // SCHEDULING COMMANDS
 // ============================================================================
 
-/**
- * Set heartbeat for canvas
- */
-async function setHeartbeat(options: { canvas?: string; every?: number }): Promise<void> {
-  try {
-    const context = getActiveContext();
-    const canvasId = options.canvas || context?.canvasId;
-    
-    if (!canvasId) {
-      printError('Canvas ID required. Use --canvas=<canvas-id> or set active canvas context');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+async function setHeartbeat(opts: { canvas?: string; every?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
 
-    const interval = options.every || 30; // Default 30 minutes
-    
-    printWarning('Heartbeat scheduling not yet implemented');
-    console.log('💓 Would set heartbeat for canvas:', canvasId);
-    console.log('⏰ Interval:', interval, 'minutes');
-    console.log('💡 This would integrate with the canvas wakeup system');
-    
+  const context = getActiveContext();
+  const canvasId = opts.canvas || context?.canvasId;
+
+  if (!canvasId) {
+    printErrorResult({
+      code: 'MISSING_CANVAS',
+      message: 'Canvas ID required. Use --canvas=<canvas-id> or set active canvas context.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  const interval = opts.every ? parseInt(opts.every, 10) : 30;
+
+  try {
+    const client = getCanvasClient();
+    await client.setHeartbeat(canvasId, interval);
+    printSuccess(`Heartbeat set for canvas ${canvasId} every ${interval} minutes`);
   } catch (error) {
-    printErrorResult('Failed to set heartbeat', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Set heartbeat', error);
   }
 }
 
-/**
- * Add cron schedule
- */
-async function addCronSchedule(schedule: string, prompt: string, options: { canvas?: string }): Promise<void> {
-  try {
-    const context = getActiveContext();
-    const canvasId = options.canvas || context?.canvasId;
-    
-    if (!canvasId) {
-      printError('Canvas ID required. Use --canvas=<canvas-id> or set active canvas context');
-      process.exit(ExitCode.USAGE_ERROR);
-    }
+async function addCronSchedule(schedule: string, prompt: string, opts: { canvas?: string }): Promise<void> {
+  const auth = requireAuth();
+  if (!auth) return;
 
-    printWarning('Cron scheduling not yet implemented');
-    console.log('⏰ Would add cron schedule for canvas:', canvasId);
-    console.log('📅 Schedule:', schedule);
-    console.log('💬 Prompt:', prompt);
-    console.log('💡 This would integrate with the canvas wakeup system');
-    
+  const context = getActiveContext();
+  const canvasId = opts.canvas || context?.canvasId;
+
+  if (!canvasId) {
+    printErrorResult({
+      code: 'MISSING_CANVAS',
+      message: 'Canvas ID required. Use --canvas=<canvas-id> or set active canvas context.',
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return;
+  }
+
+  try {
+    const client = getCanvasClient();
+    await client.addCronSchedule(canvasId, schedule, prompt);
+    printSuccess(`Cron schedule added for canvas ${canvasId}: ${schedule}`);
   } catch (error) {
-    printErrorResult('Failed to add cron schedule', error);
-    process.exit(ExitCode.GENERAL_ERROR);
+    printError('Add cron schedule', error);
   }
 }
 
@@ -551,12 +496,12 @@ export function registerCanvasCommands(program: Command): void {
     .option('--title <title>', 'Session title')
     .option('--agent <agent>', 'Primary agent ID')
     .option('--queue-mode <mode>', 'Queue mode (collect, followup, steer, interrupt)', 'followup')
-    .action((opts) => requireAuth(() => createCanvasSession(opts)));
+    .action(async (opts) => { await createCanvasSession(opts); });
 
   session
     .command('use <session-key>')
     .description('Activate a canvas session')
-    .action((sessionKey) => requireAuth(() => useCanvasSession(sessionKey)));
+    .action(async (sessionKey) => { await useCanvasSession(sessionKey); });
 
   session
     .command('history')
@@ -564,13 +509,13 @@ export function registerCanvasCommands(program: Command): void {
     .option('--session <session>', 'Session key (uses active session if not specified)')
     .option('--limit <limit>', 'Number of messages to show', '50')
     .option('--offset <offset>', 'Message offset', '0')
-    .action((opts) => requireAuth(() => showSessionHistory(opts.session, opts)));
+    .action(async (opts) => { await showSessionHistory(opts); });
 
   session
     .command('reset')
     .description('Reset a canvas session')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((opts) => requireAuth(() => resetCanvasSession(opts.session)));
+    .action(async (opts) => { await resetCanvasSession(opts); });
 
   // ── Queue Subcommand Group ───────────────────────────────────────────────
 
@@ -582,13 +527,13 @@ export function registerCanvasCommands(program: Command): void {
     .command('get')
     .description('Get queue status')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((opts) => requireAuth(() => getQueueStatus(opts.session)));
+    .action(async (opts) => { await getQueueStatus(opts); });
 
   queue
     .command('set <mode>')
     .description('Set queue mode (collect, followup, steer, interrupt)')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((mode, opts) => requireAuth(() => setQueueMode(mode, opts.session)));
+    .action(async (mode, opts) => { await setQueueMode(mode, opts); });
 
   // ── Agent Subcommand Group ───────────────────────────────────────────────
 
@@ -600,19 +545,19 @@ export function registerCanvasCommands(program: Command): void {
     .command('send <message>')
     .description('Send message to canvas agent')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((message, opts) => requireAuth(() => sendAgentMessage(message, opts.session)));
+    .action(async (message, opts) => { await sendAgentMessage(message, opts); });
 
   agent
     .command('steer <message>')
     .description('Steer active canvas agent run')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((message, opts) => requireAuth(() => steerAgent(message, opts.session)));
+    .action(async (message, opts) => { await steerAgent(message, opts); });
 
   agent
     .command('cancel')
     .description('Cancel active canvas agent run')
     .option('--session <session>', 'Session key (uses active session if not specified)')
-    .action((opts) => requireAuth(() => cancelAgentRun(opts.session)));
+    .action(async (opts) => { await cancelAgentRun(opts); });
 
   // ── Run Subcommand Group ─────────────────────────────────────────────────
 
@@ -623,17 +568,17 @@ export function registerCanvasCommands(program: Command): void {
   run
     .command('status <run-id>')
     .description('Get run status')
-    .action((runId) => requireAuth(() => getRunStatus(runId)));
+    .action(async (runId) => { await getRunStatus(runId); });
 
   run
     .command('logs <run-id>')
     .description('Get run logs')
-    .action((runId) => requireAuth(() => getRunLogs(runId)));
+    .action(async (runId) => { await getRunLogs(runId); });
 
   run
     .command('trace <run-id>')
     .description('Get run execution trace')
-    .action((runId) => requireAuth(() => getRunTrace(runId)));
+    .action(async (runId) => { await getRunTrace(runId); });
 
   // ── Scheduling Subcommand Group ───────────────────────────────────────────
 
@@ -646,7 +591,7 @@ export function registerCanvasCommands(program: Command): void {
     .description('Set heartbeat interval for canvas')
     .option('--canvas <canvas>', 'Canvas ID')
     .option('--every <minutes>', 'Heartbeat interval in minutes', '30')
-    .action((opts) => requireAuth(() => setHeartbeat(opts)));
+    .action(async (opts) => { await setHeartbeat(opts); });
 
   const cron = canvas
     .command('cron')
@@ -656,5 +601,5 @@ export function registerCanvasCommands(program: Command): void {
     .command('add <schedule> <prompt>')
     .description('Add cron schedule for canvas')
     .option('--canvas <canvas>', 'Canvas ID')
-    .action((schedule, prompt, opts) => requireAuth(() => addCronSchedule(schedule, prompt, opts)));
+    .action(async (schedule, prompt, opts) => { await addCronSchedule(schedule, prompt, opts); });
 }
