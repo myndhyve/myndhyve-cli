@@ -31,6 +31,12 @@ import { registerBridgeCommands } from './bridge.js';
 import { registerA2ACommands } from './a2a.js';
 import { registerMCPClientCommands } from './mcp-client.js';
 import { registerPromptCommands } from './prompts.js';
+import { registerMarketplaceCommands } from './marketplace.js';
+import { registerPackCommands } from './packs.js';
+import { registerSecretsCommands } from './secrets.js';
+import { registerIntelCommands } from './intel.js';
+import { registerEntityCommands } from './entities.js';
+import { registerNotifyCommands } from './notify.js';
 import { registerCompletionCommand } from './completion.js';
 import { registerUpdateCommand } from './update.js';
 import { applyGlobalOptions } from './global-options.js';
@@ -103,6 +109,30 @@ export function createProgram(): Command {
   // ── Prompt Management ──────────────────────────────────────────────────
 
   registerPromptCommands(program);
+
+  // ── Marketplace ─────────────────────────────────────────────────────────
+
+  registerMarketplaceCommands(program);
+
+  // ── Pack Storage ───────────────────────────────────────────────────────
+
+  registerPackCommands(program);
+
+  // ── Secrets Management ─────────────────────────────────────────────────
+
+  registerSecretsCommands(program);
+
+  // ── Market Intelligence ────────────────────────────────────────────────
+
+  registerIntelCommands(program);
+
+  // ── Entity Management ──────────────────────────────────────────────────
+
+  registerEntityCommands(program);
+
+  // ── Notifications ──────────────────────────────────────────────────────
+
+  registerNotifyCommands(program);
 
   // ── Cron Scheduler ──────────────────────────────────────────────────────
 

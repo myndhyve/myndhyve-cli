@@ -32,9 +32,9 @@ The project uses **Canvas Type** terminology (not "Hyve"):
 
 | API | Base URL |
 |-----|----------|
-| canvasApiV2 | `https://us-central1-myndhyve.cloudfunctions.net/canvasApiV2` |
-| agentApiV2 | `https://us-central1-myndhyve.cloudfunctions.net/agentApiV2` |
-| aiProxyV2 | `https://us-central1-myndhyve.cloudfunctions.net/aiProxyV2` |
+| canvasApi | `https://us-central1-myndhyve.cloudfunctions.net/canvasApi` |
+| agentApi | `https://us-central1-myndhyve.cloudfunctions.net/agentApi` |
+| aiProxy | `https://us-central1-myndhyve.cloudfunctions.net/aiProxy` |
 | promptApi | `https://us-central1-myndhyve.cloudfunctions.net/promptApi` |
 
 ## Dependencies

@@ -65,8 +65,21 @@ export class MyndHyveClient {
     });
   }
 
-  async delete<T>(path: string): Promise<T> {
-    return this.request<T>(this.buildUrl(path), { method: 'DELETE' });
+  async patch<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>(this.buildUrl(path), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async delete<T>(path: string, query?: Record<string, string>): Promise<T> {
+    let url = this.buildUrl(path);
+    if (query) {
+      const params = new URLSearchParams(query);
+      url += `?${params.toString()}`;
+    }
+    return this.request<T>(url, { method: 'DELETE' });
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
