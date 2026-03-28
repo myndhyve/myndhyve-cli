@@ -5,7 +5,7 @@
  * Uses in-memory cache to avoid repeated API calls within a session.
  *
  * @see functions/src/prompt-api/index.ts — server endpoint
- * @see src/core/hyve/services/SystemPromptService.ts — web app equivalent
+ * @see src/core/canvas/services/SystemPromptService.ts — web app equivalent
  */
 
 import { getAPIClient } from './client.js';

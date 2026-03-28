@@ -626,7 +626,7 @@ function registerSchemaCommand(dev: Command): void {
         { id: 'coordination', name: 'Coordination', count: 6, description: 'Vote, consensus, compete, map-reduce, delegate, round-robin (disabled)' },
         { id: 'dataIntegration', name: 'Data Integration', count: 8, description: 'REST, MCP, A2A, GraphQL, fetch, compute, binding, transform' },
         { id: 'webResearch', name: 'Web Research', count: 4, description: 'Search, scrape, analyze, summarize' },
-        { id: 'landingPageBuild', name: 'Landing Page', count: 8, description: 'Content, structure, personas, theme, tracking, validate, review, publish' },
+        { id: 'pageBuilder', name: 'Page Builder', count: 8, description: 'Content, structure, personas, theme, tracking, validate, review, publish' },
         { id: 'brandTheme', name: 'Brand & Theme', count: 8, description: 'Discovery, generate, validate, competitor, review, implement, template, publish' },
         { id: 'adsStudio', name: 'Ads Studio', count: 11, description: 'Campaigns, audiences, creatives, budgets, scheduling' },
         { id: 'campaignStudio', name: 'Campaign Studio', count: 7, description: 'Create, launch, pause, metrics, forecast, rebalance, attribute' },

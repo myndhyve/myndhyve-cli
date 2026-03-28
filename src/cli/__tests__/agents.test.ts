@@ -79,7 +79,7 @@ const SAMPLE_AGENT_SUMMARY = {
 
 const SAMPLE_AGENT_SUMMARY_2 = {
   id: 'agent-xyz789',
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   name: 'LP Agent',
   description: 'Landing page helper',
   enabled: false,
@@ -483,13 +483,13 @@ describe('registerAgentCommands', () => {
       mockCreateAgent.mockResolvedValue({
         id: 'agent-new',
         name: 'GPT Agent',
-        canvasTypeId: 'landing-page',
+        canvasTypeId: 'campaign-studio',
         model: { provider: 'openai', modelId: 'gpt-4o' },
       });
 
       await run([
         'agents', 'create',
-        '--canvas-type', 'landing-page',
+        '--canvas-type', 'campaign-studio',
         '--name', 'GPT Agent',
         '--provider', 'openai',
         '--model', 'gpt-4o',

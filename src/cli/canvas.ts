@@ -91,7 +91,7 @@ async function createCanvasSession(opts: {
       tenantId: opts.tenant || 'default',
       projectId: opts.project || context.projectId,
       canvasId,
-      canvasType: opts.type || 'landing-page',
+      canvasType: opts.type || 'campaign-studio',
       surface: opts.surface || 'cli',
       sessionScope: opts.scope || 'main',
       title: opts.title,
@@ -490,7 +490,7 @@ export function registerCanvasCommands(program: Command): void {
     .option('--tenant <tenant>', 'Tenant ID', 'default')
     .option('--project <project>', 'Project ID')
     .option('--canvas <canvas>', 'Canvas ID')
-    .option('--type <type>', 'Canvas type', 'landing-page')
+    .option('--type <type>', 'Canvas type', 'campaign-studio')
     .option('--surface <surface>', 'Surface type', 'cli')
     .option('--scope <scope>', 'Session scope', 'main')
     .option('--title <title>', 'Session title')

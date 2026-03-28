@@ -217,7 +217,7 @@ async function firestoreRequest(
 /**
  * Get a single document by its collection path and document ID.
  *
- * @param collectionPath - e.g. 'projects' or 'users/uid123/hyveDocuments'
+ * @param collectionPath - e.g. 'projects' or 'users/uid123/canvases'
  * @param documentId - Document ID
  * @returns Deserialized document data with `id` field, or null if not found
  */
@@ -247,7 +247,7 @@ export async function getDocument(
 /**
  * List all documents in a collection.
  *
- * @param collectionPath - e.g. 'projects' or 'users/uid123/hyveDocuments'
+ * @param collectionPath - e.g. 'projects' or 'users/uid123/canvases'
  * @param options - Page size and page token for pagination
  * @returns Array of deserialized documents
  */
@@ -469,7 +469,7 @@ function buildCompositeFilter(
 
 /**
  * Extract the last segment of a collection path (the collection ID).
- * e.g. 'users/uid/hyveDocuments' → 'hyveDocuments'
+ * e.g. 'users/uid/canvases' → 'canvases'
  */
 function getCollectionId(collectionPath: string): string {
   const parts = collectionPath.split('/');
@@ -478,7 +478,7 @@ function getCollectionId(collectionPath: string): string {
 
 /**
  * Get the parent document path for a subcollection.
- * e.g. 'users/uid/hyveDocuments' → 'users/uid'
+ * e.g. 'users/uid/canvases' → 'users/uid'
  * Returns undefined for top-level collections.
  */
 function getParentPath(collectionPath: string): string | undefined {

@@ -223,7 +223,7 @@ let defaultClient: MyndHyveClient | undefined;
  * ```typescript
  * // Use default Cloud Functions URL
  * const client = getAPIClient();
- * const data = await client.get('/hyveApi/workflows');
+ * const data = await client.get('/canvasApi/workflows');
  *
  * // Override base URL (e.g., for local emulator)
  * const devClient = getAPIClient({ baseUrl: 'http://localhost:5001' });

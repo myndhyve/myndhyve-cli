@@ -139,7 +139,7 @@ const SAMPLE_PROJECT_2 = {
   id: 'proj-2',
   name: 'Another Project',
   slug: 'another-project',
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   status: 'draft',
 };
 
@@ -191,7 +191,7 @@ describe('registerProjectCommands', () => {
     // listCanvasTypes default
     mockListCanvasTypes.mockReturnValue([
       { canvasTypeId: 'app-builder', name: 'App Builder' },
-      { canvasTypeId: 'landing-page', name: 'Landing Page' },
+      { canvasTypeId: 'campaign-studio', name: 'Campaign Studio' },
     ]);
 
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

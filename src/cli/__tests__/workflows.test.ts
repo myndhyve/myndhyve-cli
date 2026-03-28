@@ -81,8 +81,8 @@ const AUTH_USER = { uid: 'user-123', email: 'dev@myndhyve.com' };
 const DEFAULT_CONTEXT = {
   projectId: 'proj-123',
   projectName: 'My Project',
-  canvasTypeId: 'landing-page',
-  canvasTypeName: 'Landing Page',
+  canvasTypeId: 'campaign-studio',
+  canvasTypeName: 'Campaign Studio',
   setAt: '2025-01-15T10:00:00Z',
 };
 
@@ -125,7 +125,7 @@ const mockWorkflowSummaryDisabled = {
 
 const mockWorkflowDetail = {
   ...mockWorkflowSummary,
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   nodes: [
     { id: 'node-1', type: 'ai-generate', label: 'Generate PRD', requiresApproval: false },
     { id: 'node-2', type: 'approval', label: 'Review PRD', requiresApproval: true },
@@ -153,7 +153,7 @@ const mockRunSummary = {
 
 const mockRunDetail = {
   ...mockRunSummary,
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   userId: 'user-123',
   nodeStates: [
     { nodeId: 'node-1', status: 'completed', label: 'Generate PRD' },
@@ -188,7 +188,7 @@ const mockWaitingRunDetail = {
   triggerType: 'manual',
   progress: 1,
   totalNodes: 3,
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   userId: 'user-123',
   startedAt: '2025-01-15T10:00:00Z',
   nodeStates: [
@@ -413,10 +413,10 @@ describe('registerWorkflowCommands', () => {
   });
 
   // ==========================================================================
-  // resolveHyveId (tested through commands)
+  // resolveCanvasTypeId (tested through commands)
   // ==========================================================================
 
-  describe('resolveHyveId', () => {
+  describe('resolveCanvasTypeId', () => {
     it('uses --canvas-type flag when provided', async () => {
       mockListWorkflows.mockResolvedValue([]);
 
@@ -430,7 +430,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'list']);
 
-      expect(mockListWorkflows).toHaveBeenCalledWith('landing-page');
+      expect(mockListWorkflows).toHaveBeenCalledWith('campaign-studio');
     });
 
     it('shows error when no canvas type and no context', async () => {
@@ -479,9 +479,9 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'list']);
 
-      expect(mockListWorkflows).toHaveBeenCalledWith('landing-page');
+      expect(mockListWorkflows).toHaveBeenCalledWith('campaign-studio');
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Workflows for "landing-page"');
+      expect(output).toContain('Workflows for "campaign-studio"');
       expect(output).toContain('wf-1');
       expect(output).toContain('App Builder Workflow');
     });
@@ -500,7 +500,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'list']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('No workflows found for canvas type "landing-page"');
+      expect(output).toContain('No workflows found for canvas type "campaign-studio"');
       expect(output).toContain('Workflows are configured in the web app');
     });
 
@@ -576,11 +576,11 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'info', 'wf-1']);
 
-      expect(mockGetWorkflow).toHaveBeenCalledWith('landing-page', 'wf-1');
+      expect(mockGetWorkflow).toHaveBeenCalledWith('campaign-studio', 'wf-1');
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('App Builder Workflow');
       expect(output).toContain('ID:           wf-1');
-      expect(output).toContain('Canvas Type:  landing-page');
+      expect(output).toContain('Canvas Type:  campaign-studio');
       expect(output).toContain('Version:      2');
       expect(output).toContain('Status:       enabled');
       expect(output).toContain('Description:  Creates apps');
@@ -601,7 +601,7 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('node-2');
 
       // Run hint
-      expect(output).toContain('myndhyve-cli workflows run wf-1 --canvas-type=landing-page');
+      expect(output).toContain('myndhyve-cli workflows run wf-1 --canvas-type=campaign-studio');
     });
 
     it('shows edge labels when present', async () => {
@@ -619,7 +619,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'info', 'wf-missing']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Workflow "wf-missing" not found in canvas type "landing-page"');
+      expect(output).toContain('Workflow "wf-missing" not found in canvas type "campaign-studio"');
       expect(process.exitCode).toBe(3); // NOT_FOUND
     });
 
@@ -681,8 +681,8 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'run', 'wf-1']);
 
-      expect(mockGetWorkflow).toHaveBeenCalledWith('landing-page', 'wf-1');
-      expect(mockCreateRun).toHaveBeenCalledWith('user-123', 'landing-page', 'wf-1', {
+      expect(mockGetWorkflow).toHaveBeenCalledWith('campaign-studio', 'wf-1');
+      expect(mockCreateRun).toHaveBeenCalledWith('user-123', 'campaign-studio', 'wf-1', {
         inputData: undefined,
         triggerType: 'manual',
       });
@@ -692,8 +692,8 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('Run ID:     run_abc123');
       expect(output).toContain('Workflow:   App Builder Workflow');
       expect(output).toContain('Status:     running');
-      expect(output).toContain('myndhyve-cli workflows status run_abc123 --canvas-type=landing-page');
-      expect(output).toContain('myndhyve-cli workflows logs run_abc123 --canvas-type=landing-page');
+      expect(output).toContain('myndhyve-cli workflows status run_abc123 --canvas-type=campaign-studio');
+      expect(output).toContain('myndhyve-cli workflows logs run_abc123 --canvas-type=campaign-studio');
     });
 
     it('passes parsed --input JSON to createRun', async () => {
@@ -702,7 +702,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'run', 'wf-1', '--input', '{"topic":"AI chatbots"}']);
 
-      expect(mockCreateRun).toHaveBeenCalledWith('user-123', 'landing-page', 'wf-1', {
+      expect(mockCreateRun).toHaveBeenCalledWith('user-123', 'campaign-studio', 'wf-1', {
         inputData: { topic: 'AI chatbots' },
         triggerType: 'manual',
       });
@@ -724,7 +724,7 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'run', 'wf-missing']);
 
       const output = stderrWriteSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('Workflow "wf-missing" not found in canvas type "landing-page"');
+      expect(output).toContain('Workflow "wf-missing" not found in canvas type "campaign-studio"');
       expect(process.exitCode).toBe(3); // NOT_FOUND
       expect(mockCreateRun).not.toHaveBeenCalled();
     });
@@ -785,7 +785,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'status', 'run_abc123']);
 
-      expect(mockGetRun).toHaveBeenCalledWith('user-123', 'landing-page', 'run_abc123');
+      expect(mockGetRun).toHaveBeenCalledWith('user-123', 'campaign-studio', 'run_abc123');
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Workflow Run: run_abc123');
@@ -842,8 +842,8 @@ describe('registerWorkflowCommands', () => {
       await run(['workflows', 'status', 'run_waiting123']);
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
-      expect(output).toContain('myndhyve-cli workflows approve run_waiting123 --canvas-type=landing-page');
-      expect(output).toContain('myndhyve-cli workflows reject run_waiting123 --canvas-type=landing-page');
+      expect(output).toContain('myndhyve-cli workflows approve run_waiting123 --canvas-type=campaign-studio');
+      expect(output).toContain('myndhyve-cli workflows reject run_waiting123 --canvas-type=campaign-studio');
       expect(output).toContain('myndhyve-cli workflows revise run_waiting123');
     });
 
@@ -939,7 +939,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'logs', 'run_abc123']);
 
-      expect(mockGetRunLogs).toHaveBeenCalledWith('user-123', 'landing-page', 'run_abc123');
+      expect(mockGetRunLogs).toHaveBeenCalledWith('user-123', 'campaign-studio', 'run_abc123');
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('Run Logs');
@@ -1256,7 +1256,7 @@ describe('registerWorkflowCommands', () => {
 
       expect(mockApproveRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'run_waiting123',
         undefined
       );
@@ -1273,7 +1273,7 @@ describe('registerWorkflowCommands', () => {
 
       expect(mockApproveRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'run_waiting123',
         'Looks good'
       );
@@ -1335,7 +1335,7 @@ describe('registerWorkflowCommands', () => {
 
       expect(mockRejectRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'run_waiting123',
         undefined
       );
@@ -1352,7 +1352,7 @@ describe('registerWorkflowCommands', () => {
 
       expect(mockRejectRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'run_waiting123',
         'Needs more detail'
       );
@@ -1401,7 +1401,7 @@ describe('registerWorkflowCommands', () => {
 
       expect(mockReviseRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'run_waiting123',
         'Add more sections'
       );
@@ -1457,7 +1457,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'runs']);
 
-      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
         status: undefined,
         workflowId: undefined,
         limit: 25,
@@ -1531,7 +1531,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'runs', '--status', 'completed']);
 
-      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
         status: 'completed',
         workflowId: undefined,
         limit: 25,
@@ -1566,7 +1566,7 @@ describe('registerWorkflowCommands', () => {
 
         await run(['workflows', 'runs', '--status', status]);
 
-        expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+        expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
           status,
           workflowId: undefined,
           limit: 25,
@@ -1579,7 +1579,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'runs', '--workflow', 'wf-1']);
 
-      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
         status: undefined,
         workflowId: 'wf-1',
         limit: 25,
@@ -1591,7 +1591,7 @@ describe('registerWorkflowCommands', () => {
 
       await run(['workflows', 'runs', '--limit', '10']);
 
-      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
         status: undefined,
         workflowId: undefined,
         limit: 10,
@@ -1608,7 +1608,7 @@ describe('registerWorkflowCommands', () => {
         '--limit', '5',
       ]);
 
-      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'landing-page', {
+      expect(mockListRuns).toHaveBeenCalledWith('user-123', 'campaign-studio', {
         status: 'running',
         workflowId: 'wf-1',
         limit: 5,

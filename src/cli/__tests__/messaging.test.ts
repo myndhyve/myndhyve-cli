@@ -564,7 +564,7 @@ describe('registerMessagingCommands', () => {
         requireMention: false,
         allowedUsers: [],
         allowedChannels: [],
-        channelCanvasTypeBindings: { '#general': 'app-builder', '#marketing': 'landing-page' },
+        channelCanvasTypeBindings: { '#general': 'app-builder', '#marketing': 'campaign-studio' },
         channelWorkflowBindings: {},
       });
 
@@ -575,7 +575,7 @@ describe('registerMessagingCommands', () => {
       expect(output).toContain('#general');
       expect(output).toContain('app-builder');
       expect(output).toContain('#marketing');
-      expect(output).toContain('landing-page');
+      expect(output).toContain('campaign-studio');
     });
 
     it('displays workflow bindings when present', async () => {

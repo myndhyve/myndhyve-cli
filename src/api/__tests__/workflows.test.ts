@@ -107,7 +107,7 @@ const mockWorkflowDoc: Record<string, unknown> = {
 const mockRunDoc: Record<string, unknown> = {
   id: 'run_abc123',
   userId: USER_ID,
-  hyveId: CANVAS_TYPE_ID,
+  canvasTypeId: CANVAS_TYPE_ID,
   workflowId: 'wf-1',
   workflowName: 'App Builder Workflow',
   status: 'running',
@@ -130,7 +130,7 @@ const mockRunDoc: Record<string, unknown> = {
 const mockWaitingRunDoc: Record<string, unknown> = {
   id: 'run_waiting123',
   userId: USER_ID,
-  hyveId: CANVAS_TYPE_ID,
+  canvasTypeId: CANVAS_TYPE_ID,
   workflowId: 'wf-1',
   status: 'waiting-approval',
   triggerType: 'manual',
@@ -169,7 +169,7 @@ describe('listWorkflows()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `hyves/${CANVAS_TYPE_ID}/workflows`,
+      `canvasTypes/${CANVAS_TYPE_ID}/workflows`,
       { pageSize: 50 }
     );
   });
@@ -232,10 +232,10 @@ describe('listWorkflows()', () => {
   it('uses different canvas type IDs in the collection path', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
-    await listWorkflows('landing-page');
+    await listWorkflows('campaign-studio');
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      'hyves/landing-page/workflows',
+      'canvasTypes/campaign-studio/workflows',
       { pageSize: 50 }
     );
   });
@@ -249,7 +249,7 @@ describe('getWorkflow()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `hyves/${CANVAS_TYPE_ID}/workflows`,
+      `canvasTypes/${CANVAS_TYPE_ID}/workflows`,
       'wf-1'
     );
   });
@@ -337,7 +337,7 @@ describe('listRuns()', () => {
     expect(collectionPath).toBe('runs');
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
+      { field: 'canvasTypeId', op: 'EQUAL', value: CANVAS_TYPE_ID },
     ]);
     expect(options).toEqual({
       orderBy: 'startedAt',
@@ -356,7 +356,7 @@ describe('listRuns()', () => {
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
+      { field: 'canvasTypeId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'status', op: 'EQUAL', value: 'running' },
     ]);
   });
@@ -370,7 +370,7 @@ describe('listRuns()', () => {
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
+      { field: 'canvasTypeId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
   });
@@ -384,7 +384,7 @@ describe('listRuns()', () => {
     expect(filters).toHaveLength(4);
     expect(filters).toEqual([
       { field: 'userId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: CANVAS_TYPE_ID },
+      { field: 'canvasTypeId', op: 'EQUAL', value: CANVAS_TYPE_ID },
       { field: 'status', op: 'EQUAL', value: 'completed' },
       { field: 'workflowId', op: 'EQUAL', value: 'wf-1' },
     ]);
@@ -549,7 +549,7 @@ describe('createRun()', () => {
 
     const [, , data] = mockCreateDocument.mock.calls[0];
     expect(data.userId).toBe(USER_ID);
-    expect(data.hyveId).toBe(CANVAS_TYPE_ID);
+    expect(data.canvasTypeId).toBe(CANVAS_TYPE_ID);
     expect(data.workflowId).toBe('wf-1');
     expect(data.status).toBe('pending');
     expect(data.triggerType).toBe('manual');

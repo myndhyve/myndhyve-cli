@@ -85,7 +85,7 @@ export async function listProjects(
   ];
 
   if (options?.canvasTypeId) {
-    filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
+    filters.push({ field: 'canvasTypeId', op: 'EQUAL', value: options.canvasTypeId });
   }
 
   if (options?.status) {
@@ -139,7 +139,7 @@ export async function createProject(
     name: options.name,
     slug,
     description: options.description || '',
-    hyveId: options.canvasTypeId,
+    canvasTypeId: options.canvasTypeId,
     ownerId: userId,
     ownerType: 'user',
     type: options.type || 'general',
@@ -242,7 +242,7 @@ function toProjectSummary(doc: Record<string, unknown>): ProjectSummary {
     id: doc.id as string,
     name: (doc.name as string) || 'Untitled',
     slug: (doc.slug as string) || '',
-    canvasTypeId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.canvasTypeId as string) || '',
     status: (doc.status as string) || 'draft',
     type: (doc.type as string) || 'general',
     description: doc.description as string | undefined,

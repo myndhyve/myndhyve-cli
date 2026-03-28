@@ -3,7 +3,7 @@
  *
  * Operations for Canvases (user work items within canvas types)
  * via Firestore REST API. Canvases are stored at
- * `users/{userId}/hyveDocuments/{docId}`.
+ * `users/{userId}/canvases/{docId}`.
  *
  * Also provides access to canvas type metadata (hardcoded, same as web app).
  */
@@ -22,7 +22,7 @@ const log = createLogger('CanvasTypeAPI');
 // CANVAS TYPE DEFINITIONS
 // ============================================================================
 
-/** Canvas type metadata (mirrors HyveManifestLite from web app). */
+/** Canvas type metadata (mirrors CanvasTypeManifestLite from web app). */
 export interface CanvasType {
   canvasTypeId: string;
   name: string;
@@ -36,7 +36,7 @@ export interface CanvasType {
 }
 
 /**
- * Canvas types — hardcoded to match the web app's `src/hyves/manifests.ts`.
+ * Canvas types — hardcoded to match the web app's `src/canvas-types/manifests.ts`.
  * These are platform-level apps, not user-created content.
  */
 export const CANVAS_TYPES: CanvasType[] = [
@@ -49,73 +49,73 @@ export const CANVAS_TYPES: CanvasType[] = [
     visibility: 'public',
     primaryColor: '#8b5cf6',
     tags: ['app-development', 'code-generation', 'ai-assisted', 'full-stack'],
-    helpTopicId: 'hyve-app-builder',
+    helpTopicId: 'canvas-app-builder',
   },
   {
     canvasTypeId: 'slides',
     name: 'Slides',
-    description: 'AI-assisted presentation creation - from outline to polished deck. Generate slides, apply themes, and create compelling presentations.',
+    description: 'AI-assisted presentation creation - from outline to polished deck.',
     icon: 'Presentation',
     tier: 'platform',
     visibility: 'public',
     primaryColor: '#3b82f6',
     tags: ['presentations', 'slides', 'ai-assisted', 'design'],
-    helpTopicId: 'hyve-slides',
+    helpTopicId: 'canvas-slides',
   },
   {
     canvasTypeId: 'drawings',
     name: 'Drawings',
-    description: 'AI-assisted digital illustration - from sketch to finished artwork. Create drawings with intelligent brush tools and color suggestions.',
+    description: 'AI-assisted digital illustration - from sketch to finished artwork.',
     icon: 'PenTool',
     tier: 'platform',
     visibility: 'public',
     primaryColor: '#10b981',
     tags: ['illustration', 'drawing', 'ai-assisted', 'art'],
-    helpTopicId: 'hyve-drawings',
+    helpTopicId: 'canvas-drawings',
   },
   {
-    canvasTypeId: 'hyve-maker',
-    name: 'Hyve Maker',
-    description: 'Build custom Hyves through AI-assisted design. Create PRDs, design workflows, and generate prompts through conversational interaction.',
+    canvasTypeId: 'canvas-maker',
+    name: 'Workspace Maker',
+    description: 'Build custom workspaces through AI-assisted design.',
     icon: 'Puzzle',
     tier: 'platform',
     visibility: 'internal',
     primaryColor: '#f59e0b',
-    tags: ['meta-hyve', 'hyve-builder', 'ai-assisted', 'workflow-design'],
-    helpTopicId: 'hyve-hyve-maker',
+    tags: ['meta-canvas', 'canvas-builder', 'ai-assisted', 'workflow-design'],
+    helpTopicId: 'canvas-canvas-maker',
   },
   {
-    canvasTypeId: 'hyve-builder',
-    name: 'Hyve Builder',
-    description: 'AI-assisted Hyve creation using the workflow engine. Create PRDs, prompts, workflows, schemas, and integrations through step-by-step approval.',
+    canvasTypeId: 'canvas-builder',
+    name: 'Workspace Builder',
+    description: 'AI-assisted workspace creation using the workflow engine.',
     icon: 'Puzzle',
     tier: 'platform',
     visibility: 'internal',
     primaryColor: '#f59e0b',
-    tags: ['meta-hyve', 'hyve-builder', 'ai-assisted', 'workflow-design', 'envelope-protocol'],
-    helpTopicId: 'hyve-hyve-builder',
+    tags: ['meta-canvas', 'canvas-builder', 'ai-assisted', 'workflow-design', 'envelope-protocol'],
+    helpTopicId: 'canvas-canvas-builder',
   },
   {
     canvasTypeId: 'cad',
     name: 'CAD Designer',
-    description: '3D CAD design with parametric dimensions and constraints. Create 3D models with precision using primitives, transforms, and constraints.',
+    description: '3D CAD design with parametric dimensions and constraints.',
     icon: 'Box',
     tier: 'platform',
     visibility: 'public',
     primaryColor: '#22d3ee',
     tags: ['3d-design', 'cad', 'parametric', 'modeling', 'webgl'],
-    helpTopicId: 'hyve-cad',
+    helpTopicId: 'canvas-cad',
   },
   {
-    canvasTypeId: 'landing-page',
-    name: 'Launch Studio',
-    description: 'Build startup launch funnels with drag-and-drop sections, AI-assisted content, responsive design, and lead capture forms.',
-    icon: 'Globe',
+    canvasTypeId: 'campaign-studio',
+    name: 'Campaign Studio',
+    description: 'Orchestrate marketing campaigns with multi-channel ads, funnels, analytics, commerce, and AI-powered optimization.',
+    icon: 'Megaphone',
     tier: 'platform',
     visibility: 'public',
     primaryColor: '#0ea5e9',
-    tags: ['landing-page', 'marketing', 'lead-generation', 'conversion', 'responsive', 'seo'],
-    helpTopicId: 'hyve-landing-page',
+    tags: ['campaign-studio', 'marketing', 'campaigns', 'ads', 'funnels', 'analytics'],
+    helpTopicId: 'canvas-campaign-studio',
   },
 ];
 
@@ -196,7 +196,7 @@ export async function listCanvases(
   userId: string,
   options?: { canvasTypeId?: string; status?: string; pinned?: boolean }
 ): Promise<CanvasSummary[]> {
-  const collectionPath = `users/${userId}/hyveDocuments`;
+  const collectionPath = `users/${userId}/canvases`;
 
   log.debug('Listing canvases', { userId, options });
 
@@ -204,7 +204,7 @@ export async function listCanvases(
   if (options?.canvasTypeId || options?.status || options?.pinned !== undefined) {
     const filters: QueryFilter[] = [];
     if (options.canvasTypeId) {
-      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
+      filters.push({ field: 'canvasTypeId', op: 'EQUAL', value: options.canvasTypeId });
     }
     if (options.status) {
       filters.push({ field: 'status', op: 'EQUAL', value: options.status });
@@ -236,7 +236,7 @@ export async function getCanvas(
   userId: string,
   canvasId: string
 ): Promise<CanvasDetail | null> {
-  const collectionPath = `users/${userId}/hyveDocuments`;
+  const collectionPath = `users/${userId}/canvases`;
 
   log.debug('Getting canvas', { userId, canvasId });
 
@@ -253,7 +253,7 @@ export async function getCanvas(
 function toCanvasSummary(doc: Record<string, unknown>): CanvasSummary {
   return {
     id: doc.id as string,
-    canvasTypeId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.canvasTypeId as string) || '',
     name: (doc.name as string) || 'Untitled',
     slug: (doc.slug as string) || '',
     status: (doc.status as string) || 'draft',

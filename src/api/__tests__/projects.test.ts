@@ -65,7 +65,7 @@ function makeRawProject(overrides: Record<string, unknown> = {}): Record<string,
     id: 'proj_test123_abc456',
     name: 'My Test Project',
     slug: 'my-test-project',
-    hyveId: 'app-builder',
+    canvasTypeId: 'app-builder',
     ownerId: USER_ID,
     ownerType: 'user',
     type: 'general',
@@ -122,7 +122,7 @@ describe('listProjects', () => {
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toEqual([
       { field: 'ownerId', op: 'EQUAL', value: USER_ID },
-      { field: 'hyveId', op: 'EQUAL', value: 'app-builder' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
   });
 
@@ -141,12 +141,12 @@ describe('listProjects', () => {
   it('combines canvasTypeId and status filters', async () => {
     mockRunQuery.mockResolvedValue([]);
 
-    await listProjects(USER_ID, { canvasTypeId: 'landing-page', status: 'draft' });
+    await listProjects(USER_ID, { canvasTypeId: 'campaign-studio', status: 'draft' });
 
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(3);
     expect(filters[0]).toEqual({ field: 'ownerId', op: 'EQUAL', value: USER_ID });
-    expect(filters[1]).toEqual({ field: 'hyveId', op: 'EQUAL', value: 'landing-page' });
+    expect(filters[1]).toEqual({ field: 'canvasTypeId', op: 'EQUAL', value: 'campaign-studio' });
     expect(filters[2]).toEqual({ field: 'status', op: 'EQUAL', value: 'draft' });
   });
 
@@ -350,7 +350,7 @@ describe('createProject', () => {
 
     expect(collection).toBe('projects');
     expect(data.name).toBe('My New App');
-    expect(data.hyveId).toBe('app-builder');
+    expect(data.canvasTypeId).toBe('app-builder');
     expect(data.ownerId).toBe(USER_ID);
     expect(data.ownerType).toBe('user');
     expect(data.status).toBe('draft');
@@ -366,7 +366,7 @@ describe('createProject', () => {
   it('generates project ID with proj_ prefix', async () => {
     await createProject(USER_ID, {
       name: 'Test',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
     });
 
     const [, projectId] = mockCreateDocument.mock.calls[0];
@@ -376,7 +376,7 @@ describe('createProject', () => {
   it('generates slug from name', async () => {
     await createProject(USER_ID, {
       name: 'My Awesome Landing Page',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];

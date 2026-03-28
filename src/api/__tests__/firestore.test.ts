@@ -411,7 +411,7 @@ describe('extractDocId', () => {
   });
 
   it('extracts ID from a subcollection document path', () => {
-    const name = 'projects/myndhyve-prod/databases/(default)/documents/users/uid1/hyveDocuments/doc456';
+    const name = 'projects/myndhyve-prod/databases/(default)/documents/users/uid1/canvases/doc456';
     expect(extractDocId(name)).toBe('doc456');
   });
 
@@ -531,14 +531,14 @@ describe('getDocument', () => {
 
   it('builds correct URL for subcollections', async () => {
     mockOkResponse({
-      name: `${FIRESTORE_BASE}/users/uid1/hyveDocuments/doc1`,
+      name: `${FIRESTORE_BASE}/users/uid1/canvases/doc1`,
       fields: { title: { stringValue: 'Doc' } },
     });
 
-    await getDocument('users/uid1/hyveDocuments', 'doc1');
+    await getDocument('users/uid1/canvases', 'doc1');
 
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/hyveDocuments/doc1`);
+    expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/canvases/doc1`);
   });
 
   it('throws FirestoreError for 403 Permission Denied', async () => {
@@ -814,10 +814,10 @@ describe('deleteDocument', () => {
       text: () => Promise.resolve(''),
     });
 
-    await deleteDocument('users/uid1/hyveDocuments', 'doc1');
+    await deleteDocument('users/uid1/canvases', 'doc1');
 
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/hyveDocuments/doc1`);
+    expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/canvases/doc1`);
   });
 
   it('throws FirestoreError on failure', async () => {
@@ -963,13 +963,13 @@ describe('runQuery', () => {
     mockOkResponse([
       {
         document: {
-          name: `${FIRESTORE_BASE}/users/uid1/hyveDocuments/doc1`,
+          name: `${FIRESTORE_BASE}/users/uid1/canvases/doc1`,
           fields: { title: { stringValue: 'My Doc' } },
         },
       },
     ]);
 
-    await runQuery('users/uid1/hyveDocuments', [
+    await runQuery('users/uid1/canvases', [
       { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
 
@@ -978,7 +978,7 @@ describe('runQuery', () => {
     expect(url).toBe(`${FIRESTORE_BASE}/users/uid1:runQuery`);
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.structuredQuery.from).toEqual([{ collectionId: 'hyveDocuments' }]);
+    expect(body.structuredQuery.from).toEqual([{ collectionId: 'canvases' }]);
   });
 
   it('returns empty array when results have no documents', async () => {
@@ -1168,16 +1168,16 @@ describe('Query Helpers (via runQuery)', () => {
     it('extracts last segment from subcollection path', async () => {
       mockOkResponse([]);
 
-      await runQuery('users/uid1/hyveDocuments', []);
+      await runQuery('users/uid1/canvases', []);
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.structuredQuery.from[0].collectionId).toBe('hyveDocuments');
+      expect(body.structuredQuery.from[0].collectionId).toBe('canvases');
     });
 
     it('extracts from deeply nested subcollection', async () => {
       mockOkResponse([]);
 
-      await runQuery('users/uid1/hyveDocuments/doc1/runs', []);
+      await runQuery('users/uid1/canvases/doc1/runs', []);
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.structuredQuery.from[0].collectionId).toBe('runs');
@@ -1197,7 +1197,7 @@ describe('Query Helpers (via runQuery)', () => {
     it('uses parent document path for subcollections', async () => {
       mockOkResponse([]);
 
-      await runQuery('users/uid1/hyveDocuments', []);
+      await runQuery('users/uid1/canvases', []);
 
       const [url] = mockFetch.mock.calls[0];
       expect(url).toBe(`${FIRESTORE_BASE}/users/uid1:runQuery`);
@@ -1206,10 +1206,10 @@ describe('Query Helpers (via runQuery)', () => {
     it('uses parent path for deeply nested subcollection', async () => {
       mockOkResponse([]);
 
-      await runQuery('users/uid1/hyveDocuments/doc1/runs', []);
+      await runQuery('users/uid1/canvases/doc1/runs', []);
 
       const [url] = mockFetch.mock.calls[0];
-      expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/hyveDocuments/doc1:runQuery`);
+      expect(url).toBe(`${FIRESTORE_BASE}/users/uid1/canvases/doc1:runQuery`);
     });
   });
 });

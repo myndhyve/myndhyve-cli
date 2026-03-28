@@ -23,6 +23,7 @@ import { registerCanvasCommands } from './canvas.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerCrmCommands } from './crm.js';
+import { registerCommerceCommands } from './commerce.js';
 import { registerAgentCommands } from './agents.js';
 import { registerKanbanCommands } from './kanban.js';
 import { registerCronCommands } from './cron.js';
@@ -36,6 +37,9 @@ import { registerPackCommands } from './packs.js';
 import { registerSecretsCommands } from './secrets.js';
 import { registerIntelCommands } from './intel.js';
 import { registerEntityCommands } from './entities.js';
+import { registerCmsCommands } from './cms.js';
+import { registerLaunchCommands } from './launch.js';
+import { registerUsageCommands } from './usage.js';
 import { registerNotifyCommands } from './notify.js';
 import { registerCompletionCommand } from './completion.js';
 import { registerUpdateCommand } from './update.js';
@@ -98,6 +102,10 @@ export function createProgram(): Command {
 
   registerCrmCommands(program);
 
+  // ── Commerce ──────────────────────────────────────────────────────────
+
+  registerCommerceCommands(program);
+
   // ── Agents ────────────────────────────────────────────────────────────
 
   registerAgentCommands(program);
@@ -105,6 +113,18 @@ export function createProgram(): Command {
   // ── Kanban ────────────────────────────────────────────────────────────
 
   registerKanbanCommands(program);
+
+  // ── Launch Studio ─────────────────────────────────────────────────────
+
+  registerLaunchCommands(program);
+
+  // ── Token Usage ──────────────────────────────────────────────────────
+
+  registerUsageCommands(program);
+
+  // ── CMS ───────────────────────────────────────────────────────────────
+
+  registerCmsCommands(program);
 
   // ── Prompt Management ──────────────────────────────────────────────────
 

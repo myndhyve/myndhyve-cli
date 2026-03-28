@@ -54,15 +54,15 @@ describe('listCanvasTypes()', () => {
     for (const canvasType of canvasTypes) {
       expect(canvasType.visibility).toBe('public');
     }
-    // hyve-maker is internal, should not be present
-    expect(canvasTypes.find((h) => h.canvasTypeId === 'hyve-maker')).toBeUndefined();
+    // canvas-maker is internal, should not be present
+    expect(canvasTypes.find((h) => h.canvasTypeId === 'canvas-maker')).toBeUndefined();
   });
 
   it('includes internal canvas types when includeInternal=true', () => {
     const canvasTypes = listCanvasTypes(true);
 
     expect(canvasTypes.length).toBe(CANVAS_TYPES.length);
-    const canvasTypeMaker = canvasTypes.find((h) => h.canvasTypeId === 'hyve-maker');
+    const canvasTypeMaker = canvasTypes.find((h) => h.canvasTypeId === 'canvas-maker');
     expect(canvasTypeMaker).toBeDefined();
     expect(canvasTypeMaker!.visibility).toBe('internal');
   });
@@ -82,7 +82,7 @@ describe('listCanvasTypes()', () => {
     expect(ids).toContain('app-builder');
     expect(ids).toContain('slides');
     expect(ids).toContain('drawings');
-    expect(ids).toContain('landing-page');
+    expect(ids).toContain('campaign-studio');
     expect(ids).toContain('cad');
   });
 
@@ -122,7 +122,7 @@ describe('getCanvasType()', () => {
   });
 
   it('returns internal canvas types too', () => {
-    const canvasType = getCanvasType('hyve-maker');
+    const canvasType = getCanvasType('canvas-maker');
 
     expect(canvasType).not.toBeNull();
     expect(canvasType!.visibility).toBe('internal');
@@ -133,10 +133,10 @@ describe('getCanvasType()', () => {
       { id: 'app-builder', name: 'App Builder' },
       { id: 'slides', name: 'Slides' },
       { id: 'drawings', name: 'Drawings' },
-      { id: 'hyve-maker', name: 'Hyve Maker' },
-      { id: 'hyve-builder', name: 'Hyve Builder' },
+      { id: 'canvas-maker', name: 'Workspace Maker' },
+      { id: 'canvas-builder', name: 'Workspace Builder' },
       { id: 'cad', name: 'CAD Designer' },
-      { id: 'landing-page', name: 'Launch Studio' },
+      { id: 'campaign-studio', name: 'Campaign Studio' },
     ];
 
     for (const { id, name } of expected) {
@@ -152,10 +152,10 @@ describe('isValidCanvasTypeId()', () => {
     expect(isValidCanvasTypeId('app-builder')).toBe(true);
     expect(isValidCanvasTypeId('slides')).toBe(true);
     expect(isValidCanvasTypeId('drawings')).toBe(true);
-    expect(isValidCanvasTypeId('hyve-maker')).toBe(true);
-    expect(isValidCanvasTypeId('hyve-builder')).toBe(true);
+    expect(isValidCanvasTypeId('canvas-maker')).toBe(true);
+    expect(isValidCanvasTypeId('canvas-builder')).toBe(true);
     expect(isValidCanvasTypeId('cad')).toBe(true);
-    expect(isValidCanvasTypeId('landing-page')).toBe(true);
+    expect(isValidCanvasTypeId('campaign-studio')).toBe(true);
   });
 
   it('returns false for invalid IDs', () => {
@@ -178,7 +178,7 @@ describe('listCanvases()', () => {
       documents: [
         {
           id: 'doc-1',
-          hyveId: 'app-builder',
+          canvasTypeId: 'app-builder',
           name: 'My App',
           slug: 'my-app',
           status: 'draft',
@@ -189,7 +189,7 @@ describe('listCanvases()', () => {
         },
         {
           id: 'doc-2',
-          hyveId: 'slides',
+          canvasTypeId: 'slides',
           name: 'My Deck',
           slug: 'my-deck',
           status: 'published',
@@ -203,7 +203,7 @@ describe('listCanvases()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/hyveDocuments`,
+      `users/${userId}/canvases`,
       { pageSize: 100 }
     );
     expect(mockRunQuery).not.toHaveBeenCalled();
@@ -216,7 +216,7 @@ describe('listCanvases()', () => {
     mockRunQuery.mockResolvedValue([
       {
         id: 'doc-1',
-        hyveId: 'app-builder',
+        canvasTypeId: 'app-builder',
         name: 'My App',
         slug: 'my-app',
         status: 'draft',
@@ -229,9 +229,9 @@ describe('listCanvases()', () => {
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${userId}/hyveDocuments`);
+    expect(collectionPath).toBe(`users/${userId}/canvases`);
     expect(filters).toEqual([
-      { field: 'hyveId', op: 'EQUAL', value: 'app-builder' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
     expect(options).toEqual({ limit: 100 });
     expect(mockListDocuments).not.toHaveBeenCalled();
@@ -254,7 +254,7 @@ describe('listCanvases()', () => {
     mockRunQuery.mockResolvedValue([
       {
         id: 'doc-pinned',
-        hyveId: 'slides',
+        canvasTypeId: 'slides',
         name: 'Pinned Deck',
         slug: 'pinned-deck',
         status: 'draft',
@@ -295,7 +295,7 @@ describe('listCanvases()', () => {
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(3);
     expect(filters).toEqual([
-      { field: 'hyveId', op: 'EQUAL', value: 'app-builder' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
       { field: 'status', op: 'EQUAL', value: 'draft' },
       { field: 'pinned', op: 'EQUAL', value: true },
     ]);
@@ -306,7 +306,7 @@ describe('listCanvases()', () => {
       documents: [
         {
           id: 'doc-shape',
-          hyveId: 'landing-page',
+          canvasTypeId: 'campaign-studio',
           name: 'Landing',
           slug: 'landing',
           status: 'published',
@@ -323,7 +323,7 @@ describe('listCanvases()', () => {
 
     expect(doc).toEqual<CanvasSummary>({
       id: 'doc-shape',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       name: 'Landing',
       slug: 'landing',
       status: 'published',
@@ -397,7 +397,7 @@ describe('getCanvas()', () => {
   it('returns CanvasDetail for existing document', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'doc-123',
-      hyveId: 'app-builder',
+      canvasTypeId: 'app-builder',
       name: 'My App',
       slug: 'my-app',
       status: 'draft',
@@ -420,7 +420,7 @@ describe('getCanvas()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/hyveDocuments`,
+      `users/${userId}/canvases`,
       documentId
     );
 
@@ -481,7 +481,7 @@ describe('getCanvas()', () => {
   it('detail extends summary (has all summary fields)', async () => {
     mockGetDocument.mockResolvedValue({
       id: 'doc-ext',
-      hyveId: 'slides',
+      canvasTypeId: 'slides',
       name: 'Presentation',
       slug: 'presentation',
       status: 'published',

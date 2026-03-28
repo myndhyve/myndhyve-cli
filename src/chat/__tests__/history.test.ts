@@ -150,7 +150,7 @@ describe('saveConversation()', () => {
     mockExistsSync.mockReturnValue(true);
 
     const conv = makeConversation({
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       model: 'claude-opus-4-6',
       provider: 'anthropic',
       agentId: 'agent-123',
@@ -159,7 +159,7 @@ describe('saveConversation()', () => {
 
     const [, content] = mockWriteFileSync.mock.calls[0];
     const parsed = JSON.parse(content as string);
-    expect(parsed.canvasTypeId).toBe('landing-page');
+    expect(parsed.canvasTypeId).toBe('campaign-studio');
     expect(parsed.model).toBe('claude-opus-4-6');
     expect(parsed.provider).toBe('anthropic');
     expect(parsed.agentId).toBe('agent-123');

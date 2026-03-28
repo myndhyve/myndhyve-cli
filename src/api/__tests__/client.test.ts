@@ -53,11 +53,11 @@ describe('MyndHyveClient', () => {
         json: () => Promise.resolve({ items: [1, 2, 3] }),
       });
 
-      const result = await client.get<{ items: number[] }>('/hyveApi/workflows');
+      const result = await client.get<{ items: number[] }>('/canvasApi/workflows');
 
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, init] = mockFetch.mock.calls[0];
-      expect(url).toBe('https://api.test.com/hyveApi/workflows');
+      expect(url).toBe('https://api.test.com/canvasApi/workflows');
       expect(init.method).toBe('GET');
       expect(init.headers.Authorization).toBe('Bearer test-id-token');
       expect(result.items).toEqual([1, 2, 3]);
@@ -71,7 +71,7 @@ describe('MyndHyveClient', () => {
         json: () => Promise.resolve({ results: [] }),
       });
 
-      await client.get('/hyveApi/search', { q: 'test', limit: '10' });
+      await client.get('/canvasApi/search', { q: 'test', limit: '10' });
 
       const [url] = mockFetch.mock.calls[0];
       expect(url).toContain('?q=test&limit=10');
@@ -87,7 +87,7 @@ describe('MyndHyveClient', () => {
         json: () => Promise.resolve({ id: 'new-123' }),
       });
 
-      const result = await client.post<{ id: string }>('/hyveApi/projects', {
+      const result = await client.post<{ id: string }>('/canvasApi/projects', {
         name: 'Test Project',
       });
 
@@ -108,7 +108,7 @@ describe('MyndHyveClient', () => {
         json: () => Promise.resolve({ updated: true }),
       });
 
-      await client.put('/hyveApi/projects/123', { name: 'Updated' });
+      await client.put('/canvasApi/projects/123', { name: 'Updated' });
 
       const [, init] = mockFetch.mock.calls[0];
       expect(init.method).toBe('PUT');
@@ -123,7 +123,7 @@ describe('MyndHyveClient', () => {
         headers: new Headers({}),
       });
 
-      await client.delete('/hyveApi/projects/123');
+      await client.delete('/canvasApi/projects/123');
 
       const [, init] = mockFetch.mock.calls[0];
       expect(init.method).toBe('DELETE');
@@ -322,9 +322,9 @@ describe('URL Building', () => {
       json: () => Promise.resolve({}),
     });
 
-    await client.get('/hyveApi/test');
+    await client.get('/canvasApi/test');
 
-    expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/hyveApi/test');
+    expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/canvasApi/test');
   });
 
   it('handles paths without leading slash', async () => {
@@ -336,9 +336,9 @@ describe('URL Building', () => {
       json: () => Promise.resolve({}),
     });
 
-    await client.get('hyveApi/test');
+    await client.get('canvasApi/test');
 
-    expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/hyveApi/test');
+    expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/canvasApi/test');
   });
 
   it('strips trailing slash from base URL', async () => {

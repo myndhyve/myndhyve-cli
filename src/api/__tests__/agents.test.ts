@@ -68,7 +68,7 @@ const agentPath = `users/${userId}/agents`;
 function makeAgentDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: agentId,
-    hyveId: 'landing-page',
+    canvasTypeId: 'campaign-studio',
     name: 'SEO Agent',
     description: 'Optimizes landing pages for search',
     enabled: true,
@@ -136,7 +136,7 @@ describe('listAgents()', () => {
 
   it('filters by canvasTypeId using runQuery', async () => {
     mockRunQuery.mockResolvedValue([
-      makeAgentDoc({ hyveId: 'app-builder' }),
+      makeAgentDoc({ canvasTypeId: 'app-builder' }),
     ]);
 
     const results = await listAgents(userId, { canvasTypeId: 'app-builder' });
@@ -145,7 +145,7 @@ describe('listAgents()', () => {
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
     expect(collectionPath).toBe(agentPath);
     expect(filters).toEqual([
-      { field: 'hyveId', op: 'EQUAL', value: 'app-builder' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
     expect(options).toEqual({ limit: 100 });
     expect(mockListDocuments).not.toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('listAgents()', () => {
     const [, filters] = mockRunQuery.mock.calls[0];
     expect(filters).toHaveLength(2);
     expect(filters).toEqual([
-      { field: 'hyveId', op: 'EQUAL', value: 'slides' },
+      { field: 'canvasTypeId', op: 'EQUAL', value: 'slides' },
       { field: 'enabled', op: 'EQUAL', value: true },
     ]);
   });
@@ -233,7 +233,7 @@ describe('Agent summary mapping', () => {
 
     expect(summary).toEqual<AgentSummary>({
       id: agentId,
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       name: 'SEO Agent',
       description: 'Optimizes landing pages for search',
       enabled: true,
@@ -324,7 +324,7 @@ describe('getAgent()', () => {
 
     expect(agent).not.toBeNull();
     expect(agent!.id).toBe(agentId);
-    expect(agent!.canvasTypeId).toBe('landing-page');
+    expect(agent!.canvasTypeId).toBe('campaign-studio');
     expect(agent!.name).toBe('SEO Agent');
     expect(agent!.description).toBe('Optimizes landing pages for search');
     expect(agent!.enabled).toBe(true);
@@ -402,7 +402,7 @@ describe('getAgent()', () => {
 
     // Verify summary fields are present in the detail result
     expect(agent!.id).toBe(agentId);
-    expect(agent!.canvasTypeId).toBe('landing-page');
+    expect(agent!.canvasTypeId).toBe('campaign-studio');
     expect(agent!.name).toBe('SEO Agent');
     expect(agent!.provider).toBe('anthropic');
     expect(agent!.modelId).toBe('claude-sonnet-4-20250514');
@@ -431,7 +431,7 @@ describe('createAgent()', () => {
     }));
 
     const agent = await createAgent(userId, agentId, {
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       name: 'SEO Agent',
       description: 'Optimizes pages',
       model: { provider: 'openai', modelId: 'gpt-4o' },
@@ -536,7 +536,7 @@ describe('createAgent()', () => {
     }));
 
     await createAgent(userId, agentId, {
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       name: 'Tuned Agent',
       model: { temperature: 0.3 },
     });

@@ -34,7 +34,7 @@ const log = createLogger('Chat');
 
 /** Options for creating a new chat session. */
 export interface ChatSessionOptions {
-  /** Canvas type ID (e.g., 'app-builder', 'landing-page'). */
+  /** Canvas type ID (e.g., 'app-builder', 'campaign-studio'). */
   canvasTypeId?: string;
   /** Custom agent name (maps to canvasTypeId internally). */
   agentId?: string;

@@ -4,9 +4,9 @@
  * Operations for workflow management and run execution via Firestore REST API.
  *
  * Firestore collections:
- *   hyves/{canvasTypeId}/workflows/{workflowId}   — Workflow definitions
- *   runs/{runId}                                   — Workflow runs (root-level)
- *   runs/{runId}/artifacts/{artifactId}            — Run artifacts (nested under runs)
+ *   canvasTypes/{canvasTypeId}/workflows/{workflowId}  — Workflow definitions
+ *   runs/{runId}                                       — Workflow runs (root-level, filtered by userId + canvasTypeId)
+ *   runs/{runId}/artifacts/{artifactId}                — Run artifacts (nested under runs)
  */
 
 import { randomBytes } from 'node:crypto';
@@ -178,13 +178,13 @@ export interface ArtifactDetail extends ArtifactSummary {
  * Note: Workflows are system-level definitions (not user-scoped). Access is
  * gated by Firestore security rules via the auth token in the REST request.
  *
- * @param canvasTypeId - The canvas type ID (e.g., 'landing-page', 'app-builder')
+ * @param canvasTypeId - The canvas type ID (e.g., 'campaign-studio', 'app-builder')
  * @returns Array of workflow summaries
  */
 export async function listWorkflows(
   canvasTypeId: string
 ): Promise<WorkflowSummary[]> {
-  const collectionPath = `hyves/${canvasTypeId}/workflows`;
+  const collectionPath = `canvasTypes/${canvasTypeId}/workflows`;
 
   log.debug('Listing workflows', { canvasTypeId });
 
@@ -206,7 +206,7 @@ export async function getWorkflow(
   canvasTypeId: string,
   workflowId: string
 ): Promise<WorkflowDetail | null> {
-  const collectionPath = `hyves/${canvasTypeId}/workflows`;
+  const collectionPath = `canvasTypes/${canvasTypeId}/workflows`;
 
   log.debug('Getting workflow', { canvasTypeId, workflowId });
 
@@ -241,7 +241,7 @@ export async function listRuns(
   // Runs are root-level; always filter by userId + canvasTypeId
   const filters: QueryFilter[] = [
     { field: 'userId', op: 'EQUAL', value: userId },
-    { field: 'hyveId', op: 'EQUAL', value: canvasTypeId },
+    { field: 'canvasTypeId', op: 'EQUAL', value: canvasTypeId },
   ];
 
   if (options?.status) {
@@ -303,7 +303,7 @@ export async function createRun(
 
   const runData: Record<string, unknown> = {
     userId,
-    hyveId: canvasTypeId,
+    canvasTypeId,
     workflowId,
     status: 'pending',
     triggerType: options?.triggerType || 'manual',
@@ -640,7 +640,7 @@ function toRunDetail(
 
   return {
     ...summary,
-    canvasTypeId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.canvasTypeId as string) || '',
     userId: (doc.userId as string) || '',
     inputData: doc.inputData as Record<string, unknown> | undefined,
     nodeStates,

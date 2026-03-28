@@ -175,7 +175,7 @@ export async function createBoard(
   const now = new Date().toISOString();
   const boardData: Record<string, unknown> = {
     name: data.name,
-    hyveId: data.canvasTypeId || null,
+    canvasTypeId: data.canvasTypeId || null,
     description: data.description || '',
     ownerId: userId,
     columns: data.columns || DEFAULT_COLUMNS,
@@ -307,7 +307,7 @@ function toBoardSummary(doc: Record<string, unknown>): BoardSummary {
   return {
     id: doc.id as string,
     name: (doc.name as string) || 'Untitled Board',
-    canvasTypeId: doc.hyveId as string | undefined,
+    canvasTypeId: doc.canvasTypeId as string | undefined,
     columnCount: columns.length,
     taskCount: tasks ? Object.keys(tasks).length : 0,
     createdAt: doc.createdAt as string | undefined,

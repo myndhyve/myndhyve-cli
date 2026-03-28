@@ -29,6 +29,7 @@ import { ExitCode, printErrorResult } from '../utils/output.js';
 /** Singular display name for each CRM collection. */
 const COLLECTION_SINGULAR: Record<CrmCollection, string> = {
   contacts: 'Contact',
+  companies: 'Company',
   activities: 'Activity',
   tasks: 'Task',
   deals: 'Deal',
@@ -38,6 +39,14 @@ const COLLECTION_SINGULAR: Record<CrmCollection, string> = {
   products: 'Product',
   coupons: 'Coupon',
   affiliates: 'Affiliate',
+  emails: 'Email',
+  calls: 'Call',
+  meetings: 'Meeting',
+  enrollments: 'Enrollment',
+  quotes: 'Quote',
+  associations: 'Association',
+  pipelines: 'Pipeline',
+  stages: 'Stage',
 };
 
 // ============================================================================

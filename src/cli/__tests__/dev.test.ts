@@ -1221,7 +1221,7 @@ describe('registerDevCommands', () => {
       mockGetActiveContext.mockReturnValue({
         projectId: 'proj-1',
         projectName: 'Marketing Site',
-        canvasTypeId: 'landing-page',
+        canvasTypeId: 'campaign-studio',
       });
 
       await run(['dev', 'config', 'validate', '--format', 'json']);

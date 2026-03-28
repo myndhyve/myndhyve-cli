@@ -91,7 +91,7 @@ describe('listBoards()', () => {
         {
           id: 'board-1',
           name: 'Sprint Board',
-          hyveId: 'landing-page',
+          canvasTypeId: 'campaign-studio',
           columns: DEFAULT_COLUMNS,
           tasks: { t1: { title: 'Task 1' }, t2: { title: 'Task 2' } },
           createdAt: '2024-06-01T00:00:00Z',
@@ -118,7 +118,7 @@ describe('listBoards()', () => {
     expect(boards[0]).toEqual<BoardSummary>({
       id: 'board-1',
       name: 'Sprint Board',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       columnCount: 5,
       taskCount: 2,
       createdAt: '2024-06-01T00:00:00Z',
@@ -132,13 +132,13 @@ describe('listBoards()', () => {
   it('filters by canvasTypeId client-side', async () => {
     mockListDocuments.mockResolvedValue({
       documents: [
-        { id: 'board-1', name: 'LP Board', hyveId: 'landing-page', columns: [], tasks: {} },
-        { id: 'board-2', name: 'App Board', hyveId: 'app-builder', columns: [], tasks: {} },
-        { id: 'board-3', name: 'LP Board 2', hyveId: 'landing-page', columns: [], tasks: {} },
+        { id: 'board-1', name: 'LP Board', canvasTypeId: 'campaign-studio', columns: [], tasks: {} },
+        { id: 'board-2', name: 'App Board', canvasTypeId: 'app-builder', columns: [], tasks: {} },
+        { id: 'board-3', name: 'LP Board 2', canvasTypeId: 'campaign-studio', columns: [], tasks: {} },
       ],
     });
 
-    const boards = await listBoards(userId, { canvasTypeId: 'landing-page' });
+    const boards = await listBoards(userId, { canvasTypeId: 'campaign-studio' });
 
     expect(boards).toHaveLength(2);
     expect(boards[0].id).toBe('board-1');
@@ -156,7 +156,7 @@ describe('listBoards()', () => {
   it('returns empty array when canvasTypeId filter matches nothing', async () => {
     mockListDocuments.mockResolvedValue({
       documents: [
-        { id: 'board-1', name: 'Board', hyveId: 'app-builder', columns: [], tasks: {} },
+        { id: 'board-1', name: 'Board', canvasTypeId: 'app-builder', columns: [], tasks: {} },
       ],
     });
 
@@ -219,7 +219,7 @@ describe('getBoard()', () => {
     mockGetDocument.mockResolvedValue({
       id: 'board-123',
       name: 'Sprint Board',
-      hyveId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       ownerId: 'user-xyz',
       description: 'Current sprint tasks',
       columns: DEFAULT_COLUMNS,
@@ -249,7 +249,7 @@ describe('getBoard()', () => {
     // Summary fields
     expect(board!.id).toBe('board-123');
     expect(board!.name).toBe('Sprint Board');
-    expect(board!.canvasTypeId).toBe('landing-page');
+    expect(board!.canvasTypeId).toBe('campaign-studio');
     expect(board!.columnCount).toBe(5);
     expect(board!.taskCount).toBe(3);
     expect(board!.createdAt).toBe('2024-06-01T00:00:00Z');
@@ -407,12 +407,12 @@ describe('createBoard()', () => {
 
     await createBoard(userId, boardId, {
       name: 'LP Tasks',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       description: 'Tasks for the landing page',
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
-    expect(data.hyveId).toBe('landing-page');
+    expect(data.canvasTypeId).toBe('campaign-studio');
     expect(data.description).toBe('Tasks for the landing page');
   });
 
@@ -422,10 +422,10 @@ describe('createBoard()', () => {
         Promise.resolve({ id: boardId, ...data })
     );
 
-    await createBoard(userId, boardId, { name: 'No Hyve' });
+    await createBoard(userId, boardId, { name: 'No Canvas Type' });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
-    expect(data.hyveId).toBeNull();
+    expect(data.canvasTypeId).toBeNull();
   });
 
   it('uses custom columns when provided', async () => {

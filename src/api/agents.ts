@@ -112,7 +112,7 @@ export async function listAgents(
   if (options?.canvasTypeId || options?.enabled !== undefined) {
     const filters: QueryFilter[] = [];
     if (options.canvasTypeId) {
-      filters.push({ field: 'hyveId', op: 'EQUAL', value: options.canvasTypeId });
+      filters.push({ field: 'canvasTypeId', op: 'EQUAL', value: options.canvasTypeId });
     }
     if (options.enabled !== undefined) {
       filters.push({ field: 'enabled', op: 'EQUAL', value: options.enabled });
@@ -167,7 +167,7 @@ export async function createAgent(
 
   const now = new Date().toISOString();
   const agentData: Record<string, unknown> = {
-    hyveId: data.canvasTypeId,
+    canvasTypeId: data.canvasTypeId,
     name: data.name,
     description: data.description || '',
     systemPromptId: data.systemPromptId || '',
@@ -241,7 +241,7 @@ function toAgentSummary(doc: Record<string, unknown>): AgentSummary {
 
   return {
     id: doc.id as string,
-    canvasTypeId: (doc.hyveId as string) || '',
+    canvasTypeId: (doc.canvasTypeId as string) || '',
     name: (doc.name as string) || 'Unnamed Agent',
     description: (doc.description as string) || '',
     enabled: (doc.enabled as boolean) ?? true,

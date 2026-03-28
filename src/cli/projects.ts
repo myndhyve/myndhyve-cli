@@ -108,7 +108,7 @@ Examples:
   projects
     .command('create <name>')
     .description('Create a new project')
-    .requiredOption('--canvas-type <canvasTypeId>', 'Canvas type (e.g., app-builder, landing-page)')
+    .requiredOption('--canvas-type <canvasTypeId>', 'Canvas type (e.g., app-builder, campaign-studio)')
     .option('--description <desc>', 'Project description')
     .option('--type <type>', 'Project type (general, app, design, etc.)', 'general')
     .option('--tags <tags>', 'Comma-separated tags')

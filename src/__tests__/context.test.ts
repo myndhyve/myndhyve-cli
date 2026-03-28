@@ -194,8 +194,8 @@ describe('setActiveContext()', () => {
     const input = {
       projectId: 'proj-new',
       projectName: 'New Project',
-      canvasTypeId: 'landing-page',
-      canvasTypeName: 'Landing Page Canvas',
+      canvasTypeId: 'campaign-studio',
+      canvasTypeName: 'Campaign Studio Canvas',
     };
 
     const result = setActiveContext(input);
@@ -211,15 +211,15 @@ describe('setActiveContext()', () => {
     const parsed = JSON.parse(content as string);
     expect(parsed.projectId).toBe('proj-new');
     expect(parsed.projectName).toBe('New Project');
-    expect(parsed.canvasTypeId).toBe('landing-page');
-    expect(parsed.canvasTypeName).toBe('Landing Page Canvas');
+    expect(parsed.canvasTypeId).toBe('campaign-studio');
+    expect(parsed.canvasTypeName).toBe('Campaign Studio Canvas');
     expect(parsed.setAt).toBeTruthy();
 
     // Verify return value matches written content
     expect(result.projectId).toBe('proj-new');
     expect(result.projectName).toBe('New Project');
-    expect(result.canvasTypeId).toBe('landing-page');
-    expect(result.canvasTypeName).toBe('Landing Page Canvas');
+    expect(result.canvasTypeId).toBe('campaign-studio');
+    expect(result.canvasTypeName).toBe('Campaign Studio Canvas');
   });
 
   it('returns the saved context with setAt timestamp', () => {

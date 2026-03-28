@@ -116,7 +116,7 @@ function makeRawPolicy(overrides: Record<string, unknown> = {}): Record<string, 
     requireMention: true,
     allowedUsers: ['U111', 'U222'],
     allowedChannels: ['C001', 'C002'],
-    channelHyveBindings: { C001: 'hyve_lp' },
+    channelCanvasTypeBindings: { C001: 'campaign-studio' },
     channelWorkflowBindings: { C001: ['wf_1', 'wf_2'] },
     createdAt: '2025-06-01T10:00:00.000Z',
     updatedAt: '2025-06-01T12:00:00.000Z',
@@ -132,7 +132,7 @@ function makeRawRoutingRule(overrides: Record<string, unknown> = {}): Record<str
     conditions: [
       { type: 'channel', operator: 'equals', value: 'slack' },
     ],
-    target: { type: 'canvasType', targetId: 'hyve_app_builder' },
+    target: { type: 'canvasType', targetId: 'app-builder' },
     enabled: true,
     connectorId: 'conn_slack_001',
     createdAt: '2025-06-01T10:00:00.000Z',
@@ -150,7 +150,7 @@ function makeRawSession(overrides: Record<string, unknown> = {}): Record<string,
     peerDisplay: 'Alice',
     conversationKind: 'dm',
     conversationId: 'D001',
-    linkedHyveId: 'hyve_lp',
+    linkedCanvasTypeId: 'campaign-studio',
     linkedAgentId: 'agent_001',
     linkedIdentityId: 'ident_001',
     messageCount: 42,
@@ -187,7 +187,7 @@ function makeRawDeliveryLog(overrides: Record<string, unknown> = {}): Record<str
     sessionKey: 'slack:T12345:U111:dm',
     allowed: true,
     dispatched: true,
-    dispatchTarget: 'hyve_lp',
+    dispatchTarget: 'campaign-studio',
     status: 'delivered',
     durationMs: 120,
     timestamp: '2025-06-15T08:30:00.000Z',
@@ -473,7 +473,7 @@ describe('getPolicy', () => {
       requireMention: true,
       allowedUsers: ['U111', 'U222'],
       allowedChannels: ['C001', 'C002'],
-      channelCanvasTypeBindings: { C001: 'hyve_lp' },
+      channelCanvasTypeBindings: { C001: 'campaign-studio' },
       channelWorkflowBindings: { C001: ['wf_1', 'wf_2'] },
       createdAt: '2025-06-01T10:00:00.000Z',
       updatedAt: '2025-06-01T12:00:00.000Z',
@@ -719,7 +719,7 @@ describe('createRoutingRule', () => {
       name: 'New Rule',
       priority: 5,
       conditions: [],
-      target: { type: 'canvasType', targetId: 'hyve_lp' },
+      target: { type: 'canvasType', targetId: 'campaign-studio' },
     });
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
@@ -732,7 +732,7 @@ describe('createRoutingRule', () => {
       name: 'Test Rule',
       priority: 1,
       conditions: [],
-      target: { type: 'canvasType', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'canvas-type-1' },
     });
 
     const [, ruleId] = mockCreateDocument.mock.calls[0];
@@ -771,7 +771,7 @@ describe('createRoutingRule', () => {
       name: 'Default enabled',
       priority: 1,
       conditions: [],
-      target: { type: 'canvasType', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'canvas-type-1' },
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -783,7 +783,7 @@ describe('createRoutingRule', () => {
       name: 'No connector',
       priority: 1,
       conditions: [],
-      target: { type: 'canvasType', targetId: 'hyve_1' },
+      target: { type: 'canvasType', targetId: 'canvas-type-1' },
     });
 
     const [, , data] = mockCreateDocument.mock.calls[0];
@@ -896,7 +896,7 @@ describe('listSessions', () => {
       peerDisplay: 'Alice',
       conversationKind: 'dm',
       conversationId: 'D001',
-      linkedCanvasTypeId: 'hyve_lp',
+      linkedCanvasTypeId: 'campaign-studio',
       linkedAgentId: 'agent_001',
       linkedIdentityId: 'ident_001',
       messageCount: 42,
@@ -1395,7 +1395,7 @@ describe('queryDeliveryLogs', () => {
       sessionKey: 'slack:T12345:U111:dm',
       allowed: true,
       dispatched: true,
-      dispatchTarget: 'hyve_lp',
+      dispatchTarget: 'campaign-studio',
       status: 'delivered',
       durationMs: 120,
       timestamp: '2025-06-15T08:30:00.000Z',

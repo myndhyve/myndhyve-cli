@@ -84,8 +84,8 @@ const SAMPLE_CANVAS_TYPE = {
 };
 
 const SAMPLE_CANVAS_TYPE_2 = {
-  canvasTypeId: 'landing-page',
-  name: 'Landing Page',
+  canvasTypeId: 'campaign-studio',
+  name: 'Campaign Studio',
   description: 'Create landing pages',
   icon: '\u{1F680}',
   visibility: 'public',
@@ -119,7 +119,7 @@ const SAMPLE_DOC = {
 const SAMPLE_DOC_PINNED = {
   id: 'doc-2',
   name: 'Important Doc',
-  canvasTypeId: 'landing-page',
+  canvasTypeId: 'campaign-studio',
   status: 'active',
   pinned: true,
 };
@@ -185,7 +185,7 @@ describe('registerCanvasTypeCommands & registerContextCommands', () => {
     // getCanvasType default
     mockGetCanvasType.mockImplementation((canvasTypeId: string) => {
       if (canvasTypeId === 'app-builder') return SAMPLE_CANVAS_TYPE;
-      if (canvasTypeId === 'landing-page') return SAMPLE_CANVAS_TYPE_2;
+      if (canvasTypeId === 'campaign-studio') return SAMPLE_CANVAS_TYPE_2;
       return null;
     });
 
@@ -249,7 +249,7 @@ describe('registerCanvasTypeCommands & registerContextCommands', () => {
       expect(output).toContain('Canvas Types (2)');
       expect(output).toContain('app-builder');
       expect(output).toContain('App Builder');
-      expect(output).toContain('landing-page');
+      expect(output).toContain('campaign-studio');
     });
 
     it('outputs JSON format', () => {

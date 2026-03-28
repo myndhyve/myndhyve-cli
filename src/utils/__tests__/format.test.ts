@@ -55,7 +55,8 @@ describe('formatTimeUntil()', () => {
   });
 
   it('returns days for dates more than 24 hours away', () => {
-    const date = new Date(Date.now() + 3 * 24 * 60 * 60_000); // 3 days from now
+    // Add 1-min buffer so Math.floor doesn't round down due to ms elapsed between Date.now() calls
+    const date = new Date(Date.now() + 3 * 24 * 60 * 60_000 + 60_000);
     expect(formatTimeUntil(date)).toBe('3 days');
   });
 

@@ -80,7 +80,7 @@ function makeCronJob(overrides: Partial<CronJob> = {}): CronJob {
     name: 'Test Job',
     enabled: true,
     schedule: { kind: 'cron', expr: '0 9 * * *' },
-    action: { type: 'workflow', workflowId: 'wf-1', canvasTypeId: 'landing-page' },
+    action: { type: 'workflow', workflowId: 'wf-1', canvasTypeId: 'campaign-studio' },
     createdAt: '2026-03-07T00:00:00.000Z',
     updatedAt: '2026-03-07T00:00:00.000Z',
     consecutiveFailures: 0,

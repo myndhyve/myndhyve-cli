@@ -527,8 +527,8 @@ describe('checkActiveContext()', () => {
     mockGetActiveContext.mockReturnValue({
       projectId: 'proj-123',
       projectName: 'My Campaign',
-      canvasTypeId: 'landing-page',
-      canvasTypeName: 'Landing Page',
+      canvasTypeId: 'campaign-studio',
+      canvasTypeName: 'Campaign Studio',
       setAt: '2024-06-15T10:00:00.000Z',
     });
 
@@ -538,7 +538,7 @@ describe('checkActiveContext()', () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain('My Campaign');
     expect(result.message).toContain('proj-123');
-    expect(result.message).toContain('Landing Page');
+    expect(result.message).toContain('Campaign Studio');
     expect(result.fix).toBeUndefined();
   });
 

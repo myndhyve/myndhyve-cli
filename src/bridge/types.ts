@@ -34,7 +34,7 @@ export interface BridgeSession {
   userId: string;
   /** MyndHyve project or hyveDocument ID */
   projectId: string;
-  /** Canvas type ID (e.g. 'app-builder', 'landing-page') */
+  /** Canvas type ID (e.g. 'app-builder', 'campaign-studio') */
   canvasTypeId: string;
 
   /** Absolute local project path */

@@ -510,7 +510,7 @@ export function registerChatCommand(program: Command): void {
     .command('chat')
     .description('Chat with MyndHyve AI agents')
     .argument('[message]', 'One-shot message (non-interactive)')
-    .option('--canvas-type <id>', 'Canvas type ID (app-builder, landing-page, hyve-maker)')
+    .option('--canvas-type <id>', 'Canvas type ID (app-builder, campaign-studio, canvas-maker)')
     .option('--agent <name>', 'Agent name (alias for --canvas-type)')
     .option('--model <id>', 'Model ID or alias (e.g., claude-sonnet, gpt-4o)')
     .option('--provider <name>', 'AI provider (anthropic, openai, gemini, minimax)')

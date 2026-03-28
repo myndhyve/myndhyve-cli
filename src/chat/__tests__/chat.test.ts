@@ -97,23 +97,23 @@ describe('createSession()', () => {
   });
 
   it('uses API prompt when available', async () => {
-    mockFetchCanvasTypeSystemPrompt.mockResolvedValue('You are the Landing Page AI from Firestore.');
+    mockFetchCanvasTypeSystemPrompt.mockResolvedValue('You are the Campaign Studio AI from Firestore.');
 
     const session = await createSession({
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       model: 'gpt-4o',
       provider: 'openai',
       temperature: 0.3,
     });
 
-    expect(session.systemPrompt).toBe('You are the Landing Page AI from Firestore.');
-    expect(mockFetchCanvasTypeSystemPrompt).toHaveBeenCalledWith('landing-page');
+    expect(session.systemPrompt).toBe('You are the Campaign Studio AI from Firestore.');
+    expect(mockFetchCanvasTypeSystemPrompt).toHaveBeenCalledWith('campaign-studio');
   });
 
   it('falls back to default when API returns null', async () => {
     mockFetchCanvasTypeSystemPrompt.mockResolvedValue(null);
 
-    const session = await createSession({ canvasTypeId: 'landing-page' });
+    const session = await createSession({ canvasTypeId: 'campaign-studio' });
 
     expect(session.systemPrompt).toContain('MyndHyve AI');
   });
@@ -193,7 +193,7 @@ describe('createSession()', () => {
     mockLoadConversation.mockReturnValue({
       sessionId: 'chat_resume_1',
       title: 'Resumed',
-      canvasTypeId: 'landing-page',
+      canvasTypeId: 'campaign-studio',
       model: 'claude-sonnet',
       provider: 'anthropic',
       messages: [],
@@ -250,7 +250,7 @@ describe('resolveSystemPrompt()', () => {
   it('falls back to default when API throws during createSession', async () => {
     mockFetchCanvasTypeSystemPrompt.mockRejectedValue(new Error('DNS failure'));
 
-    const session = await createSession({ canvasTypeId: 'landing-page' });
+    const session = await createSession({ canvasTypeId: 'campaign-studio' });
 
     expect(session.systemPrompt).toContain('MyndHyve AI');
   });

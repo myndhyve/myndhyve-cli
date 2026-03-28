@@ -92,7 +92,7 @@ describe('CronExecutor', () => {
       const action: JobAction = {
         type: 'workflow',
         workflowId: 'wf-1',
-        canvasTypeId: 'landing-page',
+        canvasTypeId: 'campaign-studio',
         input: { key: 'val' },
       };
 
@@ -102,7 +102,7 @@ describe('CronExecutor', () => {
       expect(result).toContain('queued');
       expect(mockCreateRun).toHaveBeenCalledWith(
         'user-123',
-        'landing-page',
+        'campaign-studio',
         'wf-1',
         { triggerType: 'schedule', inputData: { key: 'val' } },
       );

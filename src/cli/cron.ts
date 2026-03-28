@@ -205,7 +205,7 @@ export function registerCronCommands(program: Command): void {
         printErrorResult({
           code: 'INVALID_ARGUMENT',
           message: '--workflow requires --canvas-type.',
-          suggestion: 'Example: --workflow abc123 --canvas-type landing-page',
+          suggestion: 'Example: --workflow abc123 --canvas-type campaign-studio',
         });
         process.exitCode = ExitCode.USAGE_ERROR;
         return;
