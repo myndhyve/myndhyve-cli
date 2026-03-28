@@ -65,8 +65,8 @@ beforeEach(() => {
 // ============================================================================
 
 describe('CRM_COLLECTIONS', () => {
-  it('contains exactly 10 collection names', () => {
-    expect(CRM_COLLECTIONS).toHaveLength(10);
+  it('contains exactly 19 collection names', () => {
+    expect(CRM_COLLECTIONS).toHaveLength(19);
   });
 
   it('includes all expected collections', () => {
@@ -557,34 +557,37 @@ describe('getCrmStats()', () => {
   const userId = 'user-stats';
 
   it('returns -1 for collections with data, 0 for empty', async () => {
-    // contacts: has data, deals: empty, orders: has data, products: empty, customers: has data
     mockListDocuments
-      .mockResolvedValueOnce({ documents: [{ id: 'c1' }] }) // contacts
-      .mockResolvedValueOnce({ documents: [] })              // deals
-      .mockResolvedValueOnce({ documents: [{ id: 'o1' }] }) // orders
-      .mockResolvedValueOnce({ documents: [] })              // products
-      .mockResolvedValueOnce({ documents: [{ id: 'cu1' }] }); // customers
+      .mockResolvedValueOnce({ documents: [{ id: 'c1' }] }) // contacts: has data
+      .mockResolvedValueOnce({ documents: [] })              // companies: empty
+      .mockResolvedValueOnce({ documents: [] })              // deals: empty
+      .mockResolvedValueOnce({ documents: [{ id: 'o1' }] }) // orders: has data
+      .mockResolvedValueOnce({ documents: [] })              // products: empty
+      .mockResolvedValueOnce({ documents: [{ id: 'cu1' }] }) // customers: has data
+      .mockResolvedValueOnce({ documents: [] });             // quotes: empty
 
     const stats = await getCrmStats(userId);
 
     expect(stats).toEqual({
       contacts: -1,
+      companies: 0,
       deals: 0,
       orders: -1,
       products: 0,
       customers: -1,
+      quotes: 0,
     });
   });
 
-  it('queries exactly 5 collections with pageSize 1', async () => {
+  it('queries exactly 7 collections with pageSize 1', async () => {
     mockListDocuments.mockResolvedValue({ documents: [] });
 
     await getCrmStats(userId);
 
-    expect(mockListDocuments).toHaveBeenCalledTimes(5);
+    expect(mockListDocuments).toHaveBeenCalledTimes(7);
 
-    const expectedCollections = ['contacts', 'deals', 'orders', 'products', 'customers'];
-    for (let i = 0; i < 5; i++) {
+    const expectedCollections = ['contacts', 'companies', 'deals', 'orders', 'products', 'customers', 'quotes'];
+    for (let i = 0; i < 7; i++) {
       const [path, options] = mockListDocuments.mock.calls[i];
       expect(path).toBe(`users/${userId}/crm/${expectedCollections[i]}`);
       expect(options).toEqual({ pageSize: 1 });
@@ -598,29 +601,35 @@ describe('getCrmStats()', () => {
 
     expect(stats).toEqual({
       contacts: 0,
+      companies: 0,
       deals: 0,
       orders: 0,
       products: 0,
       customers: 0,
+      quotes: 0,
     });
   });
 
   it('returns 0 for a collection when its query throws an error', async () => {
     mockListDocuments
       .mockResolvedValueOnce({ documents: [{ id: 'c1' }] }) // contacts: OK
-      .mockRejectedValueOnce(new Error('Network error'))      // deals: error
+      .mockRejectedValueOnce(new Error('Network error'))      // companies: error
+      .mockResolvedValueOnce({ documents: [] })              // deals: empty
       .mockResolvedValueOnce({ documents: [{ id: 'o1' }] }) // orders: OK
       .mockResolvedValueOnce({ documents: [] })              // products: empty
-      .mockRejectedValueOnce(new Error('Timeout'));           // customers: error
+      .mockRejectedValueOnce(new Error('Timeout'))            // customers: error
+      .mockResolvedValueOnce({ documents: [{ id: 'q1' }] }); // quotes: OK
 
     const stats = await getCrmStats(userId);
 
     expect(stats).toEqual({
       contacts: -1,
-      deals: 0,    // error treated as 0
+      companies: 0, // error treated as 0
+      deals: 0,
       orders: -1,
       products: 0,
       customers: 0, // error treated as 0
+      quotes: -1,
     });
   });
 
@@ -631,10 +640,12 @@ describe('getCrmStats()', () => {
 
     expect(stats).toEqual({
       contacts: -1,
+      companies: -1,
       deals: -1,
       orders: -1,
       products: -1,
       customers: -1,
+      quotes: -1,
     });
   });
 });
