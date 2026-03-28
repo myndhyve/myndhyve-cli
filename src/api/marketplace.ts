@@ -17,16 +17,24 @@ const log = createLogger('MarketplaceAPI');
 // ============================================================================
 
 export type PackType =
-  | 'canvas'
-  | 'node-pack'
-  | 'card-pack'
-  | 'canvas-pack'
+  | 'canvas-type'
+  | 'pack'
+  | 'agent'
+  | 'plugin'
   | 'template'
   | 'block'
   | 'mcp-server'
   | 'a2a-agent'
-  | 'connector-template'
-  | 'skill-package';
+  | 'connector'
+  | 'skill'
+  | 'extension-pack';
+
+/** SDK package type discriminator for extension-pack listings */
+export type SDKPackageType =
+  | 'canvas-type' | 'workflow' | 'ai' | 'connector'
+  | 'design-system' | 'plugin' | 'analytics' | 'persistence'
+  | 'cms' | 'crm' | 'commerce' | 'email-marketing'
+  | 'consent' | 'tracking' | 'webhook' | 'audit';
 
 export type PricingType = 'free' | 'paid' | 'subscription';
 
@@ -69,6 +77,10 @@ export interface PackListingDetail extends PackListingSummary {
   minPlatformVersion?: string;
   dependencies: string[];
   createdAt: string;
+  /** SDK package type for extension-pack listings */
+  sdkPackageType?: SDKPackageType;
+  /** Capabilities list */
+  capabilities?: string[];
 }
 
 export interface InstalledPack {
