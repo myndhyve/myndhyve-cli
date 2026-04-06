@@ -6,6 +6,22 @@ This CLI project (`/Users/david/dev/myndhyve-cli`) is an extension of the main M
 
 When making changes, be aware that the CLI depends on APIs and services defined in the main MyndHyve project. Consult `/Users/david/dev/myndhyve` for backend context when needed.
 
+## Workspace-Scoped Data
+
+All collaborative Firestore data lives at `workspaces/{workspaceId}/` (not `users/{userId}/`). The shared path helper at `src/utils/workspacePaths.ts` provides:
+
+```typescript
+import { resolveCollectionPath, resolveDocumentPath } from '../utils/workspacePaths.js';
+
+// Returns 'workspaces/ws-personal-{userId}/agents' (personal workspace)
+resolveCollectionPath(userId, 'agents');
+
+// With explicit workspace ID (team workspace)
+resolveCollectionPath(userId, 'agents', 'ws-team-abc');
+```
+
+Every user has a personal workspace `ws-personal-{userId}`. Personal data (secrets, messaging, bridge sessions) stays at `users/{userId}/`.
+
 ## Terminology
 
 The project uses **Canvas Type** terminology:
@@ -40,8 +56,8 @@ The standalone e-commerce module provides CLI access to product catalog, order m
 | `src/cli/commerce.ts` | `commerce` command group |
 
 **Firestore paths:** Uses `commerce_` prefix (NOT `crm/`):
-- User-scoped: `users/{userId}/commerce_{collection}/{entityId}`
-- Workspace-scoped: `workspaces/{workspaceId}/commerce_{collection}/{entityId}`
+- `workspaces/{workspaceId}/commerce_{collection}/{entityId}`
+- Personal workspace: `workspaces/ws-personal-{userId}/commerce_{collection}/{entityId}`
 
 **Collections:** products, orders, customers, coupons, affiliates
 

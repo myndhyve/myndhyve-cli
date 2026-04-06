@@ -398,6 +398,66 @@ export async function reviseRun(
   return submitApprovalDecision(userId, canvasTypeId, runId, 'rejected', feedback);
 }
 
+// ============================================================================
+// BACKGROUND RUN LIFECYCLE
+// ============================================================================
+
+/**
+ * Pause a running background workflow run.
+ * Sets status to 'waiting-approval' so the run stops after the current node.
+ */
+export async function pauseRun(runId: string): Promise<RunDetail> {
+  log.debug('Pausing run', { runId });
+  const doc = await getDocument('runs', runId);
+  if (!doc) throw new Error(`Run "${runId}" not found`);
+  if (doc.status !== 'running') {
+    throw new Error(`Cannot pause run with status: ${doc.status}`);
+  }
+  const result = await updateDocument('runs', runId, {
+    status: 'waiting-approval',
+  }, ['status']);
+  return toRunDetail(result);
+}
+
+/**
+ * Resume a paused or cap-breached workflow run.
+ * Sets status back to 'running'.
+ */
+export async function resumeRun(runId: string): Promise<RunDetail> {
+  log.debug('Resuming run', { runId });
+  const doc = await getDocument('runs', runId);
+  if (!doc) throw new Error(`Run "${runId}" not found`);
+  if (doc.status !== 'waiting-approval') {
+    throw new Error(`Cannot resume run with status: ${doc.status}`);
+  }
+  const result = await updateDocument('runs', runId, {
+    status: 'running',
+  }, ['status']);
+  return toRunDetail(result);
+}
+
+/**
+ * Abort a running or paused workflow run.
+ * Sets status to 'cancelled'.
+ */
+export async function abortRun(runId: string): Promise<RunDetail> {
+  log.debug('Aborting run', { runId });
+  const doc = await getDocument('runs', runId);
+  if (!doc) throw new Error(`Run "${runId}" not found`);
+  if (!['running', 'waiting-approval', 'pending'].includes(doc.status as string)) {
+    throw new Error(`Cannot abort run with status: ${doc.status}`);
+  }
+  const result = await updateDocument('runs', runId, {
+    status: 'cancelled',
+    endedAt: new Date().toISOString(),
+  }, ['status', 'endedAt']);
+  return toRunDetail(result);
+}
+
+// ============================================================================
+// APPROVAL DECISION (private)
+// ============================================================================
+
 /**
  * Submit an approval/rejection decision for a waiting-approval run.
  *

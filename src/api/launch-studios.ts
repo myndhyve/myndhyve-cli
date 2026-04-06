@@ -2,12 +2,13 @@
  * MyndHyve CLI — Launch Studio API
  *
  * CRUD for Launch Studios via Firestore REST API.
- * Path: users/{userId}/launchStudios/{studioId}
+ * Path: workspaces/{workspaceId}/launchStudios/{studioId}
  */
 
 import { getDocument, createDocument, deleteDocument, listDocuments } from './firestore.js';
 import { createLogger } from '../utils/logger.js';
 import { randomBytes } from 'node:crypto';
+import { resolveCollectionPath, resolveDocumentPath } from '../utils/workspacePaths.js';
 
 const log = createLogger('LaunchStudioAPI');
 
@@ -72,7 +73,7 @@ const COLLECTION = 'launchStudios';
 
 export async function listLaunchStudios(userId: string): Promise<LaunchStudio[]> {
   log.debug('Listing launch studios');
-  const result = await listDocuments(`users/${userId}/${COLLECTION}`);
+  const result = await listDocuments(resolveCollectionPath(userId, COLLECTION));
   return (result.documents ?? []).map((doc) => {
     const id = (doc._documentId as string) ?? '';
     return { ...doc, id } as unknown as LaunchStudio;
@@ -81,7 +82,7 @@ export async function listLaunchStudios(userId: string): Promise<LaunchStudio[]>
 
 export async function getLaunchStudio(userId: string, studioId: string): Promise<LaunchStudio | null> {
   log.debug('Getting launch studio');
-  const doc = await getDocument(`users/${userId}/${COLLECTION}`, studioId);
+  const doc = await getDocument(resolveCollectionPath(userId, COLLECTION), studioId);
   if (!doc) return null;
   return { ...doc, id: studioId } as unknown as LaunchStudio;
 }
@@ -101,10 +102,10 @@ export async function createLaunchStudio(
     flowTemplateId: options.flowTemplateId, steps, sharedArtifactRefs: [],
     status: 'draft', currentStepIndex: 0, createdAt: now, updatedAt: now,
   };
-  await createDocument(`users/${userId}/${COLLECTION}`, studioId, data);
+  await createDocument(resolveCollectionPath(userId, COLLECTION), studioId, data);
   return { id: studioId, ...data } as LaunchStudio;
 }
 
 export async function deleteLaunchStudio(userId: string, studioId: string): Promise<void> {
-  await deleteDocument(`users/${userId}/${COLLECTION}`, studioId);
+  await deleteDocument(resolveCollectionPath(userId, COLLECTION), studioId);
 }

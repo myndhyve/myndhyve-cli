@@ -109,7 +109,7 @@ describe('Firestore path format', () => {
     await listCommerceEntities('user-123', 'products');
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      'users/user-123/commerce_products',
+      'workspaces/ws-personal-user-123/commerce_products',
       { pageSize: 100 }
     );
   });
@@ -145,7 +145,7 @@ describe('listCommerceEntities()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/commerce_products`,
+      `workspaces/ws-personal-${userId}/commerce_products`,
       { pageSize: 100 }
     );
     expect(mockRunQuery).not.toHaveBeenCalled();
@@ -164,7 +164,7 @@ describe('listCommerceEntities()', () => {
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${userId}/commerce_orders`);
+    expect(collectionPath).toBe(`workspaces/ws-personal-${userId}/commerce_orders`);
     expect(filters).toEqual([
       { field: 'status', op: 'EQUAL', value: 'pending' },
     ]);
@@ -179,7 +179,7 @@ describe('listCommerceEntities()', () => {
     await listCommerceEntities(userId, 'products', { limit: 25 });
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/commerce_products`,
+      `workspaces/ws-personal-${userId}/commerce_products`,
       { pageSize: 25 }
     );
   });
@@ -283,7 +283,7 @@ describe('getCommerceEntity()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/commerce_products`,
+      `workspaces/ws-personal-${userId}/commerce_products`,
       'prod-1'
     );
     expect(entity).not.toBeNull();
@@ -329,7 +329,7 @@ describe('createCommerceEntity()', () => {
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
     const [path, entityId, sentData] = mockCreateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/commerce_products`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/commerce_products`);
     expect(entityId).toBe('prod-new');
     expect(sentData.name).toBe('New Product');
     expect(sentData.price).toBe(1999);
@@ -372,7 +372,7 @@ describe('updateCommerceEntity()', () => {
 
     expect(mockUpdateDocument).toHaveBeenCalledOnce();
     const [path, entityId, sentData] = mockUpdateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/commerce_products`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/commerce_products`);
     expect(entityId).toBe('p1');
     expect(sentData.name).toBe('Updated Product');
     expect(sentData.updatedAt).toBeDefined();
@@ -406,7 +406,7 @@ describe('deleteCommerceEntity()', () => {
 
     expect(mockDeleteDocument).toHaveBeenCalledOnce();
     expect(mockDeleteDocument).toHaveBeenCalledWith(
-      `users/${userId}/commerce_products`,
+      `workspaces/ws-personal-${userId}/commerce_products`,
       'p1'
     );
   });
@@ -457,7 +457,7 @@ describe('fulfillOrder()', () => {
 
     expect(mockUpdateDocument).toHaveBeenCalledOnce();
     const [path, entityId, sentData] = mockUpdateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/commerce_orders`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/commerce_orders`);
     expect(entityId).toBe('ord-1');
     expect(sentData.status).toBe('fulfilled');
     expect(sentData.fulfillmentStatus).toBe('shipped');
@@ -562,7 +562,7 @@ describe('getCommerceStats()', () => {
     const expectedCollections = ['products', 'orders', 'customers', 'coupons', 'affiliates'];
     for (let i = 0; i < 5; i++) {
       const [path, options] = mockListDocuments.mock.calls[i];
-      expect(path).toBe(`users/${userId}/commerce_${expectedCollections[i]}`);
+      expect(path).toBe(`workspaces/ws-personal-${userId}/commerce_${expectedCollections[i]}`);
       expect(options).toEqual({ pageSize: 200 });
     }
   });
@@ -665,7 +665,7 @@ describe('getLowStockProducts()', () => {
     await getLowStockProducts(userId);
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/commerce_products`,
+      `workspaces/ws-personal-${userId}/commerce_products`,
       { pageSize: 200 }
     );
   });

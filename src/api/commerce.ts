@@ -93,10 +93,8 @@ export interface CommerceScope {
  * Uses `commerce_` prefix to match the main project's standalone module.
  */
 function commercePath(scope: CommerceScope, collection: CommerceCollection): string {
-  if (scope.workspaceId) {
-    return `workspaces/${scope.workspaceId}/commerce_${collection}`;
-  }
-  return `users/${scope.userId}/commerce_${collection}`;
+  const wsId = scope.workspaceId ?? `ws-personal-${scope.userId}`;
+  return `workspaces/${wsId}/commerce_${collection}`;
 }
 
 function resolveScope(userIdOrScope: string | CommerceScope): CommerceScope {

@@ -8,6 +8,7 @@
 import { hostname, platform } from 'node:os';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
@@ -30,7 +31,14 @@ import { DEFAULT_IGNORE_PATTERNS } from './types.js';
 
 const log = createLogger('BridgeSession');
 
-const CLI_VERSION = '0.2.0'; // TODO: read from package.json
+const CLI_VERSION: string = (() => {
+  try {
+    const require = createRequire(import.meta.url);
+    return (require('../../package.json') as { version: string }).version;
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 // ============================================================================
 // LOCAL CONFIG (.myndhyve/bridge.json)

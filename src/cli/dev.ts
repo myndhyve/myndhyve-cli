@@ -587,13 +587,31 @@ function registerSchemaCommand(dev: Command): void {
         // Schema exchange
         { type: 'schema.request', category: 'Schema', description: 'Request component schema' },
         { type: 'schema.response', category: 'Schema', description: 'Return component schema' },
-        // Hyve Builder
-        { type: 'hyve.ideation', category: 'Hyve Builder', description: 'Hyve ideation phase' },
-        { type: 'hyve.prd', category: 'Hyve Builder', description: 'Hyve PRD generation' },
-        { type: 'hyve.prompts', category: 'Hyve Builder', description: 'Hyve prompt generation' },
-        { type: 'hyve.workflows', category: 'Hyve Builder', description: 'Hyve workflow generation' },
-        { type: 'hyve.schemas', category: 'Hyve Builder', description: 'Hyve schema generation' },
-        { type: 'hyve.integrations', category: 'Hyve Builder', description: 'Hyve integration setup' },
+        // Canvas Type Builder
+        { type: 'canvas-builder.ideation', category: 'Canvas Builder', description: 'Canvas type ideation' },
+        { type: 'canvas-builder.prd', category: 'Canvas Builder', description: 'Canvas type PRD generation' },
+        { type: 'canvas-builder.prompts', category: 'Canvas Builder', description: 'Canvas type prompt generation' },
+        { type: 'canvas-builder.workflows', category: 'Canvas Builder', description: 'Canvas type workflow generation' },
+        { type: 'canvas-builder.schemas', category: 'Canvas Builder', description: 'Canvas type schema generation' },
+        { type: 'canvas-builder.integrations', category: 'Canvas Builder', description: 'Canvas type integration setup' },
+        // Brand Persona
+        { type: 'brand.persona.generate', category: 'Brand', description: 'AI-generate brand personas' },
+        { type: 'brand.persona.refine', category: 'Brand', description: 'Refine existing persona with data' },
+        // CRM AI Agent
+        { type: 'crm.contact.create', category: 'CRM', description: 'Create a CRM contact' },
+        { type: 'crm.contact.update', category: 'CRM', description: 'Update contact fields' },
+        { type: 'crm.deal.create', category: 'CRM', description: 'Create a deal' },
+        { type: 'crm.deal.update', category: 'CRM', description: 'Update deal fields' },
+        { type: 'crm.deal.forecast', category: 'CRM', description: 'Generate pipeline forecast' },
+        { type: 'crm.task.create', category: 'CRM', description: 'Create a CRM task' },
+        { type: 'crm.sequence.enroll', category: 'CRM', description: 'Enroll contact in sequence' },
+        { type: 'crm.query.execute', category: 'CRM', description: 'Natural language CRM query' },
+        { type: 'crm.report.generate', category: 'CRM', description: 'Generate CRM report' },
+        { type: 'crm.email.draft', category: 'CRM', description: 'Draft email for contact' },
+        { type: 'crm.agent.action', category: 'CRM', description: 'Generic CRM agent action' },
+        // Launch Studio
+        { type: 'launch.canvas.create', category: 'Launch', description: 'Create project in Launch Studio' },
+        { type: 'launch.task.dispatch', category: 'Launch', description: 'Dispatch task to canvas type' },
       ];
 
       if (opts.format === 'json') {
@@ -628,6 +646,7 @@ function registerSchemaCommand(dev: Command): void {
         { id: 'webResearch', name: 'Web Research', count: 4, description: 'Search, scrape, analyze, summarize' },
         { id: 'pageBuilder', name: 'Page Builder', count: 8, description: 'Content, structure, personas, theme, tracking, validate, review, publish' },
         { id: 'brandTheme', name: 'Brand & Theme', count: 8, description: 'Discovery, generate, validate, competitor, review, implement, template, publish' },
+        { id: 'brandPersona', name: 'Brand Persona', count: 5, description: 'Discover, generate, validate, review, publish' },
         { id: 'adsStudio', name: 'Ads Studio', count: 11, description: 'Campaigns, audiences, creatives, budgets, scheduling' },
         { id: 'campaignStudio', name: 'Campaign Studio', count: 7, description: 'Create, launch, pause, metrics, forecast, rebalance, attribute' },
         { id: 'campaignAutopilot', name: 'Campaign Autopilot', count: 5, description: 'AI-driven campaign management' },

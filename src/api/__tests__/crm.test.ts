@@ -124,7 +124,7 @@ describe('listCrmEntities()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/crm/contacts`,
+      `workspaces/ws-personal-${userId}/crm/contacts`,
       { pageSize: 100 }
     );
     expect(mockRunQuery).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe('listCrmEntities()', () => {
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${userId}/crm/deals`);
+    expect(collectionPath).toBe(`workspaces/ws-personal-${userId}/crm/deals`);
     expect(filters).toEqual([
       { field: 'status', op: 'EQUAL', value: 'won' },
     ]);
@@ -197,7 +197,7 @@ describe('listCrmEntities()', () => {
     await listCrmEntities(userId, 'products', { limit: 25 });
 
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/crm/products`,
+      `workspaces/ws-personal-${userId}/crm/products`,
       { pageSize: 25 }
     );
   });
@@ -345,7 +345,7 @@ describe('getCrmEntity()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/crm/contacts`,
+      `workspaces/ws-personal-${userId}/crm/contacts`,
       'contact-1'
     );
 
@@ -383,7 +383,7 @@ describe('getCrmEntity()', () => {
     await getCrmEntity(userId, 'orders', 'o1');
 
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/crm/orders`,
+      `workspaces/ws-personal-${userId}/crm/orders`,
       'o1'
     );
   });
@@ -410,7 +410,7 @@ describe('createCrmEntity()', () => {
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
     const [path, entityId, sentData] = mockCreateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/crm/contacts`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/crm/contacts`);
     expect(entityId).toBe('contact-new');
     expect(sentData.name).toBe('New Contact');
     expect(sentData.email).toBe('new@test.com');
@@ -481,7 +481,7 @@ describe('updateCrmEntity()', () => {
 
     expect(mockUpdateDocument).toHaveBeenCalledOnce();
     const [path, entityId, sentData] = mockUpdateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/crm/contacts`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/crm/contacts`);
     expect(entityId).toBe('c1');
     expect(sentData.name).toBe('Updated Name');
     expect(sentData.updatedAt).toBeDefined();
@@ -524,7 +524,7 @@ describe('deleteCrmEntity()', () => {
 
     expect(mockDeleteDocument).toHaveBeenCalledOnce();
     expect(mockDeleteDocument).toHaveBeenCalledWith(
-      `users/${userId}/crm/contacts`,
+      `workspaces/ws-personal-${userId}/crm/contacts`,
       'c1'
     );
   });
@@ -535,7 +535,7 @@ describe('deleteCrmEntity()', () => {
     await deleteCrmEntity(userId, 'coupons', 'coupon-99');
 
     expect(mockDeleteDocument).toHaveBeenCalledWith(
-      `users/${userId}/crm/coupons`,
+      `workspaces/ws-personal-${userId}/crm/coupons`,
       'coupon-99'
     );
   });
@@ -589,7 +589,7 @@ describe('getCrmStats()', () => {
     const expectedCollections = ['contacts', 'companies', 'deals', 'orders', 'products', 'customers', 'quotes'];
     for (let i = 0; i < 7; i++) {
       const [path, options] = mockListDocuments.mock.calls[i];
-      expect(path).toBe(`users/${userId}/crm/${expectedCollections[i]}`);
+      expect(path).toBe(`workspaces/ws-personal-${userId}/crm/${expectedCollections[i]}`);
       expect(options).toEqual({ pageSize: 1 });
     }
   });

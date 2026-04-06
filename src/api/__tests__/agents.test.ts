@@ -63,7 +63,7 @@ beforeEach(() => {
 
 const userId = 'user-abc123';
 const agentId = 'agent-001';
-const agentPath = `users/${userId}/agents`;
+const agentPath = `workspaces/ws-personal-${userId}/agents`;
 
 function makeAgentDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

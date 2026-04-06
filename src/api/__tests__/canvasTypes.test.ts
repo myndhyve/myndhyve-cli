@@ -203,7 +203,7 @@ describe('listCanvases()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/canvases`,
+      `workspaces/ws-personal-${userId}/canvases`,
       { pageSize: 100 }
     );
     expect(mockRunQuery).not.toHaveBeenCalled();
@@ -229,7 +229,7 @@ describe('listCanvases()', () => {
 
     expect(mockRunQuery).toHaveBeenCalledOnce();
     const [collectionPath, filters, options] = mockRunQuery.mock.calls[0];
-    expect(collectionPath).toBe(`users/${userId}/canvases`);
+    expect(collectionPath).toBe(`workspaces/ws-personal-${userId}/canvases`);
     expect(filters).toEqual([
       { field: 'canvasTypeId', op: 'EQUAL', value: 'app-builder' },
     ]);
@@ -420,7 +420,7 @@ describe('getCanvas()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/canvases`,
+      `workspaces/ws-personal-${userId}/canvases`,
       documentId
     );
 

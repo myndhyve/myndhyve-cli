@@ -33,6 +33,8 @@ const ContextSchema = z.object({
   canvasId: z.string().optional(),
   /** Active canvas session key */
   sessionKey: z.string().optional(),
+  /** Active workspace ID (drives Firestore path resolution) */
+  workspaceId: z.string().optional(),
   /** When the context was set */
   setAt: z.string(),
 });

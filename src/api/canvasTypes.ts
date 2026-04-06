@@ -3,7 +3,7 @@
  *
  * Operations for Canvases (user work items within canvas types)
  * via Firestore REST API. Canvases are stored at
- * `users/{userId}/canvases/{docId}`.
+ * `workspaces/{workspaceId}/canvases/{docId}`.
  *
  * Also provides access to canvas type metadata (hardcoded, same as web app).
  */
@@ -15,6 +15,7 @@ import {
   type QueryFilter,
 } from './firestore.js';
 import { createLogger } from '../utils/logger.js';
+import { resolveCollectionPath, resolveDocumentPath } from '../utils/workspacePaths.js';
 
 const log = createLogger('CanvasTypeAPI');
 
@@ -196,7 +197,7 @@ export async function listCanvases(
   userId: string,
   options?: { canvasTypeId?: string; status?: string; pinned?: boolean }
 ): Promise<CanvasSummary[]> {
-  const collectionPath = `users/${userId}/canvases`;
+  const collectionPath = resolveCollectionPath(userId, 'canvases');
 
   log.debug('Listing canvases', { userId, options });
 
@@ -236,7 +237,7 @@ export async function getCanvas(
   userId: string,
   canvasId: string
 ): Promise<CanvasDetail | null> {
-  const collectionPath = `users/${userId}/canvases`;
+  const collectionPath = resolveCollectionPath(userId, 'canvases');
 
   log.debug('Getting canvas', { userId, canvasId });
 

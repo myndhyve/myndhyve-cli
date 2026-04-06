@@ -121,18 +121,11 @@ export interface CrmScope {
 
 /**
  * Build the Firestore collection path for CRM entities.
- * Uses workspace path when workspaceId is provided, otherwise user path.
+ * Always uses workspace-scoped path.
  */
 function crmPath(scope: CrmScope, collection: CrmCollection): string {
-  if (scope.workspaceId) {
-    return `workspaces/${scope.workspaceId}/crm/${collection}`;
-  }
-  return `users/${scope.userId}/crm/${collection}`;
-}
-
-/** @deprecated Use CrmScope overload. Kept for backward compatibility. */
-function crmPathLegacy(userId: string, collection: CrmCollection): string {
-  return `users/${userId}/crm/${collection}`;
+  const wsId = scope.workspaceId ?? `ws-personal-${scope.userId}`;
+  return `workspaces/${wsId}/crm/${collection}`;
 }
 
 function resolveScope(userIdOrScope: string | CrmScope): CrmScope {

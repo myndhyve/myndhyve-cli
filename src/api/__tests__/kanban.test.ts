@@ -110,7 +110,7 @@ describe('listBoards()', () => {
 
     expect(mockListDocuments).toHaveBeenCalledOnce();
     expect(mockListDocuments).toHaveBeenCalledWith(
-      `users/${userId}/kanban`,
+      `workspaces/ws-personal-${userId}/kanbanBoards`,
       { pageSize: 50 }
     );
     expect(boards).toHaveLength(2);
@@ -241,7 +241,7 @@ describe('getBoard()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/kanban`,
+      `workspaces/ws-personal-${userId}/kanbanBoards`,
       boardId
     );
 
@@ -349,7 +349,7 @@ describe('createBoard()', () => {
 
     expect(mockCreateDocument).toHaveBeenCalledOnce();
     const [path, id, data] = mockCreateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/kanban`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/kanbanBoards`);
     expect(id).toBe(boardId);
 
     // Verify defaults
@@ -479,7 +479,7 @@ describe('updateBoard()', () => {
 
     expect(mockUpdateDocument).toHaveBeenCalledOnce();
     const [path, id, data] = mockUpdateDocument.mock.calls[0];
-    expect(path).toBe(`users/${userId}/kanban`);
+    expect(path).toBe(`workspaces/ws-personal-${userId}/kanbanBoards`);
     expect(id).toBe(boardId);
     expect(data.name).toBe('Renamed Board');
     expect(data.updatedAt).toBeDefined();
@@ -529,7 +529,7 @@ describe('deleteBoard()', () => {
 
     expect(mockDeleteDocument).toHaveBeenCalledOnce();
     expect(mockDeleteDocument).toHaveBeenCalledWith(
-      `users/${userId}/kanban`,
+      `workspaces/ws-personal-${userId}/kanbanBoards`,
       boardId
     );
   });
@@ -745,7 +745,7 @@ describe('getTask()', () => {
 
     expect(mockGetDocument).toHaveBeenCalledOnce();
     expect(mockGetDocument).toHaveBeenCalledWith(
-      `users/${userId}/kanban`,
+      `workspaces/ws-personal-${userId}/kanbanBoards`,
       boardId
     );
 

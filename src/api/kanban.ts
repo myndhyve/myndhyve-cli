@@ -2,7 +2,7 @@
  * MyndHyve CLI — Kanban API
  *
  * Operations for kanban boards and tasks via Firestore REST API.
- * Boards are user-scoped at `users/{userId}/kanban/{boardId}`.
+ * Boards are stored at `workspaces/{workspaceId}/kanbanBoards/{boardId}`.
  */
 
 import {
@@ -13,6 +13,7 @@ import {
   deleteDocument,
 } from './firestore.js';
 import { createLogger } from '../utils/logger.js';
+import { resolveCollectionPath, resolveDocumentPath } from '../utils/workspacePaths.js';
 
 const log = createLogger('KanbanAPI');
 
@@ -121,7 +122,7 @@ export async function listBoards(
   userId: string,
   options?: { canvasTypeId?: string }
 ): Promise<BoardSummary[]> {
-  const path = `users/${userId}/kanban`;
+  const path = resolveCollectionPath(userId, 'kanbanBoards');
 
   log.debug('Listing boards', { userId, options });
 
@@ -145,7 +146,7 @@ export async function getBoard(
   userId: string,
   boardId: string
 ): Promise<BoardDetail | null> {
-  const path = `users/${userId}/kanban`;
+  const path = resolveCollectionPath(userId, 'kanbanBoards');
 
   log.debug('Getting board', { userId, boardId });
 
@@ -168,7 +169,7 @@ export async function createBoard(
     columns?: BoardColumn[];
   }
 ): Promise<BoardDetail> {
-  const path = `users/${userId}/kanban`;
+  const path = resolveCollectionPath(userId, 'kanbanBoards');
 
   log.debug('Creating board', { userId, boardId });
 
@@ -198,7 +199,7 @@ export async function updateBoard(
   boardId: string,
   data: Record<string, unknown>
 ): Promise<BoardDetail> {
-  const path = `users/${userId}/kanban`;
+  const path = resolveCollectionPath(userId, 'kanbanBoards');
 
   log.debug('Updating board', { userId, boardId });
 
@@ -214,7 +215,7 @@ export async function deleteBoard(
   userId: string,
   boardId: string
 ): Promise<void> {
-  const path = `users/${userId}/kanban`;
+  const path = resolveCollectionPath(userId, 'kanbanBoards');
 
   log.debug('Deleting board', { userId, boardId });
 
@@ -241,7 +242,7 @@ export async function listTasks(
   if (!board) return [];
 
   // Get tasks from the raw board document
-  const doc = await getDocument(`users/${userId}/kanban`, boardId);
+  const doc = await getDocument(resolveCollectionPath(userId, 'kanbanBoards'), boardId);
   if (!doc) return [];
 
   const tasksMap = (doc.tasks || {}) as Record<string, Record<string, unknown>>;
@@ -266,7 +267,7 @@ export async function getTask(
 ): Promise<TaskDetail | null> {
   log.debug('Getting task', { userId, boardId, taskId });
 
-  const doc = await getDocument(`users/${userId}/kanban`, boardId);
+  const doc = await getDocument(resolveCollectionPath(userId, 'kanbanBoards'), boardId);
   if (!doc) return null;
 
   const tasksMap = (doc.tasks || {}) as Record<string, Record<string, unknown>>;

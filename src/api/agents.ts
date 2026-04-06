@@ -2,7 +2,7 @@
  * MyndHyve CLI — Agent API
  *
  * Operations for AutomationAgent entities via Firestore REST API.
- * Agents are stored at `users/{userId}/agents/{agentId}`.
+ * Agents are stored at `workspaces/{workspaceId}/agents/{agentId}`.
  */
 
 import {
@@ -15,6 +15,7 @@ import {
   type QueryFilter,
 } from './firestore.js';
 import { createLogger } from '../utils/logger.js';
+import { resolveCollectionPath, resolveDocumentPath } from '../utils/workspacePaths.js';
 
 const log = createLogger('AgentAPI');
 
@@ -83,6 +84,12 @@ export interface AgentDetail extends AgentSummary {
   envelopeTypes: string[];
   schedule?: { cron: string; timezone: string };
   kanbanAccess?: AgentKanbanAccess;
+  backgroundConfig?: {
+    enabled: boolean;
+    maxTokensPerRun: number;
+    maxWallClockMinutes: number;
+    maxToolInvocations: number;
+  };
 }
 
 /** Default model configuration. */
@@ -105,7 +112,7 @@ export async function listAgents(
   userId: string,
   options?: { canvasTypeId?: string; enabled?: boolean }
 ): Promise<AgentSummary[]> {
-  const path = `users/${userId}/agents`;
+  const path = resolveCollectionPath(userId, 'agents');
 
   log.debug('Listing agents', { userId, options });
 
@@ -133,7 +140,7 @@ export async function getAgent(
   userId: string,
   agentId: string
 ): Promise<AgentDetail | null> {
-  const path = `users/${userId}/agents`;
+  const path = resolveCollectionPath(userId, 'agents');
 
   log.debug('Getting agent', { userId, agentId });
 
@@ -161,7 +168,7 @@ export async function createAgent(
     enabled?: boolean;
   }
 ): Promise<AgentDetail> {
-  const path = `users/${userId}/agents`;
+  const path = resolveCollectionPath(userId, 'agents');
 
   log.debug('Creating agent', { userId, agentId, canvasTypeId: data.canvasTypeId });
 
@@ -193,7 +200,7 @@ export async function updateAgent(
   agentId: string,
   data: Record<string, unknown>
 ): Promise<AgentDetail> {
-  const path = `users/${userId}/agents`;
+  const path = resolveCollectionPath(userId, 'agents');
 
   log.debug('Updating agent', { userId, agentId });
 
@@ -213,7 +220,7 @@ export async function deleteAgent(
   userId: string,
   agentId: string
 ): Promise<void> {
-  const path = `users/${userId}/agents`;
+  const path = resolveCollectionPath(userId, 'agents');
 
   log.debug('Deleting agent', { userId, agentId });
 
