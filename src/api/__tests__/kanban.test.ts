@@ -550,47 +550,66 @@ describe('deleteBoard()', () => {
 describe('listTasks()', () => {
   const userId = 'user-tasks';
   const boardId = 'board-tasks';
+  const canvasTypeId = 'app-builder';
 
-  it('extracts tasks from board document tasks map', async () => {
-    // getBoard() calls getDocument once, then listTasks calls getDocument again
+  function mockBoardWithCanvas() {
     mockGetDocument.mockResolvedValue({
       id: boardId,
       name: 'Task Board',
+      canvasTypeId,
       columns: DEFAULT_COLUMNS,
       config: DEFAULT_BOARD_CONFIG,
       swimlanes: [],
       ownerId: userId,
-      tasks: {
-        't-1': {
+    });
+  }
+
+  it('reads tasks from canvases/{canvasTypeId}/tasks subcollection', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({
+      documents: [
+        {
+          id: 't-1',
+          boardId,
           title: 'First Task',
           status: 'todo',
           priority: 'high',
-          assignee: 'agent-1',
+          kind: 'task',
+          assignedTo: 'agent-1',
           labels: ['frontend'],
           dueDate: '2024-07-01T00:00:00Z',
           createdAt: '2024-06-01T00:00:00Z',
         },
-        't-2': {
+        {
+          id: 't-2',
+          boardId,
           title: 'Second Task',
           status: 'doing',
           priority: 'medium',
+          kind: 'feature',
           labels: [],
         },
-      },
+      ],
     });
 
     const tasks = await listTasks(userId, boardId);
 
-    expect(tasks).toHaveLength(2);
+    // listDocuments should be called against the canvas-tasks subcollection.
+    expect(mockListDocuments).toHaveBeenCalledWith(
+      `canvases/${canvasTypeId}/tasks`,
+      expect.objectContaining({ pageSize: expect.any(Number) }),
+    );
 
+    expect(tasks).toHaveLength(2);
     const task1 = tasks.find((t) => t.id === 't-1')!;
-    expect(task1).toBeDefined();
     expect(task1).toEqual<TaskSummary>({
       id: 't-1',
       boardId,
+      canvasTypeId,
       title: 'First Task',
       status: 'todo',
       priority: 'high',
+      kind: 'task',
       assignee: 'agent-1',
       labels: ['frontend'],
       dueDate: '2024-07-01T00:00:00Z',
@@ -598,88 +617,77 @@ describe('listTasks()', () => {
     });
 
     const task2 = tasks.find((t) => t.id === 't-2')!;
-    expect(task2).toBeDefined();
-    expect(task2.boardId).toBe(boardId);
-    expect(task2.status).toBe('doing');
-    expect(task2.priority).toBe('medium');
+    expect(task2.kind).toBe('feature');
+    expect(task2.canvasTypeId).toBe(canvasTypeId);
   });
 
-  it('filters tasks by status', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'Board',
-      columns: DEFAULT_COLUMNS,
-      config: DEFAULT_BOARD_CONFIG,
-      swimlanes: [],
-      ownerId: userId,
-      tasks: {
-        't-1': { title: 'Done Task', status: 'done', priority: 'low', labels: [] },
-        't-2': { title: 'Todo Task', status: 'todo', priority: 'medium', labels: [] },
-        't-3': { title: 'Another Done', status: 'done', priority: 'high', labels: [] },
-        't-4': { title: 'Blocked Task', status: 'blocked', priority: 'critical', labels: [] },
-      },
+  it('filters tasks by boardId — sibling boards on the same canvas type are excluded', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({
+      documents: [
+        { id: 't-mine', boardId, title: 'Mine', status: 'todo', priority: 'medium', labels: [] },
+        { id: 't-other', boardId: 'some-other-board', title: 'Other', status: 'todo', priority: 'medium', labels: [] },
+        { id: 't-no-board', title: 'Unscoped', status: 'todo', priority: 'medium', labels: [] },
+      ],
+    });
+
+    const tasks = await listTasks(userId, boardId);
+    const ids = tasks.map((t) => t.id);
+    expect(ids).toContain('t-mine');
+    expect(ids).toContain('t-no-board'); // no boardId → kept
+    expect(ids).not.toContain('t-other');
+  });
+
+  it('filters by status when status option is provided', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({
+      documents: [
+        { id: 't-1', boardId, title: 'Done', status: 'done', priority: 'low', labels: [] },
+        { id: 't-2', boardId, title: 'Todo', status: 'todo', priority: 'medium', labels: [] },
+        { id: 't-3', boardId, title: 'Done 2', status: 'done', priority: 'high', labels: [] },
+      ],
     });
 
     const doneTasks = await listTasks(userId, boardId, { status: 'done' });
-
     expect(doneTasks).toHaveLength(2);
     expect(doneTasks.every((t) => t.status === 'done')).toBe(true);
   });
 
-  it('returns empty array when board does not exist', async () => {
+  it('returns empty array when the board does not exist', async () => {
     mockGetDocument.mockResolvedValue(null);
-
     const tasks = await listTasks(userId, 'nonexistent-board');
-
     expect(tasks).toEqual([]);
+    expect(mockListDocuments).not.toHaveBeenCalled();
   });
 
-  it('returns empty array when board has no tasks', async () => {
+  it('returns empty array when the board has no canvasTypeId', async () => {
     mockGetDocument.mockResolvedValue({
       id: boardId,
-      name: 'Empty Board',
-      columns: DEFAULT_COLUMNS,
-      config: DEFAULT_BOARD_CONFIG,
-      swimlanes: [],
-      ownerId: userId,
-      tasks: {},
-    });
-
-    const tasks = await listTasks(userId, boardId);
-
-    expect(tasks).toEqual([]);
-  });
-
-  it('returns empty array when tasks field is missing entirely', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'No Tasks Field',
+      name: 'Orphaned',
       columns: DEFAULT_COLUMNS,
       config: DEFAULT_BOARD_CONFIG,
       swimlanes: [],
       ownerId: userId,
     });
-
     const tasks = await listTasks(userId, boardId);
+    expect(tasks).toEqual([]);
+    expect(mockListDocuments).not.toHaveBeenCalled();
+  });
 
+  it('returns empty array when the canvas-tasks collection is empty', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({ documents: [] });
+    const tasks = await listTasks(userId, boardId);
     expect(tasks).toEqual([]);
   });
 
-  it('defaults task fields when sparse task data', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'Board',
-      columns: [],
-      config: DEFAULT_BOARD_CONFIG,
-      swimlanes: [],
-      ownerId: userId,
-      tasks: {
-        't-sparse': {},
-      },
+  it('defaults task fields when the doc is sparse', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({
+      documents: [{ id: 't-sparse', boardId }],
     });
 
     const tasks = await listTasks(userId, boardId);
-
     expect(tasks).toHaveLength(1);
     expect(tasks[0].title).toBe('Untitled');
     expect(tasks[0].status).toBe('backlog');
@@ -687,21 +695,12 @@ describe('listTasks()', () => {
     expect(tasks[0].labels).toEqual([]);
   });
 
-  it('uses name field as fallback when title is missing', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'Board',
-      columns: [],
-      config: DEFAULT_BOARD_CONFIG,
-      swimlanes: [],
-      ownerId: userId,
-      tasks: {
-        't-named': { name: 'Named Task' },
-      },
+  it('uses name field as a title fallback', async () => {
+    mockBoardWithCanvas();
+    mockListDocuments.mockResolvedValue({
+      documents: [{ id: 't-named', boardId, name: 'Named Task' }],
     });
-
     const tasks = await listTasks(userId, boardId);
-
     expect(tasks[0].title).toBe('Named Task');
   });
 });
@@ -713,132 +712,122 @@ describe('listTasks()', () => {
 describe('getTask()', () => {
   const userId = 'user-gettask';
   const boardId = 'board-gt';
+  const canvasTypeId = 'app-builder';
 
-  it('returns full task detail for existing task', async () => {
-    mockGetDocument.mockResolvedValue({
+  function mockBoardWithCanvas() {
+    // First getDocument call resolves the board (to find its canvasTypeId);
+    // second resolves the task itself.
+    mockGetDocument.mockResolvedValueOnce({
       id: boardId,
       name: 'Board',
+      canvasTypeId,
       columns: [],
-      tasks: {
-        'task-abc': {
-          title: 'Implement Feature',
-          status: 'doing',
-          priority: 'high',
-          assignee: 'agent-code',
-          labels: ['backend', 'api'],
-          dueDate: '2024-07-15T00:00:00Z',
-          createdAt: '2024-06-10T00:00:00Z',
-          description: 'Build the REST endpoint',
-          prompt: 'Create a REST API endpoint for user management',
-          contextRefs: [
-            { type: 'document', id: 'doc-123' },
-            { type: 'workflow', id: 'wf-456' },
-          ],
-          executionResult: { status: 'running', progress: 50 },
-          createdBy: 'user-gettask',
-          updatedAt: '2024-06-12T00:00:00Z',
-        },
-      },
+      ownerId: userId,
+    });
+  }
+
+  it('returns full task detail and reads the new TaskPromptSpec fields', async () => {
+    mockBoardWithCanvas();
+    mockGetDocument.mockResolvedValueOnce({
+      id: 'task-abc',
+      boardId,
+      title: 'Implement Feature',
+      status: 'doing',
+      priority: 'high',
+      kind: 'feature',
+      goal: 'Ship the auth endpoint',
+      assignedTo: 'agent-code',
+      labels: ['backend', 'api'],
+      dueDate: '2024-07-15T00:00:00Z',
+      createdAt: '2024-06-10T00:00:00Z',
+      description: 'Build the REST endpoint',
+      promptText: 'Create a REST API endpoint for user management',
+      contextRefs: [
+        { type: 'document', id: 'doc-123' },
+        { type: 'workflow', id: 'wf-456' },
+      ],
+      parentTaskId: 'feature-root',
+      dependencies: ['task-prep'],
+      acceptanceCriteria: ['Returns 200 on valid input', '4xx on auth fail'],
+      requiresApproval: true,
+      lastExecutionResult: { status: 'running', progress: 50 },
+      createdBy: 'user-gettask',
+      updatedAt: '2024-06-12T00:00:00Z',
     });
 
     const task = await getTask(userId, boardId, 'task-abc');
 
-    expect(mockGetDocument).toHaveBeenCalledOnce();
-    expect(mockGetDocument).toHaveBeenCalledWith(
-      `workspaces/ws-personal-${userId}/kanbanBoards`,
-      boardId
+    // Two getDocument calls: one for board, one for task in canvas-tasks subcollection.
+    expect(mockGetDocument).toHaveBeenCalledTimes(2);
+    expect(mockGetDocument).toHaveBeenLastCalledWith(
+      `canvases/${canvasTypeId}/tasks`,
+      'task-abc',
     );
 
     expect(task).not.toBeNull();
-    // Summary fields
     expect(task!.id).toBe('task-abc');
+    expect(task!.canvasTypeId).toBe(canvasTypeId);
     expect(task!.boardId).toBe(boardId);
-    expect(task!.title).toBe('Implement Feature');
-    expect(task!.status).toBe('doing');
-    expect(task!.priority).toBe('high');
-    expect(task!.assignee).toBe('agent-code');
-    expect(task!.labels).toEqual(['backend', 'api']);
-    expect(task!.dueDate).toBe('2024-07-15T00:00:00Z');
-    expect(task!.createdAt).toBe('2024-06-10T00:00:00Z');
-    // Detail fields
-    expect(task!.description).toBe('Build the REST endpoint');
-    expect(task!.prompt).toBe('Create a REST API endpoint for user management');
-    expect(task!.contextRefs).toEqual([
-      { type: 'document', id: 'doc-123' },
-      { type: 'workflow', id: 'wf-456' },
+    expect(task!.kind).toBe('feature');
+    expect(task!.goal).toBe('Ship the auth endpoint');
+    expect(task!.assignee).toBe('agent-code'); // mapped from assignedTo
+    expect(task!.prompt).toBe('Create a REST API endpoint for user management'); // mapped from promptText
+    expect(task!.parentTaskId).toBe('feature-root');
+    expect(task!.dependencies).toEqual(['task-prep']);
+    expect(task!.acceptanceCriteria).toEqual([
+      'Returns 200 on valid input',
+      '4xx on auth fail',
     ]);
-    expect(task!.executionResult).toEqual({ status: 'running', progress: 50 });
-    expect(task!.createdBy).toBe('user-gettask');
-    expect(task!.updatedAt).toBe('2024-06-12T00:00:00Z');
+    expect(task!.requiresApproval).toBe(true);
+    expect(task!.executionResult).toEqual({ status: 'running', progress: 50 }); // from lastExecutionResult
   });
 
-  it('returns null when board does not exist', async () => {
-    mockGetDocument.mockResolvedValue(null);
-
+  it('returns null when the board does not exist', async () => {
+    mockGetDocument.mockResolvedValueOnce(null);
     const task = await getTask(userId, 'nonexistent-board', 'task-1');
+    expect(task).toBeNull();
+    // Should NOT proceed to fetch the task doc.
+    expect(mockGetDocument).toHaveBeenCalledTimes(1);
+  });
 
+  it('returns null when the task does not exist in the canvas-tasks collection', async () => {
+    mockBoardWithCanvas();
+    mockGetDocument.mockResolvedValueOnce(null);
+    const task = await getTask(userId, boardId, 'ghost-task');
     expect(task).toBeNull();
   });
 
-  it('returns null when task does not exist in board', async () => {
-    mockGetDocument.mockResolvedValue({
+  it('returns null when the board has no canvasTypeId', async () => {
+    mockGetDocument.mockResolvedValueOnce({
       id: boardId,
-      name: 'Board',
+      name: 'Orphan',
       columns: [],
-      tasks: {
-        'task-other': { title: 'Other Task', status: 'todo', priority: 'low', labels: [] },
-      },
+      ownerId: userId,
     });
-
-    const task = await getTask(userId, boardId, 'nonexistent-task');
-
-    expect(task).toBeNull();
-  });
-
-  it('returns null when board has no tasks map', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'Empty Board',
-      columns: [],
-    });
-
     const task = await getTask(userId, boardId, 'task-1');
-
     expect(task).toBeNull();
+    expect(mockGetDocument).toHaveBeenCalledTimes(1); // task fetch skipped
   });
 
   it('maps sparse task data with defaults', async () => {
-    mockGetDocument.mockResolvedValue({
-      id: boardId,
-      name: 'Board',
-      columns: [],
-      tasks: {
-        'task-sparse': {},
-      },
-    });
-
+    mockBoardWithCanvas();
+    mockGetDocument.mockResolvedValueOnce({ id: 'task-sparse', boardId });
     const task = await getTask(userId, boardId, 'task-sparse');
 
     expect(task).not.toBeNull();
     expect(task!.id).toBe('task-sparse');
-    expect(task!.boardId).toBe(boardId);
+    expect(task!.canvasTypeId).toBe(canvasTypeId);
     expect(task!.title).toBe('Untitled');
     expect(task!.status).toBe('backlog');
     expect(task!.priority).toBe('medium');
     expect(task!.labels).toEqual([]);
-    expect(task!.description).toBeUndefined();
-    expect(task!.prompt).toBeUndefined();
-    expect(task!.contextRefs).toBeUndefined();
-    expect(task!.executionResult).toBeUndefined();
-    expect(task!.createdBy).toBeUndefined();
-    expect(task!.updatedAt).toBeUndefined();
+    expect(task!.parentTaskId).toBeUndefined();
+    expect(task!.dependencies).toBeUndefined();
+    expect(task!.requiresApproval).toBeUndefined();
   });
 
   it('propagates errors from getDocument', async () => {
     mockGetDocument.mockRejectedValue(new Error('Network error'));
-
-    await expect(getTask(userId, boardId, 'task-1')).rejects.toThrow(
-      'Network error'
-    );
+    await expect(getTask(userId, boardId, 'task-1')).rejects.toThrow('Network error');
   });
 });

@@ -88,13 +88,19 @@ export interface BoardDetail extends BoardSummary {
   workflowRunId?: string;
 }
 
+/** Task kind — feature is a parent that decomposes into subtasks; task is atomic. */
+export type TaskKind = 'task' | 'feature';
+
 /** Kanban task summary. */
 export interface TaskSummary {
   id: string;
-  boardId: string;
+  boardId?: string;
+  canvasTypeId: string;
   title: string;
   status: TaskStatus;
   priority: TaskPriority;
+  /** 'feature' parents have child tasks via `parentTaskId`. */
+  kind?: TaskKind;
   assignee?: string;
   labels: string[];
   dueDate?: string;
@@ -103,9 +109,20 @@ export interface TaskSummary {
 
 /** Full task detail. */
 export interface TaskDetail extends TaskSummary {
+  /** Human-readable goal — what success looks like. */
+  goal?: string;
   description?: string;
+  /** The actual prompt text sent to the LLM. */
   prompt?: string;
   contextRefs?: Array<{ type: string; id: string }>;
+  /** Parent feature task id when this task was decomposed from a feature. */
+  parentTaskId?: string;
+  /** Tasks this task depends on. */
+  dependencies?: string[];
+  /** Acceptance criteria checklist. */
+  acceptanceCriteria?: string[];
+  /** Whether the task requires human approval before execution. */
+  requiresApproval?: boolean;
   executionResult?: Record<string, unknown>;
   createdBy?: string;
   updatedAt?: string;
@@ -223,12 +240,22 @@ export async function deleteBoard(
 }
 
 // ============================================================================
-// TASK API (tasks are embedded in board document or subcollection)
+// TASK API
+//
+// Tasks live at `canvases/{canvasTypeId}/tasks/{taskId}` (workflow-native
+// kanban, post `KanbanBoardConnected` consolidation in the main app). They
+// are NOT embedded in board documents — boards are workspace-scoped, tasks
+// are canvas-scoped. Each task carries its own `boardId` field for filtering.
 // ============================================================================
 
+/** Top-level tasks collection path for a canvas type. */
+function getCanvasTasksPath(canvasTypeId: string): string {
+  return `canvases/${canvasTypeId}/tasks`;
+}
+
 /**
- * List tasks in a board.
- * Tasks may be stored as a map in the board document or as a subcollection.
+ * List tasks for a board. Resolves the board's `canvasTypeId`, queries the
+ * canvas-scoped tasks collection, and filters by `boardId`.
  */
 export async function listTasks(
   userId: string,
@@ -237,18 +264,16 @@ export async function listTasks(
 ): Promise<TaskSummary[]> {
   log.debug('Listing tasks', { userId, boardId, options });
 
-  // Tasks are stored as a map inside the board document
   const board = await getBoard(userId, boardId);
-  if (!board) return [];
+  if (!board?.canvasTypeId) {
+    log.warn('Board has no canvasTypeId — cannot resolve task collection', { boardId });
+    return [];
+  }
 
-  // Get tasks from the raw board document
-  const doc = await getDocument(resolveCollectionPath(userId, 'kanbanBoards'), boardId);
-  if (!doc) return [];
-
-  const tasksMap = (doc.tasks || {}) as Record<string, Record<string, unknown>>;
-  let tasks = Object.entries(tasksMap).map(([id, task]) =>
-    toTaskSummary({ ...task, id }, boardId)
-  );
+  const { documents } = await listDocuments(getCanvasTasksPath(board.canvasTypeId), { pageSize: 200 });
+  let tasks = documents
+    .map((doc) => toTaskSummary(doc, board.canvasTypeId!))
+    .filter((t) => t.boardId === boardId || !t.boardId);
 
   if (options?.status) {
     tasks = tasks.filter((t) => t.status === options.status);
@@ -258,7 +283,8 @@ export async function listTasks(
 }
 
 /**
- * Get a task by ID.
+ * Get a task by ID. `boardId` is used to resolve the canvas type — the task
+ * itself is fetched directly from the canvas-tasks collection.
  */
 export async function getTask(
   userId: string,
@@ -267,14 +293,16 @@ export async function getTask(
 ): Promise<TaskDetail | null> {
   log.debug('Getting task', { userId, boardId, taskId });
 
-  const doc = await getDocument(resolveCollectionPath(userId, 'kanbanBoards'), boardId);
+  const board = await getBoard(userId, boardId);
+  if (!board?.canvasTypeId) {
+    log.warn('Board has no canvasTypeId — cannot resolve task collection', { boardId });
+    return null;
+  }
+
+  const doc = await getDocument(getCanvasTasksPath(board.canvasTypeId), taskId);
   if (!doc) return null;
 
-  const tasksMap = (doc.tasks || {}) as Record<string, Record<string, unknown>>;
-  const task = tasksMap[taskId];
-  if (!task) return null;
-
-  return toTaskDetail({ ...task, id: taskId }, boardId);
+  return toTaskDetail(doc, board.canvasTypeId);
 }
 
 // ============================================================================
@@ -339,15 +367,17 @@ function toBoardDetail(doc: Record<string, unknown>): BoardDetail {
 
 function toTaskSummary(
   task: Record<string, unknown>,
-  boardId: string
+  canvasTypeId: string
 ): TaskSummary {
   return {
     id: task.id as string,
-    boardId,
+    boardId: task.boardId as string | undefined,
+    canvasTypeId,
     title: (task.title as string) || (task.name as string) || 'Untitled',
     status: (task.status as TaskStatus) || 'backlog',
     priority: (task.priority as TaskPriority) || 'medium',
-    assignee: task.assignee as string | undefined,
+    kind: task.kind as TaskKind | undefined,
+    assignee: (task.assignedTo as string | undefined) ?? (task.assignee as string | undefined),
     labels: (task.labels as string[]) || [],
     dueDate: task.dueDate as string | undefined,
     createdAt: task.createdAt as string | undefined,
@@ -356,15 +386,22 @@ function toTaskSummary(
 
 function toTaskDetail(
   task: Record<string, unknown>,
-  boardId: string
+  canvasTypeId: string
 ): TaskDetail {
-  const summary = toTaskSummary(task, boardId);
+  const summary = toTaskSummary(task, canvasTypeId);
   return {
     ...summary,
+    goal: task.goal as string | undefined,
     description: task.description as string | undefined,
-    prompt: task.prompt as string | undefined,
+    // The main app stores the prompt under `promptText`; legacy docs may use `prompt`.
+    prompt: (task.promptText as string | undefined) ?? (task.prompt as string | undefined),
     contextRefs: task.contextRefs as Array<{ type: string; id: string }> | undefined,
-    executionResult: task.executionResult as Record<string, unknown> | undefined,
+    parentTaskId: task.parentTaskId as string | undefined,
+    dependencies: task.dependencies as string[] | undefined,
+    acceptanceCriteria: task.acceptanceCriteria as string[] | undefined,
+    requiresApproval: task.requiresApproval as boolean | undefined,
+    executionResult: (task.lastExecutionResult as Record<string, unknown> | undefined) ??
+      (task.executionResult as Record<string, unknown> | undefined),
     createdBy: task.createdBy as string | undefined,
     updatedAt: task.updatedAt as string | undefined,
   };
