@@ -20,6 +20,7 @@ import { registerChatCommand } from './chat.js';
 import { registerProjectCommands } from './projects.js';
 import { registerCanvasTypeCommands, registerContextCommands } from './canvasTypes.js';
 import { registerCanvasCommands } from './canvas.js';
+import { registerSlidesCommands } from './slides.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerCrmCommands } from './crm.js';
@@ -117,6 +118,10 @@ export function createProgram(): Command {
   // ── Launch Studio ─────────────────────────────────────────────────────
 
   registerLaunchCommands(program);
+
+  // ── Slides (Marp decks) ───────────────────────────────────────────────
+
+  registerSlidesCommands(program);
 
   // ── Token Usage ──────────────────────────────────────────────────────
 

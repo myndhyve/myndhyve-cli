@@ -597,6 +597,7 @@ function registerSchemaCommand(dev: Command): void {
         // Brand Persona
         { type: 'brand.persona.generate', category: 'Brand', description: 'AI-generate brand personas' },
         { type: 'brand.persona.refine', category: 'Brand', description: 'Refine existing persona with data' },
+        { type: 'persona.keyword-strategy.create', category: 'Brand', description: 'Generate per-persona keyword & channel strategy' },
         // CRM AI Agent
         { type: 'crm.contact.create', category: 'CRM', description: 'Create a CRM contact' },
         { type: 'crm.contact.update', category: 'CRM', description: 'Update contact fields' },
@@ -612,6 +613,12 @@ function registerSchemaCommand(dev: Command): void {
         // Launch Studio
         { type: 'launch.canvas.create', category: 'Launch', description: 'Create project in Launch Studio' },
         { type: 'launch.task.dispatch', category: 'Launch', description: 'Dispatch task to canvas type' },
+        // Slides (Marp-first — replaces retired slide.create / update / reorder / theme)
+        { type: 'slide.deck.replace', category: 'Slides', description: 'Full-deck Markdown replacement' },
+        { type: 'slide.deck.slide.replace', category: 'Slides', description: 'Replace a single slide (primary AI path)' },
+        { type: 'slide.deck.slide.insert', category: 'Slides', description: 'Insert a slide before/after an anchor index' },
+        { type: 'slide.deck.slide.delete', category: 'Slides', description: 'Remove a slide by index' },
+        { type: 'slide.deck.patch', category: 'Slides', description: 'Unified-diff patch (falls back to slide-replace on failure)' },
       ];
 
       if (opts.format === 'json') {
@@ -646,7 +653,7 @@ function registerSchemaCommand(dev: Command): void {
         { id: 'webResearch', name: 'Web Research', count: 4, description: 'Search, scrape, analyze, summarize' },
         { id: 'pageBuilder', name: 'Page Builder', count: 8, description: 'Content, structure, personas, theme, tracking, validate, review, publish' },
         { id: 'brandTheme', name: 'Brand & Theme', count: 8, description: 'Discovery, generate, validate, competitor, review, implement, template, publish' },
-        { id: 'brandPersona', name: 'Brand Persona', count: 5, description: 'Discover, generate, validate, review, publish' },
+        { id: 'brandPersona', name: 'Brand Persona', count: 6, description: 'Discover, generate, validate, review, publish, keyword strategy' },
         { id: 'adsStudio', name: 'Ads Studio', count: 11, description: 'Campaigns, audiences, creatives, budgets, scheduling' },
         { id: 'campaignStudio', name: 'Campaign Studio', count: 7, description: 'Create, launch, pause, metrics, forecast, rebalance, attribute' },
         { id: 'campaignAutopilot', name: 'Campaign Autopilot', count: 5, description: 'AI-driven campaign management' },

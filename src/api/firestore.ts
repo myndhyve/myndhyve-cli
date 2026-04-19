@@ -235,6 +235,9 @@ export async function getDocument(
 
     const data = fromFirestoreFields(doc.fields);
     data.id = extractDocId(doc.name);
+    // Expose server-side updateTime for optimistic-concurrency clients
+    // that want to PATCH with a `currentDocument.updateTime` precondition.
+    if (doc.updateTime) data._updateTime = doc.updateTime;
     return data;
   } catch (error) {
     if (error instanceof FirestoreError && error.code === 'NOT_FOUND') {

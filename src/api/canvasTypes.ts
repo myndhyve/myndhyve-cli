@@ -55,12 +55,12 @@ export const CANVAS_TYPES: CanvasType[] = [
   {
     canvasTypeId: 'slides',
     name: 'Slides',
-    description: 'AI-assisted presentation creation - from outline to polished deck.',
+    description: 'Marp-first presentation authoring — Markdown is the deck. AI edits via slide.deck.* envelopes.',
     icon: 'Presentation',
     tier: 'platform',
     visibility: 'public',
     primaryColor: '#3b82f6',
-    tags: ['presentations', 'slides', 'ai-assisted', 'design'],
+    tags: ['presentations', 'slides', 'marp', 'markdown', 'ai-assisted'],
     helpTopicId: 'canvas-slides',
   },
   {
