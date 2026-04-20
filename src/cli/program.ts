@@ -21,6 +21,7 @@ import { registerProjectCommands } from './projects.js';
 import { registerCanvasTypeCommands, registerContextCommands } from './canvasTypes.js';
 import { registerCanvasCommands } from './canvas.js';
 import { registerSlidesCommands } from './slides.js';
+import { registerDocumentsCommands } from './documents.js';
 import { registerMessagingCommands } from './messaging.js';
 import { registerWorkflowCommands } from './workflows.js';
 import { registerCrmCommands } from './crm.js';
@@ -122,6 +123,10 @@ export function createProgram(): Command {
   // ── Slides (Marp decks) ───────────────────────────────────────────────
 
   registerSlidesCommands(program);
+
+  // ── Documents (long-form markdown) ────────────────────────────────────
+
+  registerDocumentsCommands(program);
 
   // ── Token Usage ──────────────────────────────────────────────────────
 
