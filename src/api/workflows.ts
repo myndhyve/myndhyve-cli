@@ -11,6 +11,17 @@
 
 import { randomBytes } from 'node:crypto';
 import {
+  type ApprovalInfo,
+  type NodeRunStateSummary,
+  type RunDetail,
+  type RunSummary,
+  type WorkflowDetail,
+  type WorkflowNodeSummary,
+  type WorkflowRunStatus,
+  type WorkflowSummary,
+  type WorkflowTriggerType,
+} from '@myndhyve/types';
+import {
   getDocument,
   listDocuments,
   createDocument,
@@ -23,117 +34,29 @@ import { createLogger } from '../utils/logger.js';
 const log = createLogger('WorkflowAPI');
 
 // ============================================================================
-// WORKFLOW STATUS & TRIGGER TYPES
+// SHARED WIRE-FORMAT TYPES (re-exported from @myndhyve/types)
 // ============================================================================
 
-/** All valid workflow run statuses. */
-export type WorkflowRunStatus =
-  | 'pending'
-  | 'running'
-  | 'paused'
-  | 'waiting-approval'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'timed-out'
-  | 'interrupted';
+// Statuses, triggers, summaries, run shapes, approval info now come from the
+// shared package so the CLI and the engine cannot drift. Re-exported here so
+// existing imports (`from '../api/workflows.js'`) keep working.
+export {
+  ApprovalInfo,
+  NodeRunStateSummary,
+  RunDetail,
+  RunSummary,
+  WorkflowDetail,
+  WorkflowNodeSummary,
+  WorkflowRunStatus,
+  WorkflowSummary,
+  WorkflowTriggerType,
+};
 
-/** All valid workflow trigger types. */
-export type WorkflowTriggerType =
-  | 'manual'
-  | 'schedule'
-  | 'webhook'
-  | 'event'
-  | 'artifact'
-  | 'canvas'
-  | 'envelope'
-  | 'command'
-  | 'chat-message';
-
-// ============================================================================
-// WORKFLOW DEFINITION TYPES
-// ============================================================================
-
-/** Lightweight workflow summary for list display. */
-export interface WorkflowSummary {
-  id: string;
-  name: string;
-  description?: string;
-  version: number;
-  nodeCount: number;
-  triggerTypes: string[];
-  enabled: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-/** Node definition within a workflow. */
-export interface WorkflowNodeSummary {
-  id: string;
-  type: string;
-  label: string;
-  description?: string;
-  requiresApproval: boolean;
-}
-
-/** Full workflow detail with nodes and edges. */
-export interface WorkflowDetail extends WorkflowSummary {
-  canvasTypeId: string;
-  nodes: WorkflowNodeSummary[];
-  edges: Array<{ source: string; target: string; label?: string }>;
-  triggers: Array<{ type: WorkflowTriggerType; config?: Record<string, unknown> }>;
-  settings: Record<string, unknown>;
-}
-
-// ============================================================================
-// RUN TYPES
-// ============================================================================
-
-/** Lightweight run summary for list display, including progress and current node. */
-export interface RunSummary {
-  id: string;
-  workflowId: string;
-  workflowName?: string;
-  status: WorkflowRunStatus;
-  triggerType: string;
-  currentNodeId?: string;
-  currentNodeLabel?: string;
-  progress: number;
-  totalNodes: number;
-  startedAt?: string;
-  completedAt?: string;
-  durationMs?: number;
-}
-
-/** Execution state of a single node within a workflow run. */
-export interface NodeRunState {
-  nodeId: string;
-  status: string;
-  label?: string;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
-  approval?: ApprovalInfo;
-}
-
-/** Approval information for a waiting-approval node. */
-export interface ApprovalInfo {
-  requestedAt: string;
-  requestedBy?: string;
-  decision?: 'approved' | 'rejected';
-  decidedBy?: string;
-  decidedAt?: string;
-  feedback?: string;
-}
-
-/** Full run detail with per-node states, input data, and error info. */
-export interface RunDetail extends RunSummary {
-  canvasTypeId: string;
-  userId: string;
-  inputData?: Record<string, unknown>;
-  nodeStates: NodeRunState[];
-  error?: string;
-}
+/**
+ * @deprecated Use `NodeRunStateSummary` from `@myndhyve/types` instead. Alias
+ * kept for one release so external CLI extensions don't break instantly.
+ */
+export type NodeRunState = NodeRunStateSummary;
 
 /** Single log entry from a workflow run (max 100 entries per run in Firestore). */
 export interface RunLogEntry {
@@ -585,6 +508,101 @@ export async function getArtifact(
 }
 
 // ============================================================================
+// DRY-RUN REPLAY (Phase 1.2.5)
+// ============================================================================
+
+/** Per-invocation entry in a dry-run report. */
+export interface InvocationSummary {
+  invocationId: string;
+  nodeId: string;
+  attempt: number;
+  status: 'running' | 'committed' | 'failed';
+  startedAt?: string;
+  completedAt?: string;
+  /**
+   * Best-effort provider name extracted from the cached outputs (when
+   * available). Receipt's outputs include `status`/`statusText` from the
+   * HTTP response — `null` here means the call wasn't a wrapped-fetch
+   * (no idempotency context was passed).
+   */
+  errorMessage?: string;
+}
+
+/** Result of a `runs replay --dry-run` query. */
+export interface DryRunReport {
+  runId: string;
+  workspaceId: string;
+  /** Total invocation receipts found for this run. */
+  totalInvocations: number;
+  /** Receipts that would replay from cache (status === 'committed'). */
+  cachedCount: number;
+  /** Receipts that would re-execute (status === 'running' or 'failed'). */
+  wouldReExecuteCount: number;
+  /** Per-node grouped invocations. */
+  byNode: Record<string, InvocationSummary[]>;
+  /** Flat list of all invocations, ordered by `startedAt` ascending. */
+  invocations: InvocationSummary[];
+}
+
+/**
+ * Compute a dry-run replay report for a workflow run. Reads the
+ * `workspaces/{workspaceId}/workflow_invocations` collection, filtered to
+ * the supplied `runId`, and groups receipts by node to show which calls
+ * would replay from cache vs which would re-execute on a real replay.
+ *
+ * No state mutation — pure read query against Firestore. Safe to run
+ * before deciding to actually execute a replay.
+ */
+export async function dryRunReplay(
+  workspaceId: string,
+  runId: string,
+): Promise<DryRunReport> {
+  log.debug('Computing dry-run replay report', { workspaceId, runId });
+
+  const collectionPath = `workspaces/${workspaceId}/workflow_invocations`;
+  const filters: QueryFilter[] = [
+    { field: 'key.runId', op: 'EQUAL', value: runId },
+  ];
+  const docs = await runQuery(collectionPath, filters, {
+    orderBy: 'startedAt',
+    orderDirection: 'ASCENDING',
+  });
+
+  const invocations: InvocationSummary[] = docs.map((doc) => {
+    const key = (doc.key || {}) as { nodeId?: string; attempt?: number };
+    const error = doc.error as { message?: string } | undefined;
+    return {
+      invocationId: (doc.invocationId as string) || (doc.id as string) || 'unknown',
+      nodeId: key.nodeId || 'unknown',
+      attempt: typeof key.attempt === 'number' ? key.attempt : 0,
+      status: (doc.status as InvocationSummary['status']) || 'running',
+      startedAt: doc.startedAt as string | undefined,
+      completedAt: doc.completedAt as string | undefined,
+      errorMessage: error?.message,
+    };
+  });
+
+  const byNode: Record<string, InvocationSummary[]> = {};
+  for (const inv of invocations) {
+    if (!byNode[inv.nodeId]) byNode[inv.nodeId] = [];
+    byNode[inv.nodeId].push(inv);
+  }
+
+  const cachedCount = invocations.filter((i) => i.status === 'committed').length;
+  const wouldReExecuteCount = invocations.length - cachedCount;
+
+  return {
+    runId,
+    workspaceId,
+    totalInvocations: invocations.length,
+    cachedCount,
+    wouldReExecuteCount,
+    byNode,
+    invocations,
+  };
+}
+
+// ============================================================================
 // HELPERS
 // ============================================================================
 
@@ -686,17 +704,42 @@ function toRunDetail(
   const summary = toRunSummary(doc);
   const rawNodeStates = (doc.nodeStates || {}) as Record<string, Record<string, unknown>>;
 
-  const nodeStates: NodeRunState[] = Object.entries(rawNodeStates).map(
-    ([nodeId, state]) => ({
-      nodeId,
-      status: (state.status as string) || 'pending',
-      label: state.label as string | undefined,
-      startedAt: state.startedAt as string | undefined,
-      completedAt: state.completedAt as string | undefined,
-      error: state.error as string | undefined,
-      approval: state.approval as ApprovalInfo | undefined,
-    })
+  const nodeStates: NodeRunStateSummary[] = Object.entries(rawNodeStates).map(
+    ([nodeId, state]) => {
+      // Per-node `error` is persisted as `{ code, message, ... }` by the
+      // engine (see WorkflowRunPersistenceService). Flatten to a string for
+      // the wire-format summary; surface the message which is human-readable.
+      const rawError = state.error as { message?: string; code?: string } | string | undefined;
+      const errorString =
+        typeof rawError === 'string'
+          ? rawError
+          : rawError?.message ?? rawError?.code ?? undefined;
+
+      return {
+        nodeId,
+        status: (state.status as string) || 'pending',
+        label: state.label as string | undefined,
+        startedAt: state.startedAt as string | undefined,
+        completedAt: state.completedAt as string | undefined,
+        error: errorString,
+        approval: state.approval as ApprovalInfo | undefined,
+      };
+    },
   );
+
+  // Run-level `error` is persisted structured. Preserve the structured shape
+  // on the wire — CLI consumers format it for display via `formatRunError`.
+  const rawError = doc.error;
+  const error =
+    rawError && typeof rawError === 'object'
+      ? {
+          code: ((rawError as Record<string, unknown>).code as string) || 'unknown',
+          message: ((rawError as Record<string, unknown>).message as string) || String(rawError),
+          nodeId: (rawError as Record<string, unknown>).nodeId as string | undefined,
+        }
+      : typeof rawError === 'string'
+        ? { code: 'unknown', message: rawError }
+        : undefined;
 
   return {
     ...summary,
@@ -704,7 +747,8 @@ function toRunDetail(
     userId: (doc.userId as string) || '',
     inputData: doc.inputData as Record<string, unknown> | undefined,
     nodeStates,
-    error: doc.error as string | undefined,
+    error,
+    engineVersion: doc.engineVersion as number | undefined,
   };
 }
 

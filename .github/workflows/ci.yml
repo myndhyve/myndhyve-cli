@@ -15,23 +15,41 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: myndhyve-cli
+
+      # Sibling checkout for the @myndhyve/types workspace package, which
+      # this repo currently consumes via `file:../myndhyve/packages/types`.
+      # Once the package publishes to npm, this step + the path layout
+      # below can be removed (Tier 0.3 follow-up).
+      - name: Checkout sibling main repo (@myndhyve/types source)
+        uses: actions/checkout@v4
+        with:
+          repository: myndhyve/myndhyve
+          path: myndhyve
+          ref: main
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: myndhyve-cli/package-lock.json
 
       - name: Install dependencies
+        working-directory: myndhyve-cli
         run: npm ci
 
       - name: Type check
+        working-directory: myndhyve-cli
         run: npm run typecheck
 
       - name: Run tests
+        working-directory: myndhyve-cli
         run: npm test
 
       - name: Build
+        working-directory: myndhyve-cli
         run: npm run build
 
   smoke-test:
@@ -44,23 +62,37 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: myndhyve-cli
+
+      - name: Checkout sibling main repo (@myndhyve/types source)
+        uses: actions/checkout@v4
+        with:
+          repository: myndhyve/myndhyve
+          path: myndhyve
+          ref: main
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: myndhyve-cli/package-lock.json
 
       - name: Install dependencies
+        working-directory: myndhyve-cli
         run: npm ci
 
       - name: Build
+        working-directory: myndhyve-cli
         run: npm run build
 
       - name: Pack tarball
+        working-directory: myndhyve-cli
         run: npm pack
 
       - name: Install globally from tarball
+        working-directory: myndhyve-cli
         run: |
           npm install -g --prefix "$HOME/.local" ./myndhyve-cli-*.tgz
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -73,3 +105,75 @@ jobs:
 
       - name: Verify dev doctor (JSON mode)
         run: myndhyve-cli dev doctor --format json
+
+  # Tier 0.3 — CLI integration tests against the Firebase emulator suite.
+  # Stub today; full implementation lands when the first emulator-driven
+  # CLI flow stabilizes (likely `workflows runs <runId>` against a seeded
+  # emulator dataset). SLO target: <5min end-to-end.
+  emulator-integration:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'  # PR only until the harness stabilizes
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: myndhyve-cli
+
+      - name: Checkout sibling main repo (emulator config + types)
+        uses: actions/checkout@v4
+        with:
+          repository: myndhyve/myndhyve
+          path: myndhyve
+          ref: main
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: myndhyve-cli/package-lock.json
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install CLI dependencies
+        working-directory: myndhyve-cli
+        run: npm ci
+
+      - name: Build CLI
+        working-directory: myndhyve-cli
+        run: npm run build
+
+      - name: Start Firebase emulator (auth + firestore + functions)
+        working-directory: myndhyve
+        run: |
+          firebase emulators:start --only auth,firestore,functions \
+            --project demo-myndhyve-cli-test \
+            --import=./.emulator-fixtures \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          # Wait for emulator UI to come up (port 4000 by default).
+          for i in {1..30}; do
+            if curl -fs http://localhost:4000/ > /dev/null; then
+              echo "Emulator up after $i attempts"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run CLI integration smoke
+        working-directory: myndhyve-cli
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+        run: |
+          # TODO(Tier 0.3 follow-up): replace with real `myndhyve-cli workflows ...`
+          # commands once the emulator fixtures land. For now this just asserts the
+          # CLI binary launches against an emulator-aware environment.
+          node dist/index.js --version
+          node dist/index.js --help
+
+      - name: Dump emulator log on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/emulator.log" || true

@@ -1317,7 +1317,10 @@ describe('toRunDetail (tested via getRun)', () => {
     expect(result!.nodeStates).toEqual([]);
   });
 
-  it('includes error field when present', async () => {
+  it('includes error field when persisted as a string (legacy shape)', async () => {
+    // Legacy runs persisted before structured errors landed will have
+    // `error: string`. `toRunDetail` lifts that into the structured shape
+    // so the wire format is uniform (per @myndhyve/types `RunDetail`).
     mockGetDocument.mockResolvedValue({
       id: 'run-failed',
       status: 'failed',
@@ -1327,7 +1330,27 @@ describe('toRunDetail (tested via getRun)', () => {
 
     const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-failed');
 
-    expect(result!.error).toBe('Timeout after 30000ms');
+    expect(result!.error).toEqual({
+      code: 'unknown',
+      message: 'Timeout after 30000ms',
+    });
+  });
+
+  it('includes structured error field when persisted as object (current shape)', async () => {
+    mockGetDocument.mockResolvedValue({
+      id: 'run-failed-structured',
+      status: 'failed',
+      error: { code: 'node_timeout', message: 'Node took too long', nodeId: 'node-7' },
+      nodeStates: {},
+    });
+
+    const result = await getRun(USER_ID, CANVAS_TYPE_ID, 'run-failed-structured');
+
+    expect(result!.error).toEqual({
+      code: 'node_timeout',
+      message: 'Node took too long',
+      nodeId: 'node-7',
+    });
   });
 
   it('includes inputData when present', async () => {

@@ -18,6 +18,18 @@ The MyndHyve CLI is the primary developer interface for MyndHyve. Authenticate, 
 npm install -g @myndhyve/cli
 ```
 
+## Development
+
+This package consumes wire-format types from `@myndhyve/types` (a workspace package in the main `myndhyve` repo). Until that package is published to npm, local development requires the main repo to be checked out as a sibling directory:
+
+```
+~/dev/
+  myndhyve/         # main repo (contains packages/types)
+  myndhyve-cli/     # this repo
+```
+
+The dependency in `package.json` resolves via `file:../myndhyve/packages/types`. CI checks out both repos before installing. Once `@myndhyve/types` publishes, the `file:` entry switches to a regular semver range and the sibling-checkout step in `.github/workflows/ci.yml` can be removed.
+
 ## Quick Start
 
 ```bash

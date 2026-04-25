@@ -19,6 +19,7 @@ const {
   mockReviseRun,
   mockListArtifacts,
   mockGetArtifact,
+  mockDryRunReplay,
   mockGetActiveContext,
   mockWriteFileSync,
 } = vi.hoisted(() => ({
@@ -37,6 +38,7 @@ const {
   mockReviseRun: vi.fn(),
   mockListArtifacts: vi.fn(),
   mockGetArtifact: vi.fn(),
+  mockDryRunReplay: vi.fn(),
   mockGetActiveContext: vi.fn(),
   mockWriteFileSync: vi.fn(),
 }));
@@ -62,6 +64,7 @@ vi.mock('../../api/workflows.js', () => ({
   reviseRun: (...args: unknown[]) => mockReviseRun(...args),
   listArtifacts: (...args: unknown[]) => mockListArtifacts(...args),
   getArtifact: (...args: unknown[]) => mockGetArtifact(...args),
+  dryRunReplay: (...args: unknown[]) => mockDryRunReplay(...args),
 }));
 
 vi.mock('../../context.js', () => ({
@@ -173,7 +176,8 @@ const mockRunDetailWithDuration = {
 const mockRunDetailWithError = {
   ...mockRunDetail,
   status: 'failed',
-  error: 'Node execution failed: timeout',
+  // Structured per @myndhyve/types `RunDetail.error` shape.
+  error: { code: 'node_execution_failed', message: 'Node execution failed: timeout', nodeId: 'node-2' },
   nodeStates: [
     { nodeId: 'node-1', status: 'completed', label: 'Generate PRD' },
     { nodeId: 'node-2', status: 'failed', label: 'Generate Plan', error: 'Timeout after 30s' },
@@ -1788,6 +1792,101 @@ describe('registerWorkflowCommands', () => {
 
       const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
       expect(output).toContain('n1');
+    });
+  });
+
+  // ── workflows replay (Phase 1.2.5) ────────────────────────────────────
+  describe('workflows replay --dry-run', () => {
+    beforeEach(() => {
+      mockDryRunReplay.mockReset();
+      mockRequireAuth.mockReturnValue(AUTH_USER);
+      mockGetActiveContext.mockReturnValue({ ...DEFAULT_CONTEXT, workspaceId: 'ws-A' });
+    });
+
+    it('refuses to run without --dry-run (real replay not yet implemented)', async () => {
+      await run(['workflows', 'replay', 'run_xyz']);
+      expect(mockDryRunReplay).not.toHaveBeenCalled();
+      // Exit code is set on process — verified indirectly by no API call.
+    });
+
+    it('refuses without an active workspace', async () => {
+      mockGetActiveContext.mockReturnValue({ ...DEFAULT_CONTEXT, workspaceId: undefined });
+      await run(['workflows', 'replay', 'run_xyz', '--dry-run']);
+      expect(mockDryRunReplay).not.toHaveBeenCalled();
+    });
+
+    it('queries InvocationLog and prints a table report', async () => {
+      mockDryRunReplay.mockResolvedValue({
+        runId: 'run_xyz',
+        workspaceId: 'ws-A',
+        totalInvocations: 3,
+        cachedCount: 2,
+        wouldReExecuteCount: 1,
+        byNode: {
+          'prd-generation': [
+            { invocationId: 'i1', nodeId: 'prd-generation', attempt: 0, status: 'committed', startedAt: '2026-04-25T10:00:00Z', completedAt: '2026-04-25T10:00:05Z' },
+          ],
+          'plan-generation': [
+            { invocationId: 'i2', nodeId: 'plan-generation', attempt: 0, status: 'committed', startedAt: '2026-04-25T10:01:00Z' },
+            { invocationId: 'i3', nodeId: 'plan-generation', attempt: 1, status: 'failed', startedAt: '2026-04-25T10:02:00Z', errorMessage: 'rate limited' },
+          ],
+        },
+        invocations: [],
+      });
+
+      await run(['workflows', 'replay', 'run_xyz', '--dry-run']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(mockDryRunReplay).toHaveBeenCalledWith('ws-A', 'run_xyz');
+      expect(output).toContain('Run:          run_xyz');
+      expect(output).toContain('Cached:       2');
+      expect(output).toContain('Re-execute:   1');
+      expect(output).toContain('prd-generation');
+      expect(output).toContain('plan-generation');
+      expect(output).toContain('cached'); // from formatStatusMarker
+      expect(output).toContain('re-execute');
+    });
+
+    it('handles empty result with explanatory message', async () => {
+      mockDryRunReplay.mockResolvedValue({
+        runId: 'run_old',
+        workspaceId: 'ws-A',
+        totalInvocations: 0,
+        cachedCount: 0,
+        wouldReExecuteCount: 0,
+        byNode: {},
+        invocations: [],
+      });
+
+      await run(['workflows', 'replay', 'run_old', '--dry-run']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('No external-call receipts found');
+    });
+
+    it('emits json when --format=json', async () => {
+      const report = {
+        runId: 'run_xyz',
+        workspaceId: 'ws-A',
+        totalInvocations: 1,
+        cachedCount: 1,
+        wouldReExecuteCount: 0,
+        byNode: { 'prd': [{ invocationId: 'i1', nodeId: 'prd', attempt: 0, status: 'committed' as const }] },
+        invocations: [{ invocationId: 'i1', nodeId: 'prd', attempt: 0, status: 'committed' as const }],
+      };
+      mockDryRunReplay.mockResolvedValue(report);
+
+      await run(['workflows', 'replay', 'run_xyz', '--dry-run', '--format', 'json']);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('"runId": "run_xyz"');
+      expect(output).toContain('"cachedCount": 1');
+    });
+
+    it('surfaces API errors via printError', async () => {
+      mockDryRunReplay.mockRejectedValue(new Error('firestore-down'));
+      await run(['workflows', 'replay', 'run_xyz', '--dry-run']);
+      expect(mockPrintError).toHaveBeenCalled();
     });
   });
 });

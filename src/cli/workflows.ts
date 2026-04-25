@@ -28,6 +28,9 @@ import {
   reviseRun,
   listArtifacts,
   getArtifact,
+  dryRunReplay,
+  type DryRunReport,
+  type InvocationSummary,
   type WorkflowRunStatus,
 } from '../api/workflows.js';
 import { getActiveContext } from '../context.js';
@@ -43,9 +46,21 @@ import { ExitCode, printErrorResult } from '../utils/output.js';
 // CONSTANTS
 // ============================================================================
 
+// Sourced from the canonical engine union via `@myndhyve/types` so adding a
+// new status server-side (e.g. `waiting-external`) makes it valid here too.
 const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
-  'pending', 'running', 'paused', 'waiting-approval',
-  'completed', 'failed', 'cancelled', 'timed-out', 'interrupted',
+  'pending',
+  'planned',
+  'running',
+  'executing',
+  'paused',
+  'waiting-approval',
+  'waiting-external',
+  'completed',
+  'failed',
+  'cancelled',
+  'timed-out',
+  'interrupted',
 ];
 
 // ============================================================================
@@ -71,6 +86,7 @@ Examples:
   registerLogsCommand(workflows);
   registerArtifactCommands(workflows);
   registerApprovalCommands(workflows);
+  registerReplayCommand(workflows);
 }
 
 // ============================================================================
@@ -372,7 +388,12 @@ function registerStatusCommand(workflows: Command): void {
         }
 
         if (run.error) {
-          console.log(`  Error:      ${run.error}`);
+          // run.error is the structured wire shape from @myndhyve/types:
+          // { code, message, nodeId? }. Format `[code] message (node)` so
+          // CLI output is readable instead of "[object Object]".
+          const errorLine = `[${run.error.code}] ${run.error.message}`
+            + (run.error.nodeId ? ` (node: ${run.error.nodeId})` : '');
+          console.log(`  Error:      ${errorLine}`);
         }
 
         // Show node states
@@ -872,8 +893,11 @@ function validateRunStatus(status: string): boolean {
 function formatRunStatus(status: string): string {
   const icons: Record<string, string> = {
     'pending': '\u25cb pending',
+    'planned': '\u25cb planned',
     'running': '\u25cf running',
+    'executing': '\u25cf executing',
     'waiting-approval': '\u2691 approval',
+    'waiting-external': '\u23f3 waiting-external',
     'paused': '\u25a1 paused',
     'timed-out': '\u29d6 timed-out',
     'interrupted': '\u26a0 interrupted',
@@ -978,4 +1002,103 @@ function formatLogLevel(level: string): string {
     'error': 'ERR',
   };
   return (levels[level] || level.toUpperCase().slice(0, 3)).padEnd(3);
+}
+
+// ============================================================================
+// REPLAY (Phase 1.2.5 — dry-run report)
+// ============================================================================
+
+function registerReplayCommand(workflows: Command): void {
+  const replay = workflows
+    .command('replay <runId>')
+    .description('Replay a workflow run')
+    .option('--dry-run', 'Show which calls would replay from cache vs re-execute (no state changes)')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (runId: string, opts: { dryRun?: boolean; format?: string }) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      if (!opts.dryRun) {
+        printErrorResult({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Real replay is not yet supported via CLI. Pass --dry-run to preview.',
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
+        return;
+      }
+
+      const ctx = getActiveContext();
+      const workspaceId = ctx?.workspaceId;
+      if (!workspaceId) {
+        printErrorResult({
+          code: 'NO_WORKSPACE',
+          message: 'No active workspace. Set one with `myndhyve-cli projects open <projectId>` first.',
+        });
+        process.exitCode = ExitCode.USAGE_ERROR;
+        return;
+      }
+
+      try {
+        const report = await dryRunReplay(workspaceId, runId);
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(report, null, 2));
+          return;
+        }
+
+        printDryRunReport(report);
+      } catch (err) {
+        printError('Failed to compute dry-run replay report', err);
+        process.exitCode = ExitCode.GENERAL_ERROR;
+      }
+    });
+
+  // Marker so tests can assert the command exists without poking commander internals.
+  void replay;
+}
+
+/**
+ * Pretty-print a `DryRunReport`. Output mirrors `workflows status`:
+ * summary header → per-node breakdown → totals footer.
+ */
+function printDryRunReport(report: DryRunReport): void {
+  console.log('');
+  console.log(`  Run:          ${report.runId}`);
+  console.log(`  Workspace:    ${report.workspaceId}`);
+  console.log(`  Invocations:  ${report.totalInvocations}`);
+  console.log(`  Cached:       ${report.cachedCount} (will replay from InvocationLog)`);
+  console.log(`  Re-execute:   ${report.wouldReExecuteCount} (no committed receipt)`);
+
+  if (report.totalInvocations === 0) {
+    console.log('');
+    console.log('  No external-call receipts found for this run.');
+    console.log('  Either the run made no idempotency-wrapped calls, or the run');
+    console.log('  predates Phase 1.2 idempotency wiring.');
+    return;
+  }
+
+  console.log('');
+  console.log('  Per-node breakdown:');
+  console.log('');
+  const nodeIds = Object.keys(report.byNode).sort();
+  for (const nodeId of nodeIds) {
+    const invocations = report.byNode[nodeId];
+    console.log(`    ${nodeId}`);
+    for (const inv of invocations) {
+      const marker = formatStatusMarker(inv.status);
+      const when = inv.completedAt ?? inv.startedAt ?? 'unknown';
+      const errorSuffix = inv.errorMessage ? `  — ${truncate(inv.errorMessage, 80)}` : '';
+      console.log(`      ${marker} attempt=${inv.attempt}  ${formatRelativeTime(when)}${errorSuffix}`);
+    }
+  }
+  console.log('');
+}
+
+function formatStatusMarker(status: InvocationSummary['status']): string {
+  switch (status) {
+    case 'committed': return '\u2713 cached    ';   // ✓
+    case 'running':   return '\u25cb running   ';   // ○
+    case 'failed':    return '\u2717 re-execute';   // ✗
+    default:          return '? unknown   ';
+  }
 }
