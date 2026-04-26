@@ -619,6 +619,26 @@ function registerSchemaCommand(dev: Command): void {
         { type: 'slide.deck.slide.insert', category: 'Slides', description: 'Insert a slide before/after an anchor index' },
         { type: 'slide.deck.slide.delete', category: 'Slides', description: 'Remove a slide by index' },
         { type: 'slide.deck.patch', category: 'Slides', description: 'Unified-diff patch (falls back to slide-replace on failure)' },
+        { type: 'slide.image.generate', category: 'Slides', description: 'Generate an image asset for a slide via image-gen adapter' },
+        { type: 'slide.visualize', category: 'Slides', description: 'Suggest visualization (chart/diagram type) for slide content' },
+        { type: 'slide.diagram.generate', category: 'Slides', description: 'Generate a structured (mermaid) diagram for a slide' },
+        { type: 'slide.layout.suggest', category: 'Slides', description: 'AI suggests an appropriate Marp layout class for slide content' },
+        // Documents
+        { type: 'document.replace', category: 'Documents', description: 'Full-document Markdown replacement' },
+        { type: 'document.patch', category: 'Documents', description: 'Unified-diff patch (falls back to replace on failure)' },
+        { type: 'document.block.replace', category: 'Documents', description: 'Replace a single block by ast-id' },
+        { type: 'document.block.insert', category: 'Documents', description: 'Insert a block before/after an ast-id anchor' },
+        { type: 'document.block.delete', category: 'Documents', description: 'Delete a block by ast-id' },
+        { type: 'document.applyTheme', category: 'Documents', description: 'Swap document theme; no markdown change' },
+        { type: 'document.summarize', category: 'Documents', description: 'Summarize a document or section at a target length' },
+        // Drawings
+        { type: 'drawing.shape.create', category: 'Drawings', description: 'AI creates shape(s) on canvas' },
+        { type: 'drawing.shape.update', category: 'Drawings', description: 'AI modifies shape properties' },
+        { type: 'drawing.layer.create', category: 'Drawings', description: 'AI creates a new layer' },
+        { type: 'drawing.palette.suggest', category: 'Drawings', description: 'AI suggests a color palette' },
+        { type: 'drawing.image.generate', category: 'Drawings', description: 'Generate an image asset for the Drawings canvas' },
+        // Cross-canvas
+        { type: 'alt-text.generate', category: 'Cross-canvas', description: 'Generate WCAG-compliant alt text for an image asset' },
       ];
 
       if (opts.format === 'json') {
