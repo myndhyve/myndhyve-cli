@@ -41,6 +41,7 @@ import {
   printError,
 } from './helpers.js';
 import { ExitCode, printErrorResult } from '../utils/output.js';
+import { formatRunError } from '../utils/format.js';
 
 // ============================================================================
 // CONSTANTS
@@ -389,11 +390,23 @@ function registerStatusCommand(workflows: Command): void {
 
         if (run.error) {
           // run.error is the structured wire shape from @myndhyve/types:
-          // { code, message, nodeId? }. Format `[code] message (node)` so
-          // CLI output is readable instead of "[object Object]".
-          const errorLine = `[${run.error.code}] ${run.error.message}`
-            + (run.error.nodeId ? ` (node: ${run.error.nodeId})` : '');
-          console.log(`  Error:      ${errorLine}`);
+          // { code, message, nodeId? }. `formatRunError(... withHint: true)`
+          // surfaces both the raw `[code] message (node)` line AND an
+          // operator-actionable hint when the code is in the canonical
+          // RUN_ERROR_CODES set with a known remediation. The hint
+          // turns a bare wire code into directly-actionable guidance —
+          // e.g. `recursion_limit_exceeded` becomes "Increase
+          // RunOptions.configurable.recursionLimit or simplify the
+          // workflow."
+          const formatted = formatRunError(run.error, { withHint: true });
+          const [headLine, ...hintLines] = formatted.split('\n');
+          console.log(`  Error:      ${headLine}`);
+          for (const hintLine of hintLines) {
+            // Hint lines come pre-indented with two spaces from the
+            // helper; align under the "Error:      " label so the
+            // visual column stays consistent.
+            console.log(`              ${hintLine.trimStart()}`);
+          }
         }
 
         // Show node states

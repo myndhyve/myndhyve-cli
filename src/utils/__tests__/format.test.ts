@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { formatTimeSince, formatTimeUntil } from '../format.js';
+import {
+  formatTimeSince,
+  formatTimeUntil,
+  formatRunError,
+  __RUN_ERROR_HINTS__,
+} from '../format.js';
+import { RUN_ERROR_CODES } from '@myndhyve/types';
 
 describe('formatTimeSince()', () => {
   it('returns "just now" for dates less than 1 minute ago', () => {
@@ -63,5 +69,78 @@ describe('formatTimeUntil()', () => {
   it('returns "0 minutes" for past dates', () => {
     const date = new Date(Date.now() - 60_000); // 1 minute ago
     expect(formatTimeUntil(date)).toBe('0 minutes');
+  });
+});
+
+describe('formatRunError()', () => {
+  it('formats a known code with the canonical [code] message shape', () => {
+    const out = formatRunError({ code: 'run_not_found', message: 'no such run' });
+    expect(out).toBe('[run_not_found] no such run');
+  });
+
+  it('appends nodeId when present', () => {
+    const out = formatRunError({
+      code: 'node_execution_failed',
+      message: 'executor threw',
+      nodeId: 'n-42',
+    });
+    expect(out).toBe('[node_execution_failed] executor threw (node: n-42)');
+  });
+
+  it('omits nodeId clause when absent', () => {
+    const out = formatRunError({ code: 'auth_required', message: 'need login' });
+    expect(out).not.toContain('node:');
+  });
+
+  it('surfaces a hint on a second line when withHint=true and code is known', () => {
+    const out = formatRunError(
+      { code: 'recursion_limit_exceeded', message: 'observed 51 > limit 50' },
+      { withHint: true },
+    );
+    const lines = out.split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe('[recursion_limit_exceeded] observed 51 > limit 50');
+    expect(lines[1]).toMatch(/^ {2}Hint: /);
+    expect(lines[1]).toContain('recursionLimit');
+  });
+
+  it('surfaces a hint for capability_not_provided', () => {
+    const out = formatRunError(
+      { code: 'capability_not_provided', message: 'chat.sendPrompt missing' },
+      { withHint: true },
+    );
+    const lines = out.split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('capability provider');
+  });
+
+  it('omits hint when withHint=false (default)', () => {
+    const out = formatRunError({
+      code: 'recursion_limit_exceeded',
+      message: 'observed 51 > limit 50',
+    });
+    expect(out.split('\n')).toHaveLength(1);
+    expect(out).not.toContain('Hint:');
+  });
+
+  it('omits hint for unknown wire codes (forward-compat)', () => {
+    const out = formatRunError(
+      // Code not in RUN_ERROR_CODES — exercises the isRunErrorCode guard.
+      { code: 'future_code_not_in_union', message: 'future failure mode' },
+      { withHint: true },
+    );
+    expect(out.split('\n')).toHaveLength(1);
+    expect(out).not.toContain('Hint:');
+  });
+
+  it('every wire code in RUN_ERROR_CODES has a hint entry (drift gate)', () => {
+    // The hint table lives in the CLI but maps codes from the shared
+    // types package. If a future PR adds a wire code without a hint,
+    // this test fails immediately and the CLI's UX coverage stays in
+    // sync with the wire surface.
+    const missing = RUN_ERROR_CODES.filter(
+      (code) => __RUN_ERROR_HINTS__[code] === undefined,
+    );
+    expect(missing).toEqual([]);
   });
 });
