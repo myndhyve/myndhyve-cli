@@ -42,6 +42,7 @@ import {
 } from './helpers.js';
 import { ExitCode, printErrorResult } from '../utils/output.js';
 import { formatRunError } from '../utils/format.js';
+import { isTerminalRunStatus } from '@myndhyve/types';
 
 // ============================================================================
 // CONSTANTS
@@ -84,6 +85,7 @@ Examples:
   registerRunCommand(workflows);
   registerRunsCommand(workflows);
   registerStatusCommand(workflows);
+  registerWaitCommand(workflows);
   registerLogsCommand(workflows);
   registerArtifactCommands(workflows);
   registerApprovalCommands(workflows);
@@ -436,6 +438,207 @@ function registerStatusCommand(workflows: Command): void {
         printError('Failed to get run status', error);
       }
     });
+}
+
+// ============================================================================
+// WAIT
+// ============================================================================
+
+/**
+ * G13 — `workflows wait <run-id>` blocks until the run reaches a
+ * terminal status. Useful for shell pipelines + CI:
+ *
+ *   myndhyve-cli workflows run my-workflow --canvas-type=cad \
+ *     | jq -r .runId | xargs myndhyve-cli workflows wait
+ *
+ * Polls `getRun` on a configurable interval (default 3s) and exits
+ * when the run reports a status in `TERMINAL_RUN_STATUSES` (from
+ * `@myndhyve/types`). Exit codes:
+ *   - 0 (SUCCESS) when the run completed
+ *   - 1 (GENERAL_ERROR) when the run terminated in any non-completed
+ *     terminal state (failed / cancelled / timed-out / interrupted)
+ *   - 1 when the wait itself timed out (default 600s)
+ *   - 3 (NOT_FOUND) when the runId is unknown
+ *
+ * On exit, prints the final status + duration + any structured
+ * `RunError` with operator-actionable hint (via `formatRunError`).
+ *
+ * **Polling rationale.** The CLI doesn't yet have an SSE event-log
+ * subscriber; `workflows tail` is a sibling G13 follow-on that adds
+ * one. Until then, polling getRun() is the simplest path that
+ * doesn't pull in a full streaming client. Default 3s interval
+ * balances responsiveness vs read cost (Firestore-backed
+ * getRun() = 1 doc read per poll). Operators can tune via
+ * `--interval`.
+ */
+function registerWaitCommand(workflows: Command): void {
+  workflows
+    .command('wait <run-id>')
+    .description('Block until a run reaches a terminal status (completed / failed / cancelled / timed-out / interrupted)')
+    .option('--canvas-type <canvasTypeId>', "Canvas type ID (defaults to active project's canvas type)")
+    .option('--timeout <sec>', 'Maximum wait time in seconds before giving up', '600')
+    .option('--interval <sec>', 'Poll interval in seconds', '3')
+    .option('--quiet', 'Suppress the per-poll status updates; print only the final outcome')
+    .option('--format <format>', 'Output format (text, json)', 'text')
+    .action(async (runId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+
+      const canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      if (!canvasTypeId) return;
+
+      const timeoutSec = parseWaitNumber(opts.timeout, 'timeout', 1, 86_400);
+      if (timeoutSec === null) return;
+      const intervalSec = parseWaitNumber(opts.interval, 'interval', 1, 300);
+      if (intervalSec === null) return;
+
+      const startedAt = Date.now();
+      const deadline = startedAt + timeoutSec * 1000;
+      const quiet = Boolean(opts.quiet);
+      const jsonMode = opts.format === 'json';
+
+      let lastStatus: string | null = null;
+      let pollCount = 0;
+      // Loop until either:
+      //   (a) the run reaches a terminal status, or
+      //   (b) we exceed the deadline.
+      // The body intentionally fetches BEFORE the sleep so the first
+      // poll is immediate (operators get instant feedback when the run
+      // is already terminal at command invocation).
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        pollCount += 1;
+        let run;
+        try {
+          run = await getRun(auth.uid, canvasTypeId, runId);
+        } catch (err) {
+          printError('Failed to read run status', err);
+          process.exitCode = ExitCode.GENERAL_ERROR;
+          return;
+        }
+        if (!run) {
+          if (jsonMode) {
+            console.log(JSON.stringify({ runId, found: false }, null, 2));
+          } else {
+            printErrorResult({
+              code: 'NOT_FOUND',
+              message: `Run "${runId}" not found.`,
+            });
+          }
+          process.exitCode = ExitCode.NOT_FOUND;
+          return;
+        }
+
+        // Per-status-change update line. Skipped in --quiet and JSON
+        // modes (JSON only emits one final structured payload). We
+        // print on (a) the first poll regardless of status, and (b)
+        // any subsequent status change. Avoids spamming the terminal
+        // when the run sits in `running` for many polls.
+        if (!quiet && !jsonMode && run.status !== lastStatus) {
+          const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+          const prefix = lastStatus === null ? 'Status' : 'Status →';
+          console.log(`  ${prefix}: ${formatRunStatus(run.status)} (${elapsedSec}s elapsed, poll #${pollCount})`);
+          lastStatus = run.status;
+        }
+
+        if (isTerminalRunStatus(run.status)) {
+          // Final report.
+          if (jsonMode) {
+            console.log(
+              JSON.stringify(
+                {
+                  runId: run.id,
+                  status: run.status,
+                  durationMs: run.durationMs,
+                  startedAt: run.startedAt,
+                  completedAt: run.completedAt,
+                  error: run.error,
+                  pollCount,
+                },
+                null,
+                2,
+              ),
+            );
+          } else {
+            console.log('');
+            console.log(`  Final status: ${formatRunStatus(run.status)}`);
+            if (run.durationMs !== undefined) {
+              console.log(`  Duration:     ${formatDuration(run.durationMs)}`);
+            }
+            if (run.error) {
+              const formatted = formatRunError(run.error, { withHint: true });
+              const [headLine, ...hintLines] = formatted.split('\n');
+              console.log(`  Error:        ${headLine}`);
+              for (const hintLine of hintLines) {
+                console.log(`                ${hintLine.trimStart()}`);
+              }
+            }
+          }
+          // Exit code: 0 only on `completed`. Every other terminal
+          // status (failed / cancelled / timed-out / interrupted) is
+          // a non-success signal CI/scripts should branch on.
+          process.exitCode =
+            run.status === 'completed' ? ExitCode.SUCCESS : ExitCode.GENERAL_ERROR;
+          return;
+        }
+
+        // Not yet terminal — sleep until the next poll, but don't
+        // sleep past the deadline.
+        const now = Date.now();
+        if (now >= deadline) {
+          if (jsonMode) {
+            console.log(
+              JSON.stringify(
+                {
+                  runId: run.id,
+                  status: run.status,
+                  timedOut: true,
+                  waitedSec: Math.round((now - startedAt) / 1000),
+                  pollCount,
+                },
+                null,
+                2,
+              ),
+            );
+          } else {
+            console.log('');
+            console.log(`  Wait timed out after ${timeoutSec}s.`);
+            console.log(`  Last status: ${formatRunStatus(run.status)}`);
+            console.log(
+              `  The run is still in flight; re-invoke 'workflows wait ${run.id}' to keep polling, or use 'workflows status ${run.id}' for a one-shot check.`,
+            );
+          }
+          process.exitCode = ExitCode.GENERAL_ERROR;
+          return;
+        }
+        const sleepMs = Math.min(intervalSec * 1000, deadline - now);
+        await new Promise<void>((resolve) => setTimeout(resolve, sleepMs));
+      }
+    });
+}
+
+/**
+ * Parse a numeric CLI option value with bounds. Prints a usage error
+ * and sets the appropriate exit code on failure; callers check for
+ * `null` and short-circuit. Shared by `wait`'s `--timeout` and
+ * `--interval` flags.
+ */
+function parseWaitNumber(
+  raw: string,
+  optName: string,
+  min: number,
+  max: number,
+): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < min || n > max) {
+    printErrorResult({
+      code: 'INVALID_OPTION',
+      message: `--${optName} must be an integer between ${min} and ${max} (got "${raw}").`,
+    });
+    process.exitCode = ExitCode.USAGE_ERROR;
+    return null;
+  }
+  return n;
 }
 
 // ============================================================================

@@ -934,6 +934,103 @@ describe('registerWorkflowCommands', () => {
   });
 
   // ==========================================================================
+  // WORKFLOWS WAIT (G13)
+  // ==========================================================================
+
+  describe('workflows wait', () => {
+    it('returns 0 immediately when run is already completed', async () => {
+      mockGetRun.mockResolvedValue(mockRunDetailWithDuration);
+      // Pass a tight timeout/interval so the test's polling-loop
+      // logic exits on the first iteration without sleeping.
+      await run(['workflows', 'wait', 'run_abc123', '--interval', '1', '--timeout', '5']);
+
+      expect(mockGetRun).toHaveBeenCalledTimes(1);
+      expect(process.exitCode).toBe(0);
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(output).toContain('Final status:');
+      expect(output).toContain('Duration:');
+    });
+
+    it('returns 1 with formatted error when run terminated as failed', async () => {
+      mockGetRun.mockResolvedValue({
+        ...mockRunDetailWithError,
+        status: 'failed',
+        durationMs: 12_000,
+      });
+      await run(['workflows', 'wait', 'run_abc123', '--interval', '1', '--timeout', '5']);
+
+      expect(process.exitCode).toBe(1);
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      // Carries the wire shape head-line.
+      expect(output).toContain('[node_execution_failed]');
+      expect(output).toContain('node: node-2');
+      // Hint for known codes (formatRunError(... withHint:true) flow).
+      expect(output).toContain('Hint:');
+    });
+
+    it('returns 3 NOT_FOUND when run does not exist', async () => {
+      mockGetRun.mockResolvedValue(null);
+      await run(['workflows', 'wait', 'missing-run', '--interval', '1', '--timeout', '5']);
+      expect(process.exitCode).toBe(3);
+    });
+
+    // `interrupted` is intentionally NOT in this list — per
+    // `TERMINAL_RUN_STATUSES` in @myndhyve/types, an interrupted run
+    // is resumable (like `waiting-approval` / `waiting-external`), so
+    // `wait` keeps polling on it. Adding it here would loop until
+    // timeout. The "transitions through running → terminal" test
+    // below covers the non-terminal-then-terminal transition path.
+    for (const status of ['cancelled', 'timed-out']) {
+      it(`returns 1 (non-success) when run terminated as ${status}`, async () => {
+        mockGetRun.mockResolvedValue({
+          ...mockRunDetail,
+          status,
+          durationMs: 5_000,
+        });
+        await run(['workflows', 'wait', 'run_abc123', '--interval', '1', '--timeout', '5']);
+        expect(process.exitCode).toBe(1);
+      });
+    }
+
+    it('rejects --timeout=0 as a usage error', async () => {
+      await run(['workflows', 'wait', 'run_abc123', '--timeout', '0']);
+      expect(process.exitCode).toBe(2);
+      // No getRun call — short-circuited at option parsing.
+      expect(mockGetRun).not.toHaveBeenCalled();
+    });
+
+    it('rejects --interval below 1 as a usage error', async () => {
+      await run(['workflows', 'wait', 'run_abc123', '--interval', '0']);
+      expect(process.exitCode).toBe(2);
+      expect(mockGetRun).not.toHaveBeenCalled();
+    });
+
+    it('emits structured JSON on terminal completion when --format=json', async () => {
+      mockGetRun.mockResolvedValue(mockRunDetailWithDuration);
+      await run([
+        'workflows',
+        'wait',
+        'run_abc123',
+        '--interval',
+        '1',
+        '--timeout',
+        '5',
+        '--format',
+        'json',
+      ]);
+
+      const output = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      // The JSON report should be the last (single) console line in
+      // json mode — no per-poll text noise.
+      expect(output).toContain('"status": "completed"');
+      expect(output).toContain('"runId":');
+      expect(output).toContain('"pollCount":');
+      // No per-poll `Status:` lines in JSON mode.
+      expect(output).not.toContain('Status:');
+    });
+  });
+
+  // ==========================================================================
   // WORKFLOWS LOGS
   // ==========================================================================
 
