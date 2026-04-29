@@ -45,6 +45,32 @@ The project uses **Canvas Type** terminology:
 | `src/cli/program.ts` | Commander program definition |
 | `src/chat/index.ts` | AI chat sessions |
 | `src/cron/types.ts` | Cron job types |
+| `src/utils/format.ts` | Shared formatters: `formatTimeSince`, `formatTimeUntil`, `formatRunError` (maps `RUN_ERROR_CODES` → operator hints — see "Wire-error formatting" below) |
+
+## Wire-error formatting
+
+When surfacing a structured `RunError` from the workflow runtime
+(`run.error` on `RunDetail`, error frames on stream callbacks, etc.),
+ALWAYS route through `formatRunError(error, { withHint: true })` from
+`src/utils/format.ts` — never inline the `[code] message (node)` build.
+The helper:
+
+- emits the canonical `[code] message (node?)` head line so output stays
+  consistent across surfaces
+- appends a second `Hint: …` line for codes in the shared
+  `RUN_ERROR_CODES` set with a known remediation (e.g.
+  `recursion_limit_exceeded` → "Increase
+  `RunOptions.configurable.recursionLimit` or simplify the workflow")
+- silently skips the hint for unknown wire codes (forward-compat — a
+  future server code emitted before the CLI is rebuilt won't crash)
+
+Adding a new wire code? After landing it in
+`packages/types/src/errors.ts` (main project), open
+`src/utils/format.ts` `RUN_ERROR_HINTS` and add a hint entry. The
+drift-gate test in `format.test.ts` ("every wire code in
+RUN_ERROR_CODES has a hint entry") will fail in CI otherwise. Hints
+should be one line and operator-actionable — name the field/flag/
+flag-doc the user adjusts to recover.
 
 ## Commerce Module
 
