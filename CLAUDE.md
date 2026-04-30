@@ -46,6 +46,8 @@ The project uses **Canvas Type** terminology:
 | `src/chat/index.ts` | AI chat sessions |
 | `src/cron/types.ts` | Cron job types |
 | `src/utils/format.ts` | Shared formatters: `formatTimeSince`, `formatTimeUntil`, `formatRunError` (maps `RUN_ERROR_CODES` → operator hints — see "Wire-error formatting" below) |
+| `src/api/workflowRuntimeClient.ts` | Cloud Run `workflow-runtime` client: Bearer-auth fetch + SSE event-stream + short-poll. See "Workflow Runtime Client (SSE)" below. |
+| `src/api/workflowEvents.ts` | Pure-JS SSE parser + auto-resume reconnect loop (zero-dep). Consumed by `workflowRuntimeClient.streamEvents`. |
 
 ## Wire-error formatting
 
@@ -71,6 +73,82 @@ drift-gate test in `format.test.ts` ("every wire code in
 RUN_ERROR_CODES has a hint entry") will fail in CI otherwise. Hints
 should be one line and operator-actionable — name the field/flag/
 flag-doc the user adjusts to recover.
+
+## Workflow Runtime Client (SSE)
+
+The `workflow-runtime` Cloud Run service exposes the canonical WOP
+event stream at `GET /v1/runs/{runId}/events` (SSE) and a short-poll
+fallback at `GET /v1/runs/{runId}/events/poll`. Distinct from the
+Cloud Functions surface (`MyndHyveClient` for messaging / projects /
+workflows-via-Firestore) — use `WorkflowRuntimeClient` whenever you
+need the runtime's authoritative event log, never reach for the
+Cloud Functions client for that purpose.
+
+### When to use
+
+- `workflows tail <runId>` — live SSE stream
+- `workflows run <id> --watch` — composes on `tail`'s code path after
+  `createRun()` returns
+- Any future command that wants per-event live observability (e.g.
+  `workflows logs --follow` could migrate from polling to SSE later)
+
+### What it owns
+
+- **Bearer auth** — reuses `src/auth/getToken()` with the same
+  401-retry-with-refresh pattern as `MyndHyveClient`. Never construct
+  ad-hoc fetches against the runtime; the client centralizes the
+  token-attach + refresh + canonical-error-envelope logic.
+- **SSE consumer** — `workflowEvents.ts` exposes
+  `streamSseEvents(body)` (pure parser, no transport) and
+  `consumeSseStreamWithReconnect(opts)` (auto-resume via
+  `Last-Event-ID` + exponential backoff). Zero deps; native `fetch` +
+  `ReadableStream` only.
+- **Canonical error envelope** — F-2026-04-29-01-compliant
+  `{error: <machine_code>, message: <human>, hint?: <…>}` parsing into
+  `WorkflowRuntimeError` (or `WorkflowRuntimeAuthError` on 401 after
+  refresh). Surface via `formatRunError(... withHint: true)` for
+  consistent operator output across commands.
+
+### When you add a new streaming command
+
+1. Construct a `WorkflowRuntimeClient` once at command boot.
+2. Call `client.streamEvents(runId, opts)` — get an `AsyncGenerator<ParsedSseEvent>`.
+3. For each event, JSON-parse `event.data` if you need the
+   `RunEventDoc` shape; for line-based output, prefer the
+   `formatTailDetail` helper in `cli/workflows.ts` so you stay
+   consistent with `tail` / `run --watch`.
+4. Honor `AbortSignal` (typically wired from `process.on('SIGINT')`)
+   so Ctrl-C detaches cleanly without cancelling the run.
+5. Set `process.exitCode` based on the terminal event:
+   `run.completed` → 0, `run.failed`/`cancelled`/`timed-out` → 1,
+   reconnect-budget-exhausted → 1.
+6. Handle `WorkflowRuntimeAuthError` / `WorkflowRuntimeError`
+   explicitly — the canonical envelope's `hint` field maps to
+   `printErrorResult({ suggestion: ... })` for operator UX parity
+   with the Cloud Functions client.
+
+### Where the runtime URL comes from
+
+`src/config/defaults.ts:resolveWorkflowRuntimeUrl()` reads
+`MYNDHYVE_WORKFLOW_RUNTIME_URL` env var first, falling back to the
+prod stable URL hash. Operators can point at staging / a local Cloud
+Run emulator / a self-hosted replica via the env var without
+rebuilding. New commands MUST go through this helper, not hardcoded
+URLs.
+
+### Known invariants the tests pin
+
+- `formatRunError` drift gate: every code in shared
+  `RUN_ERROR_CODES` has a hint entry (`format.test.ts`).
+- SSE parser handles `\\n`, `\\r\\n`, `\\r` line terminators + ignores
+  comment lines (`:`) + drops the leading space after `field:` per
+  spec (`workflowEvents.test.ts`).
+- 401 retry: a single 401 force-refreshes the token; a second 401
+  surfaces `WorkflowRuntimeAuthError` (`workflowRuntimeClient.test.ts`).
+- Default terminal-event detector matches the engine's run-level
+  terminal events: `run.completed | run.failed | run.cancelled |
+  run.timed-out`. NodeModule events (`node.completed` etc.) do NOT
+  terminate the stream.
 
 ## Commerce Module
 
