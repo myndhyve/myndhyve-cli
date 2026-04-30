@@ -184,6 +184,52 @@ export async function listRuns(
 }
 
 /**
+ * G13 — list runs currently in `waiting-approval` across one or all
+ * canvas types for a user. Powers the `workflows pending` CLI
+ * command.
+ *
+ * Two modes:
+ *   - **Per-canvas-type** when `opts.canvasTypeId` is set: equivalent
+ *     to `listRuns(userId, canvasTypeId, {status: 'waiting-approval'})`.
+ *     Uses the existing `userId + canvasTypeId + status` Firestore
+ *     index so no extra index is required.
+ *   - **Cross-canvas-type** when `opts.canvasTypeId` is absent: queries
+ *     `runs` filtered by `userId + status='waiting-approval'`. This
+ *     requires a composite index `runs(userId, status, startedAt DESC)`
+ *     to be deployed alongside this code (firestore.indexes.json in
+ *     the main project). When the index is missing, Firestore returns
+ *     a "FAILED_PRECONDITION" error that the CLI surfaces with an
+ *     operator-actionable message pointing at the canvas-type-scoped
+ *     fallback.
+ *
+ * Default sort: `startedAt DESC` (most recent first). `limit` defaults
+ * to 50; raise via the option for triage.
+ */
+export async function listPendingApprovals(
+  userId: string,
+  opts?: { canvasTypeId?: string; limit?: number },
+): Promise<RunSummary[]> {
+  const filters: QueryFilter[] = [
+    { field: 'userId', op: 'EQUAL', value: userId },
+    { field: 'status', op: 'EQUAL', value: 'waiting-approval' },
+  ];
+  if (opts?.canvasTypeId) {
+    filters.push({ field: 'canvasTypeId', op: 'EQUAL', value: opts.canvasTypeId });
+  }
+  log.debug('Listing pending approvals', {
+    userId,
+    canvasTypeId: opts?.canvasTypeId,
+    limit: opts?.limit,
+  });
+  const results = await runQuery('runs', filters, {
+    orderBy: 'startedAt',
+    orderDirection: 'DESCENDING',
+    limit: opts?.limit ?? 50,
+  });
+  return results.map(toRunSummary);
+}
+
+/**
  * Get full run details by ID.
  *
  * @param userId - The authenticated user's UID (for response enrichment)

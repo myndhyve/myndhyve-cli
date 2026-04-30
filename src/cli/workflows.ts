@@ -20,6 +20,7 @@ import {
   listWorkflows,
   getWorkflow,
   listRuns,
+  listPendingApprovals,
   getRun,
   createRun,
   getRunLogs,
@@ -32,6 +33,7 @@ import {
   type DryRunReport,
   type InvocationSummary,
   type WorkflowRunStatus,
+  type RunSummary,
 } from '../api/workflows.js';
 import { getActiveContext } from '../context.js';
 import {
@@ -43,6 +45,12 @@ import {
 import { ExitCode, printErrorResult } from '../utils/output.js';
 import { formatRunError } from '../utils/format.js';
 import { isTerminalRunStatus } from '@myndhyve/types';
+import {
+  WorkflowRuntimeClient,
+  WorkflowRuntimeAuthError,
+  WorkflowRuntimeError,
+  type StreamMode,
+} from '../api/workflowRuntimeClient.js';
 
 // ============================================================================
 // CONSTANTS
@@ -83,9 +91,12 @@ Examples:
   registerListCommand(workflows);
   registerInfoCommand(workflows);
   registerRunCommand(workflows);
+  registerSubmitCommand(workflows);
   registerRunsCommand(workflows);
+  registerPendingCommand(workflows);
   registerStatusCommand(workflows);
   registerWaitCommand(workflows);
+  registerTailCommand(workflows);
   registerLogsCommand(workflows);
   registerArtifactCommands(workflows);
   registerApprovalCommands(workflows);
@@ -250,6 +261,12 @@ function registerRunCommand(workflows: Command): void {
     .option('--canvas-type <canvasTypeId>', 'Canvas type ID (defaults to active project\'s canvas type)')
     .option('--input <json>', 'Input data as JSON string')
     .option('--format <format>', 'Output format (table, json)', 'table')
+    .option('--watch', 'After creating the run, attach to its event stream and exit when terminal (composes with `workflows tail` semantics)')
+    .option(
+      '--stream-mode <mode>',
+      'When --watch is set, the SSE stream mode (updates | values | messages | debug | comma-separated mixed)',
+      'updates',
+    )
     .action(async (workflowId: string, opts) => {
       const auth = requireAuth();
       if (!auth) return;
@@ -311,6 +328,12 @@ function registerRunCommand(workflows: Command): void {
 
         if (opts.format === 'json') {
           console.log(JSON.stringify(run, null, 2));
+          if (opts.watch) {
+            // JSON mode + watch: emit the run-created envelope first,
+            // then continue streaming events as one-line JSON
+            // objects. Shell consumers can `jq` the stream.
+            await streamRunUntilTerminal(run.id, opts);
+          }
           return;
         }
 
@@ -319,9 +342,15 @@ function registerRunCommand(workflows: Command): void {
         console.log(`  Workflow:   ${workflow.name}`);
         console.log(`  Status:     ${run.status}`);
         console.log('');
-        console.log(`  Check status: myndhyve-cli workflows status ${run.id} --canvas-type=${canvasTypeId}`);
-        console.log(`  View logs:    myndhyve-cli workflows logs ${run.id} --canvas-type=${canvasTypeId}`);
-        console.log('');
+        if (opts.watch) {
+          console.log(`  Watching event stream (Ctrl-C to detach):`);
+          console.log('');
+          await streamRunUntilTerminal(run.id, opts);
+        } else {
+          console.log(`  Check status: myndhyve-cli workflows status ${run.id} --canvas-type=${canvasTypeId}`);
+          console.log(`  View logs:    myndhyve-cli workflows logs ${run.id} --canvas-type=${canvasTypeId}`);
+          console.log('');
+        }
       } catch (error) {
         printError('Failed to trigger workflow run', error);
       }
@@ -639,6 +668,313 @@ function parseWaitNumber(
     return null;
   }
   return n;
+}
+
+// ============================================================================
+// TAIL
+// ============================================================================
+
+/**
+ * G13 — `workflows tail <run-id>` opens the SSE event stream and
+ * prints events live. Reuses the {@link WorkflowRuntimeClient}
+ * foundation from G13 phase 1 so the same SSE consumer powers
+ * `tail`, the `--watch` flag on `run`, and any future streaming
+ * command.
+ *
+ * Stream-mode default is `updates` (per spec): node lifecycle +
+ * run-level transitions. Operators can request finer detail via
+ * `--stream-mode=debug` or richer event types via mixed mode
+ * (`--stream-mode=updates,messages`).
+ *
+ * Exit codes mirror `wait`:
+ *   - 0 SUCCESS         when the stream ends with a `run.completed` event
+ *   - 1 GENERAL_ERROR   when the stream ends with `run.failed` /
+ *                       `run.cancelled` / `run.timed-out`, OR the SSE
+ *                       reconnect budget is exhausted
+ *   - 1 GENERAL_ERROR   on auth/permission failures bubbling up from
+ *                       the runtime
+ *
+ * Reconnect: the underlying `consumeSseStreamWithReconnect` loop
+ * resumes from the last seen `id:` after a transient drop. Operators
+ * see a `(reconnecting…)` line in text mode; JSON mode emits no
+ * intermediate noise.
+ */
+function registerTailCommand(workflows: Command): void {
+  workflows
+    .command('tail <run-id>')
+    .description('Stream a run\'s event log live via SSE (Ctrl-C to detach)')
+    .option('--canvas-type <canvasTypeId>', "Canvas type ID (defaults to active project's canvas type)")
+    .option(
+      '--stream-mode <mode>',
+      'Stream mode: updates | values | messages | debug | comma-separated mixed (e.g. updates,messages)',
+      'updates',
+    )
+    .option('--buffer-ms <n>', 'Server-side aggregation window in ms (0–5000); 0 disables', '0')
+    .option('--from-sequence <id>', 'Resume from a specific Last-Event-ID (sequence string)')
+    .option('--format <format>', 'Output format (text, json)', 'text')
+    .action(async (runId: string, opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+      const _canvasTypeId = resolveCanvasTypeId(opts.canvasType);
+      // canvas-type isn't strictly required for the runtime call (the
+      // runtime resolves the workspace/project from the run doc), but
+      // we still validate the active context is set so operators get
+      // a clean error when they forget --canvas-type and have no
+      // active project.
+      if (!_canvasTypeId) return;
+
+      // Validate buffer-ms early so a usage error fires before any
+      // network call. The helper accepts the parsed value via `opts`.
+      const bufferMsCheck = parseWaitNumber(opts.bufferMs ?? '0', 'buffer-ms', 0, 5_000);
+      if (bufferMsCheck === null) return;
+
+      // Delegate to the shared streamer (same path used by
+      // `run --watch`). Single-source so format/error handling/SIGINT
+      // semantics stay identical across both commands.
+      await streamRunUntilTerminal(runId, opts);
+    });
+}
+
+/** Best-effort JSON parse — returns the raw string if the payload isn't JSON. */
+function tryParseJson(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return s;
+  }
+}
+
+/**
+ * Shared SSE consumer used by both `tail` and `run --watch`. Streams
+ * events from the workflow-runtime, prints them in the caller's
+ * preferred format, and sets `process.exitCode` on terminal/failure.
+ *
+ * Single-source so the two commands stay in lockstep on stream-mode
+ * handling, error rendering, exit codes, and SIGINT detach.
+ */
+async function streamRunUntilTerminal(
+  runId: string,
+  opts: { format?: string; streamMode?: string; bufferMs?: string; fromSequence?: string },
+): Promise<void> {
+  const jsonMode = opts.format === 'json';
+  const bufferMs = opts.bufferMs
+    ? parseWaitNumber(opts.bufferMs, 'buffer-ms', 0, 5_000) ?? 0
+    : 0;
+  const client = new WorkflowRuntimeClient();
+  const ctrl = new AbortController();
+  const sigintHandler = (): void => {
+    if (!jsonMode) console.log('  (detaching from stream — run keeps running)');
+    ctrl.abort();
+  };
+  process.on('SIGINT', sigintHandler);
+  try {
+    for await (const event of client.streamEvents(runId, {
+      streamMode: (opts.streamMode ?? 'updates') as StreamMode,
+      bufferMs,
+      lastEventId: opts.fromSequence ?? null,
+      signal: ctrl.signal,
+    })) {
+      if (jsonMode) {
+        console.log(
+          JSON.stringify({ id: event.id, event: event.event, data: tryParseJson(event.data) }),
+        );
+      } else {
+        const parsed = tryParseJson(event.data);
+        const detail =
+          typeof parsed === 'object' && parsed !== null
+            ? formatTailDetail(parsed as Record<string, unknown>)
+            : event.data;
+        console.log(`  [${event.id ?? '·'}] ${event.event}${detail ? ` — ${detail}` : ''}`);
+      }
+      if (
+        event.event === 'run.failed' ||
+        event.event === 'run.cancelled' ||
+        event.event === 'run.timed-out'
+      ) {
+        process.exitCode = ExitCode.GENERAL_ERROR;
+      }
+      if (event.event === 'error') {
+        process.exitCode = ExitCode.GENERAL_ERROR;
+      }
+    }
+  } catch (err) {
+    if (err instanceof WorkflowRuntimeAuthError) {
+      printErrorResult({ code: 'AUTH_REQUIRED', message: err.message });
+      process.exitCode = ExitCode.UNAUTHORIZED;
+    } else if (err instanceof WorkflowRuntimeError) {
+      printErrorResult({
+        code: err.code.toUpperCase(),
+        message: err.message,
+        ...(err.hint ? { suggestion: err.hint } : {}),
+      });
+      process.exitCode = ExitCode.GENERAL_ERROR;
+    } else {
+      printError('Stream failed', err);
+      process.exitCode = ExitCode.GENERAL_ERROR;
+    }
+  } finally {
+    process.off('SIGINT', sigintHandler);
+  }
+}
+
+/**
+ * Render a one-line detail summary from an event payload. The wire
+ * shape is `RunEventDoc` per `docs/wop-spec/v1/api/asyncapi.yaml` —
+ * pick a small set of common fields (nodeId, status, error.code) so
+ * `tail`'s output stays scannable. Verbose payloads are dropped from
+ * the line; consumers wanting full payloads switch to `--format json`.
+ */
+function formatTailDetail(payload: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (typeof payload.nodeId === 'string') parts.push(`node=${payload.nodeId}`);
+  if (typeof payload.status === 'string') parts.push(`status=${payload.status}`);
+  if (
+    payload.error &&
+    typeof payload.error === 'object' &&
+    typeof (payload.error as Record<string, unknown>).code === 'string'
+  ) {
+    parts.push(`err=${(payload.error as Record<string, unknown>).code as string}`);
+  }
+  return parts.join(' ');
+}
+
+// ============================================================================
+// PENDING
+// ============================================================================
+
+/**
+ * G13 — `workflows pending [--canvas-type <id>]` lists runs in
+ * `waiting-approval` across the user's runs. Default is workspace-
+ * wide (cross-canvas-type) with a `--canvas-type` flag to scope.
+ *
+ * Output: a table with workflow name, run id, age, and the per-row
+ * approve/reject/revise hint lines mirroring `workflows status`'s
+ * waiting-approval treatment so operators can copy-paste the exact
+ * command to act.
+ */
+function registerPendingCommand(workflows: Command): void {
+  workflows
+    .command('pending')
+    .description('List runs currently waiting for approval (cross-canvas-type by default)')
+    .option('--canvas-type <canvasTypeId>', 'Scope to a single canvas type (default: all canvas types under this user)')
+    .option('--limit <n>', 'Max runs to show', '50')
+    .option('--format <format>', 'Output format (table, json)', 'table')
+    .action(async (opts) => {
+      const auth = requireAuth();
+      if (!auth) return;
+      const limit = parseLimit(opts.limit);
+      if (limit === null) return;
+
+      try {
+        const runs = await listPendingApprovals(auth.uid, {
+          canvasTypeId: opts.canvasType,
+          limit,
+        });
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(runs, null, 2));
+          return;
+        }
+
+        if (runs.length === 0) {
+          const scopeLabel = opts.canvasType
+            ? `canvas type "${opts.canvasType}"`
+            : 'any canvas type';
+          console.log(`\n  No runs waiting for approval in ${scopeLabel}.`);
+          return;
+        }
+
+        console.log(`\n  Pending approvals (${runs.length}):`);
+        console.log('  ' + '─'.repeat(60));
+        for (const run of runs) {
+          const ageStr = run.startedAt ? formatRelativeTime(run.startedAt) : '—';
+          console.log('');
+          console.log(`  • ${truncate(run.workflowName ?? run.workflowId, 50)}`);
+          console.log(`    Run:        ${run.id}`);
+          console.log(`    Started:    ${ageStr}`);
+          // canvasTypeId on the summary is reliable when the
+          // cross-canvas-type query is used (so operators can see
+          // which canvas-type the run lives under without re-running
+          // with --canvas-type=…).
+          if ((run as RunSummary & { canvasTypeId?: string }).canvasTypeId) {
+            console.log(
+              `    Canvas:     ${(run as RunSummary & { canvasTypeId?: string }).canvasTypeId}`,
+            );
+          }
+          // Action hints (consistent with workflows status's
+          // waiting-approval treatment). The operator copies the
+          // command line they want to run.
+          const ctFlag = (run as RunSummary & { canvasTypeId?: string }).canvasTypeId
+            ? ` --canvas-type=${(run as RunSummary & { canvasTypeId?: string }).canvasTypeId}`
+            : '';
+          console.log(`    Approve:    myndhyve-cli workflows approve ${run.id}${ctFlag}`);
+          console.log(`    Reject:     myndhyve-cli workflows reject ${run.id}${ctFlag}`);
+          console.log(`    Revise:     myndhyve-cli workflows revise ${run.id}${ctFlag}`);
+        }
+        console.log('');
+      } catch (err) {
+        // Firestore "FAILED_PRECONDITION" surfaces when the cross-
+        // canvas-type composite index is missing in the deployed
+        // project. Translate into an operator-actionable hint
+        // pointing at the canvas-type-scoped fallback.
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('FAILED_PRECONDITION') || msg.toLowerCase().includes('index')) {
+          printErrorResult({
+            code: 'INDEX_MISSING',
+            message:
+              'The cross-canvas-type pending-approvals query needs a Firestore composite index that has not been deployed yet.',
+            suggestion:
+              'As a workaround, scope to a single canvas type with --canvas-type=<id>. The composite index ships in firestore.indexes.json and deploys via `firebase deploy --only firestore:indexes`.',
+          });
+          process.exitCode = ExitCode.GENERAL_ERROR;
+          return;
+        }
+        printError('Failed to list pending approvals', err);
+      }
+    });
+}
+
+// ============================================================================
+// SUBMIT
+// ============================================================================
+
+/**
+ * G13 — `workflows submit <workflow-id>` is the explicit detached-
+ * submission verb operators reach for in shell pipelines. It's a
+ * one-line wrapper around `workflows run --format json` so the
+ * command surface stays single-source: the `run` handler already
+ * supports detached creation and JSON output.
+ *
+ * Why a separate verb if `run --format json` already exists:
+ *   - operator UX: `submit` reads as fire-and-forget; `run` reads as
+ *     "trigger and tell me what happened"
+ *   - shell-pipeline ergonomics: `submit` always returns the
+ *     structured payload regardless of TTY detection in the future
+ *
+ * Implementation: invoke the same Commander action by re-emitting
+ * the run command with the JSON-format flag injected.
+ */
+function registerSubmitCommand(workflows: Command): void {
+  workflows
+    .command('submit <workflow-id>')
+    .description('Submit a workflow for detached execution (alias for `workflows run --format=json`)')
+    .option('--canvas-type <canvasTypeId>', "Canvas type ID (defaults to active project's canvas type)")
+    .option('--input <json>', 'Input data as JSON string')
+    .action(async (workflowId: string, opts) => {
+      // Delegate to `run` by invoking the same parent command with
+      // --format=json forced. The `run` handler does its own auth +
+      // input-parsing; we just re-route through the program tree so
+      // future changes to `run` (new flags, validation, etc.) flow
+      // here automatically.
+      const argv = ['workflows', 'run', workflowId, '--format', 'json'];
+      if (opts.canvasType) argv.push('--canvas-type', opts.canvasType);
+      if (opts.input) argv.push('--input', opts.input);
+      // Walk up to the root program and re-parse with the synthetic
+      // argv. Commander's parseAsync is the canonical way to invoke
+      // a sibling command without manually replaying the action.
+      const root = (workflows.parent ?? workflows) as Command;
+      await root.parseAsync(argv, { from: 'user' });
+    });
 }
 
 // ============================================================================

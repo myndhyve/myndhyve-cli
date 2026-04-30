@@ -11,6 +11,7 @@ const {
   mockListWorkflows,
   mockGetWorkflow,
   mockListRuns,
+  mockListPendingApprovals,
   mockGetRun,
   mockCreateRun,
   mockGetRunLogs,
@@ -22,6 +23,7 @@ const {
   mockDryRunReplay,
   mockGetActiveContext,
   mockWriteFileSync,
+  mockStreamEvents,
 } = vi.hoisted(() => ({
   mockRequireAuth: vi.fn(),
   mockTruncate: vi.fn(),
@@ -30,6 +32,7 @@ const {
   mockListWorkflows: vi.fn(),
   mockGetWorkflow: vi.fn(),
   mockListRuns: vi.fn(),
+  mockListPendingApprovals: vi.fn(),
   mockGetRun: vi.fn(),
   mockCreateRun: vi.fn(),
   mockGetRunLogs: vi.fn(),
@@ -41,6 +44,7 @@ const {
   mockDryRunReplay: vi.fn(),
   mockGetActiveContext: vi.fn(),
   mockWriteFileSync: vi.fn(),
+  mockStreamEvents: vi.fn(),
 }));
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
@@ -56,6 +60,7 @@ vi.mock('../../api/workflows.js', () => ({
   listWorkflows: (...args: unknown[]) => mockListWorkflows(...args),
   getWorkflow: (...args: unknown[]) => mockGetWorkflow(...args),
   listRuns: (...args: unknown[]) => mockListRuns(...args),
+  listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
   getRun: (...args: unknown[]) => mockGetRun(...args),
   createRun: (...args: unknown[]) => mockCreateRun(...args),
   getRunLogs: (...args: unknown[]) => mockGetRunLogs(...args),
@@ -66,6 +71,23 @@ vi.mock('../../api/workflows.js', () => ({
   getArtifact: (...args: unknown[]) => mockGetArtifact(...args),
   dryRunReplay: (...args: unknown[]) => mockDryRunReplay(...args),
 }));
+
+// G13 phase 2 — mock the workflow-runtime client so tail/run --watch
+// tests can drive the SSE consumer without a real network call.
+vi.mock('../../api/workflowRuntimeClient.js', async () => {
+  const actual = await vi.importActual<typeof import('../../api/workflowRuntimeClient.js')>(
+    '../../api/workflowRuntimeClient.js',
+  );
+  class FakeWorkflowRuntimeClient {
+    streamEvents(...args: unknown[]): AsyncGenerator<unknown, void, void> {
+      return mockStreamEvents(...args) as AsyncGenerator<unknown, void, void>;
+    }
+  }
+  return {
+    ...actual,
+    WorkflowRuntimeClient: FakeWorkflowRuntimeClient,
+  };
+});
 
 vi.mock('../../context.js', () => ({
   getActiveContext: (...args: unknown[]) => mockGetActiveContext(...args),
@@ -263,6 +285,11 @@ describe('registerWorkflowCommands', () => {
     mockGetArtifact.mockReset();
     mockGetActiveContext.mockReset();
     mockWriteFileSync.mockReset();
+    mockListPendingApprovals.mockReset();
+    mockStreamEvents.mockReset();
+    // process.exitCode persists across test invocations; clear it
+    // so a previous test's exit code doesn't leak into the next.
+    process.exitCode = undefined;
 
     // Default: auth success
     mockRequireAuth.mockReturnValue(AUTH_USER);
@@ -1027,6 +1054,247 @@ describe('registerWorkflowCommands', () => {
       expect(output).toContain('"pollCount":');
       // No per-poll `Status:` lines in JSON mode.
       expect(output).not.toContain('Status:');
+    });
+  });
+
+  // ==========================================================================
+  // WORKFLOWS TAIL (G13)
+  // ==========================================================================
+
+  /**
+   * Build a synthetic SSE-event async iterator. Each entry shape mimics
+   * `ParsedSseEvent` so the command-under-test sees what the real
+   * `WorkflowRuntimeClient.streamEvents` would yield.
+   */
+  function fakeEventStream(events: Array<{ id?: string | null; event: string; data: string }>): AsyncGenerator<{ id: string | null; event: string; data: string }, void, void> {
+    return (async function* () {
+      for (const ev of events) {
+        yield { id: ev.id ?? null, event: ev.event, data: ev.data };
+      }
+    })();
+  }
+
+  describe('workflows tail', () => {
+    it('streams events to text output and exits 0 on run.completed', async () => {
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.started', data: '{"runId":"run_1"}' },
+          { id: '2', event: 'node.completed', data: '{"nodeId":"n1"}' },
+          { id: '3', event: 'run.completed', data: '{"runId":"run_1"}' },
+        ]),
+      );
+      await run(['workflows', 'tail', 'run_1']);
+      expect(process.exitCode ?? 0).toBe(0);
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(out).toContain('run.started');
+      expect(out).toContain('node.completed');
+      expect(out).toContain('run.completed');
+    });
+
+    it('exits 1 when stream ends with run.failed', async () => {
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.started', data: '{}' },
+          { id: '2', event: 'run.failed', data: '{"error":{"code":"node_execution_failed"}}' },
+        ]),
+      );
+      await run(['workflows', 'tail', 'run_1']);
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('emits one JSON line per event when --format=json', async () => {
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.started', data: '{"runId":"r1"}' },
+          { id: '2', event: 'run.completed', data: '{"runId":"r1"}' },
+        ]),
+      );
+      await run(['workflows', 'tail', 'run_1', '--format', 'json']);
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      // Each line should be parseable JSON. The call sequence is one
+      // `console.log` per event in JSON mode; no decorative text.
+      const lines = out.split('\n').filter((l) => l.length > 0);
+      expect(lines).toHaveLength(2);
+      for (const line of lines) {
+        expect(() => JSON.parse(line)).not.toThrow();
+      }
+      expect(JSON.parse(lines[0]!)).toMatchObject({ id: '1', event: 'run.started' });
+    });
+
+    it('rejects --buffer-ms outside 0..5000 as a usage error', async () => {
+      await run(['workflows', 'tail', 'run_1', '--buffer-ms', '6000']);
+      expect(process.exitCode).toBe(2);
+      // No stream call — short-circuited at parse.
+      expect(mockStreamEvents).not.toHaveBeenCalled();
+    });
+
+    it('passes streamMode + bufferMs + lastEventId through to the client', async () => {
+      mockStreamEvents.mockReturnValue(fakeEventStream([
+        { id: '5', event: 'run.completed', data: '{}' },
+      ]));
+      await run([
+        'workflows',
+        'tail',
+        'run_1',
+        '--stream-mode',
+        'updates,messages',
+        '--buffer-ms',
+        '500',
+        '--from-sequence',
+        '4',
+      ]);
+      const call = mockStreamEvents.mock.calls[0];
+      expect(call?.[0]).toBe('run_1');
+      const opts = call?.[1] as Record<string, unknown>;
+      expect(opts.streamMode).toBe('updates,messages');
+      expect(opts.bufferMs).toBe(500);
+      expect(opts.lastEventId).toBe('4');
+    });
+
+    it('exits 1 on a stream-side error event from the reconnect-budget', async () => {
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.started', data: '{}' },
+          { id: '1', event: 'error', data: '{"kind":"sse-reconnect-budget-exhausted"}' },
+        ]),
+      );
+      await run(['workflows', 'tail', 'run_1']);
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // WORKFLOWS PENDING (G13)
+  // ==========================================================================
+
+  describe('workflows pending', () => {
+    it('renders a table when there are waiting-approval runs', async () => {
+      mockListPendingApprovals.mockResolvedValue([
+        {
+          ...mockWaitingRunDetail,
+          canvasTypeId: 'app-builder',
+        },
+      ]);
+      await run(['workflows', 'pending']);
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(out).toContain('Pending approvals (1):');
+      expect(out).toContain('Run:        run_waiting123');
+      expect(out).toContain('Canvas:     app-builder');
+      expect(out).toContain('myndhyve-cli workflows approve run_waiting123 --canvas-type=app-builder');
+    });
+
+    it('shows a friendly empty-state when no runs are waiting', async () => {
+      mockListPendingApprovals.mockResolvedValue([]);
+      await run(['workflows', 'pending']);
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(out).toMatch(/No runs waiting for approval in any canvas type/);
+    });
+
+    it('emits JSON when --format=json', async () => {
+      mockListPendingApprovals.mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
+      await run(['workflows', 'pending', '--format', 'json']);
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(() => JSON.parse(out)).not.toThrow();
+      expect(JSON.parse(out)).toHaveLength(2);
+    });
+
+    it('forwards --canvas-type to listPendingApprovals', async () => {
+      mockListPendingApprovals.mockResolvedValue([]);
+      await run(['workflows', 'pending', '--canvas-type', 'app-builder']);
+      expect(mockListPendingApprovals).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({ canvasTypeId: 'app-builder' }),
+      );
+    });
+
+    it('translates Firestore FAILED_PRECONDITION into an INDEX_MISSING usage hint', async () => {
+      mockListPendingApprovals.mockRejectedValue(
+        new Error('FAILED_PRECONDITION: The query requires an index'),
+      );
+      await run(['workflows', 'pending']);
+      expect(process.exitCode).toBe(1);
+      // printErrorResult writes to stderr, not stdout — capture
+      // through the existing stderrWriteSpy.
+      const err = stderrWriteSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(err).toContain('--canvas-type=<id>');
+    });
+  });
+
+  // ==========================================================================
+  // WORKFLOWS RUN --WATCH (G13)
+  // ==========================================================================
+
+  describe('workflows run --watch', () => {
+    it('creates the run and then attaches to the SSE stream', async () => {
+      mockGetWorkflow.mockResolvedValue({ id: 'wf-1', name: 'X', enabled: true });
+      mockCreateRun.mockResolvedValue({ id: 'run_w1', workflowId: 'wf-1', status: 'running' });
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.started', data: '{}' },
+          { id: '2', event: 'run.completed', data: '{}' },
+        ]),
+      );
+
+      await run(['workflows', 'run', 'wf-1', '--watch']);
+
+      expect(mockCreateRun).toHaveBeenCalledTimes(1);
+      // The SSE stream was opened with the new run's id.
+      expect(mockStreamEvents).toHaveBeenCalledWith('run_w1', expect.anything());
+      // No exit code set on success.
+      expect(process.exitCode ?? 0).toBe(0);
+    });
+
+    it('returns 1 when the watched run terminates as failed', async () => {
+      mockGetWorkflow.mockResolvedValue({ id: 'wf-1', name: 'X', enabled: true });
+      mockCreateRun.mockResolvedValue({ id: 'run_w1', workflowId: 'wf-1', status: 'running' });
+      mockStreamEvents.mockReturnValue(
+        fakeEventStream([
+          { id: '1', event: 'run.failed', data: '{}' },
+        ]),
+      );
+      await run(['workflows', 'run', 'wf-1', '--watch']);
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('does not stream when --watch is absent', async () => {
+      mockGetWorkflow.mockResolvedValue({ id: 'wf-1', name: 'X', enabled: true });
+      mockCreateRun.mockResolvedValue({ id: 'run_w1', workflowId: 'wf-1', status: 'running' });
+      await run(['workflows', 'run', 'wf-1']);
+      expect(mockStreamEvents).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // WORKFLOWS SUBMIT (G13)
+  // ==========================================================================
+
+  describe('workflows submit', () => {
+    it('delegates to `run --format json` and emits the structured payload', async () => {
+      mockGetWorkflow.mockResolvedValue({ id: 'wf-1', name: 'X', enabled: true });
+      mockCreateRun.mockResolvedValue({ id: 'run_s1', workflowId: 'wf-1', status: 'running' });
+
+      await run(['workflows', 'submit', 'wf-1']);
+
+      // The run was created (delegation worked).
+      expect(mockCreateRun).toHaveBeenCalledTimes(1);
+      // The output is JSON (the only console.log in run's json branch).
+      const out = consoleSpy.mock.calls.map((c) => c[0]).join('\n');
+      expect(() => JSON.parse(out)).not.toThrow();
+      expect(JSON.parse(out)).toMatchObject({ id: 'run_s1' });
+    });
+
+    it('forwards --input through to the underlying run handler', async () => {
+      mockGetWorkflow.mockResolvedValue({ id: 'wf-1', name: 'X', enabled: true });
+      mockCreateRun.mockResolvedValue({ id: 'run_s1', workflowId: 'wf-1', status: 'running' });
+
+      await run(['workflows', 'submit', 'wf-1', '--input', '{"topic":"x"}']);
+
+      expect(mockCreateRun).toHaveBeenCalledWith(
+        'user-123',
+        expect.any(String),
+        'wf-1',
+        expect.objectContaining({ inputData: { topic: 'x' } }),
+      );
     });
   });
 
