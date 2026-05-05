@@ -6,11 +6,13 @@ const {
   mockPrintError,
   mockGetTodayUsage,
   mockGetUsageForDate,
+  mockGetWorkspaceUsage,
 } = vi.hoisted(() => ({
   mockRequireAuth: vi.fn(),
   mockPrintError: vi.fn(),
   mockGetTodayUsage: vi.fn(),
   mockGetUsageForDate: vi.fn(),
+  mockGetWorkspaceUsage: vi.fn(),
 }));
 
 vi.mock('../helpers.js', () => ({
@@ -21,6 +23,11 @@ vi.mock('../helpers.js', () => ({
 vi.mock('../../api/usage.js', () => ({
   getTodayUsage: (...args: unknown[]) => mockGetTodayUsage(...args),
   getUsageForDate: (...args: unknown[]) => mockGetUsageForDate(...args),
+  getWorkspaceUsage: (...args: unknown[]) => mockGetWorkspaceUsage(...args),
+}));
+
+vi.mock('../../api/client.js', () => ({
+  MyndHyveClient: vi.fn().mockImplementation(() => ({})),
 }));
 
 vi.mock('../../utils/output.js', () => ({
@@ -114,6 +121,74 @@ describe('usage commands', () => {
       await run(['usage', 'date', '2026-01-01']);
       expect(mockGetUsageForDate).toHaveBeenCalled();
       spy.mockRestore();
+    });
+  });
+
+  // Phase 1.6 of the WOP A-grade closeout — `usage workspace` surfaces
+  // the bySecretScope breakdown (run / user / tenant / platform) when
+  // the Cloud Functions callable returns it. Optional in the response
+  // shape so older deployments that don't surface bySecretScope still
+  // render cleanly.
+  describe('usage workspace — bySecretScope breakdown', () => {
+    function workspaceSummary(extras: Partial<Record<string, unknown>> = {}) {
+      return {
+        workspaceId: 'ws-1',
+        range: '7d' as const,
+        fromDate: '2026-04-28',
+        toDate: '2026-05-05',
+        totalCostCents: 1234,
+        totalTokens: 100_000,
+        promptTokens: 60_000,
+        completionTokens: 40_000,
+        requestCount: 50,
+        byProvider: { anthropic: { tokens: 80_000, costCents: 1000, requests: 40 } },
+        byModel: { 'claude-sonnet-4-6': { tokens: 80_000, costCents: 1000, requests: 40 } },
+        earliestHourBucket: '2026-04-28-09',
+        ...extras,
+      };
+    }
+
+    it('renders the human-label "By Secret Scope" block when populated', async () => {
+      mockGetWorkspaceUsage.mockResolvedValue(
+        workspaceSummary({
+          bySecretScope: {
+            user: { tokens: 60_000, costCents: 800, requests: 30 },
+            platform: { tokens: 40_000, costCents: 434, requests: 20 },
+          },
+        }),
+      );
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      expect(out).toContain('By Secret Scope:');
+      expect(out).toContain('User BYOK');
+      expect(out).toContain('Platform fallback');
+      // Raw enum surfaced in dim text alongside the human label so
+      // operators can match against logs / Firestore docs.
+      expect(out).toContain('(user)');
+      expect(out).toContain('(platform)');
+    });
+
+    it('omits the block when bySecretScope is missing or empty', async () => {
+      mockGetWorkspaceUsage.mockResolvedValue(workspaceSummary()); // no bySecretScope
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      expect(out).not.toContain('By Secret Scope:');
     });
   });
 });

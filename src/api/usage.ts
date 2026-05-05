@@ -74,6 +74,14 @@ export interface WorkspaceUsageSummary {
   requestCount: number;
   byProvider: Record<string, WorkspaceUsageBreakdownEntry>;
   byModel: Record<string, WorkspaceUsageBreakdownEntry>;
+  /**
+   * BYOK / platform credential-scope breakout per Phase 1.6 of the WOP
+   * A-grade closeout (main project commit a1c5fc61). Keys are the four
+   * `byokSecretResolver.resolveWithProvenance` source values:
+   * `'run' | 'user' | 'tenant' | 'platform'`. Older Cloud Functions
+   * deployments don't surface this field — treat as optional.
+   */
+  bySecretScope?: Record<string, WorkspaceUsageBreakdownEntry>;
   earliestHourBucket: string | null;
 }
 

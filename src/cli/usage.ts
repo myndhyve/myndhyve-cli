@@ -123,6 +123,26 @@ export function registerUsageCommands(program: Command): void {
             console.log(`  ${fitColumn(m, 35)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
           }
         }
+        // Phase 1.6 of the WOP A-grade closeout — BYOK/platform secret-scope
+        // breakdown. Optional because older deployments of getWorkspaceUsage
+        // don't surface the field. Human label is rendered first; the raw
+        // enum follows in dim text so operators can still match against
+        // logs / Firestore docs.
+        const scopes = Object.entries(data.bySecretScope ?? {});
+        if (scopes.length > 0) {
+          console.log(chalk.dim('\nBy Secret Scope:'));
+          const scopeLabels: Record<string, string> = {
+            run: 'Run-scope ephemeral',
+            user: 'User BYOK',
+            tenant: 'Workspace BYOK',
+            platform: 'Platform fallback',
+          };
+          for (const [scope, s] of scopes) {
+            const label = scopeLabels[scope] ?? scope;
+            const tag = chalk.dim(`(${scope})`);
+            console.log(`  ${fitColumn(label, 22)} ${tag.padEnd(12)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
+          }
+        }
       } catch (err) {
         printError('Failed to fetch workspace usage', err);
         process.exitCode = ExitCode.GENERAL_ERROR;
