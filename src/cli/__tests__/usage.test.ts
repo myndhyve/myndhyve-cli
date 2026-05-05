@@ -190,5 +190,130 @@ describe('usage commands', () => {
       const out = captured.join('\n');
       expect(out).not.toContain('By Secret Scope:');
     });
+
+    // Architecture-review hardening tests — defensive rendering against
+    // future enum graduation, malformed entries, and ANSI escape
+    // injection from the Cloud Functions response.
+
+    it('renders unknown scope keys with a fallback label and "(scope · unknown)" tag', async () => {
+      mockGetWorkspaceUsage.mockResolvedValue(
+        workspaceSummary({
+          bySecretScope: {
+            // Future enum graduation: a 5th scope ships before the CLI updates.
+            enterprise: { tokens: 5_000, costCents: 50, requests: 5 },
+          },
+        }),
+      );
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      expect(out).toContain('By Secret Scope:');
+      // Unknown key surfaced as the safe-rendered raw key
+      expect(out).toContain('enterprise');
+      // Tag reads "(enterprise · unknown)" so operators see this is unrecognized
+      expect(out).toContain('· unknown');
+    });
+
+    it('skips malformed entries (null / wrong-shape / no numeric fields)', async () => {
+      mockGetWorkspaceUsage.mockResolvedValue(
+        workspaceSummary({
+          bySecretScope: {
+            user: { tokens: 100, costCents: 10, requests: 1 },
+            broken: null,
+            also_broken: 'oops',
+            partial: { tokens: 'not a number', costCents: 'bad' },
+          },
+        }),
+      );
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      // Valid row renders
+      expect(out).toContain('User BYOK');
+      // Malformed rows skipped silently — the formatter never throws
+      expect(out).not.toContain('broken');
+      expect(out).not.toContain('also_broken');
+      expect(out).not.toContain('partial');
+      // The error catch never fired
+      expect(mockPrintError).not.toHaveBeenCalled();
+    });
+
+    it('strips ANSI escape sequences from breakdown keys before printing', async () => {
+      // Hostile / drift-induced scope key carrying a CSI clear-line sequence
+      // followed by a fake "All good!" message. The sanitizer must scrub
+      // the control bytes so the operator's terminal can't be spoofed.
+      const hostileKey = '[2K\rAll good!';
+      mockGetWorkspaceUsage.mockResolvedValue(
+        workspaceSummary({
+          bySecretScope: {
+            [hostileKey]: { tokens: 100, costCents: 10, requests: 1 },
+          },
+        }),
+      );
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      // The CSI bytes (0x1B = ESC) and 0x0D (CR) MUST NOT appear verbatim
+      expect(out).not.toContain('[2K');
+      expect(out).not.toContain('\r');
+      // The sanitizer keeps the printable suffix so the row still
+      // renders — it just can't run terminal commands.
+      expect(out).toContain('All good!');
+      // Tag shows it's an unrecognized scope
+      expect(out).toContain('· unknown');
+    });
+
+    it('skips a malformed byProvider row without throwing the whole render', async () => {
+      // The mock accepts any shape, so we layer the malformed entry into
+      // `byProvider` via Object.assign rather than a type cast — keeps the
+      // test free of `as unknown as` (banned pattern) while still letting
+      // us inject the realistic-but-malformed Firestore drift case.
+      const summary = workspaceSummary();
+      const malformedByProvider: Record<string, unknown> = {
+        anthropic: { tokens: 80_000, costCents: 1000, requests: 40 },
+        // simulating a stray null entry from a partial Firestore write
+        openai: null,
+      };
+      mockGetWorkspaceUsage.mockResolvedValue(
+        Object.assign({}, summary, { byProvider: malformedByProvider }),
+      );
+      const captured: string[] = [];
+      const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+        captured.push(args.map(String).join(' '));
+      });
+      try {
+        await run(['usage', 'workspace', 'ws-1']);
+      } finally {
+        spy.mockRestore();
+      }
+      const out = captured.join('\n');
+      // Healthy row renders
+      expect(out).toContain('anthropic');
+      // Malformed row dropped — and the misleading "Failed to fetch" path
+      // is never taken
+      expect(out).not.toContain('openai');
+      expect(mockPrintError).not.toHaveBeenCalled();
+    });
   });
 });

@@ -36,6 +36,80 @@ function fitColumn(value: string, width: number): string {
   return value.slice(0, width - 1) + '…';
 }
 
+/**
+ * Strip ANSI escape sequences + non-printing control characters from
+ * a string before rendering it to the operator's terminal. Defense in
+ * depth against breakdown keys that flow from Firestore via the
+ * getWorkspaceUsage callable: if a malicious tenant ever writes shard
+ * data with crafted bracket-notation field paths (admin-SDK-bypass
+ * scenario), we don't want crafted ANSI sequences executing in the
+ * caller's terminal. Same protection applied to provider / model /
+ * scope keys uniformly.
+ */
+function sanitizeBreakdownKey(raw: unknown, fallback: string, maxLen = 64): string {
+  if (typeof raw !== 'string') return fallback;
+  // Strip C0 controls (0x00-0x1F including ESC=0x1B + BEL=0x07), DEL
+  // (0x7F), and C1 controls (0x80-0x9F). This neutralizes CSI / OSC /
+  // hyperlink / cursor-movement escape sequences before they reach
+  // `console.log`. Hex-escape form keeps the regex source-readable
+  // (vs literal control bytes that some editors mangle) and avoids
+  // tripping `no-control-regex` since the only suppressed range is
+  // explicit and bounded.
+  const CONTROL_CHARS = /[\x00-\x1f\x7f-\x9f]/g;
+  const stripped = raw.replace(CONTROL_CHARS, '');
+  if (stripped.length === 0) return fallback;
+  return stripped.length > maxLen ? stripped.slice(0, maxLen - 1) + '…' : stripped;
+}
+
+/**
+ * Coerce a `WorkspaceUsageBreakdownEntry` to safe numeric fields. If
+ * any field is malformed (non-finite, undefined, string), render a
+ * zero rather than letting `formatTokens(undefined)` throw downstream.
+ * Returns `null` when the entire entry is unusable so callers can
+ * skip the row instead of rendering meaningless zeros.
+ */
+function coerceBreakdownEntry(
+  raw: unknown,
+): { tokens: number; costCents: number; requests: number } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const v = raw as { tokens?: unknown; costCents?: unknown; requests?: unknown };
+  const num = (x: unknown): number =>
+    typeof x === 'number' && Number.isFinite(x) ? x : 0;
+  const entry = {
+    tokens: num(v.tokens),
+    costCents: num(v.costCents),
+    requests: num(v.requests),
+  };
+  // If every counter is zero AND none was a real number, treat as
+  // unusable. Real zero-shard rows would still be filtered out at the
+  // .length > 0 gate, so this only drops genuinely-malformed entries.
+  if (entry.tokens === 0 && entry.costCents === 0 && entry.requests === 0 &&
+      typeof v.tokens !== 'number' && typeof v.costCents !== 'number' && typeof v.requests !== 'number') {
+    return null;
+  }
+  return entry;
+}
+
+/**
+ * Phase 1.6 of the WOP A-grade closeout — human-readable labels for
+ * the four `byokSecretResolver.resolveWithProvenance` source values.
+ *
+ * Mirror of `SECRET_SCOPE_LABELS` in the browser AICostDashboard
+ * (src/components/observability/AICostDashboard.tsx). Both surfaces
+ * track the spec language at
+ * `https://github.com/myndhyve/wop/blob/main/spec/v1/byok.md` —
+ * update both maps together when the enum graduates.
+ */
+const SECRET_SCOPE_LABELS: Record<string, string> = {
+  run: 'Run-scope ephemeral',
+  user: 'User BYOK',
+  tenant: 'Workspace BYOK',
+  platform: 'Platform fallback',
+};
+
+/** Allowlist used to short-circuit unknown / hostile scope keys to a safe rendering. */
+const KNOWN_SECRET_SCOPES = new Set(Object.keys(SECRET_SCOPE_LABELS));
+
 export function registerUsageCommands(program: Command): void {
   const usage = program.command('usage').description('View AI token usage and costs');
 
@@ -109,38 +183,62 @@ export function registerUsageCommands(program: Command): void {
         console.log(`  Prompt Tokens:    ${formatTokens(data.promptTokens)}`);
         console.log(`  Completion:       ${formatTokens(data.completionTokens)}`);
         console.log(`  Requests:         ${data.requestCount}`);
-        const providers = Object.entries(data.byProvider);
-        if (providers.length > 0) {
-          console.log(chalk.dim('\nBy Provider:'));
-          for (const [p, s] of providers) {
-            console.log(`  ${fitColumn(p, 15)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
+        // Architecture-review hardening (2026-05-05): each breakdown row
+        // is sanitized + coerced before printing. `sanitizeBreakdownKey`
+        // strips ANSI/control characters from Firestore-sourced keys,
+        // `coerceBreakdownEntry` skips malformed rows so a partial-write
+        // race or schema drift doesn't throw deep in the formatter chain
+        // (which would surface as a misleading "Failed to fetch workspace
+        // usage" error).
+        const renderBreakdown = (
+          label: string,
+          breakdown: Record<string, unknown> | undefined,
+          colWidth: number,
+        ): void => {
+          if (!breakdown) return;
+          const rows: Array<[string, { tokens: number; costCents: number; requests: number }]> = [];
+          for (const [rawKey, rawEntry] of Object.entries(breakdown)) {
+            const entry = coerceBreakdownEntry(rawEntry);
+            if (!entry) continue;
+            const key = sanitizeBreakdownKey(rawKey, '<unknown>');
+            rows.push([key, entry]);
           }
-        }
-        const models = Object.entries(data.byModel);
-        if (models.length > 0) {
-          console.log(chalk.dim('\nBy Model:'));
-          for (const [m, s] of models) {
-            console.log(`  ${fitColumn(m, 35)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
+          if (rows.length === 0) return;
+          console.log(chalk.dim(`\n${label}:`));
+          for (const [k, s] of rows) {
+            console.log(`  ${fitColumn(k, colWidth)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
           }
-        }
+        };
+        renderBreakdown('By Provider', data.byProvider as Record<string, unknown>, 15);
+        renderBreakdown('By Model', data.byModel as Record<string, unknown>, 35);
+
         // Phase 1.6 of the WOP A-grade closeout — BYOK/platform secret-scope
         // breakdown. Optional because older deployments of getWorkspaceUsage
-        // don't surface the field. Human label is rendered first; the raw
-        // enum follows in dim text so operators can still match against
-        // logs / Firestore docs.
-        const scopes = Object.entries(data.bySecretScope ?? {});
-        if (scopes.length > 0) {
+        // don't surface the field. Unknown scope keys (future enum
+        // graduation, malicious tenant write) fall back to the sanitized
+        // raw key with a "(unknown)" tag so the row still renders without
+        // breaking the table.
+        const scopeRows: Array<[string, string, { tokens: number; costCents: number; requests: number }]> = [];
+        for (const [rawKey, rawEntry] of Object.entries(data.bySecretScope ?? {})) {
+          const entry = coerceBreakdownEntry(rawEntry);
+          if (!entry) continue;
+          const safeKey = sanitizeBreakdownKey(rawKey, 'unknown', 32);
+          const label = KNOWN_SECRET_SCOPES.has(safeKey)
+            ? SECRET_SCOPE_LABELS[safeKey]
+            : safeKey;
+          const tag = KNOWN_SECRET_SCOPES.has(safeKey) ? safeKey : `${safeKey} · unknown`;
+          scopeRows.push([label, tag, entry]);
+        }
+        if (scopeRows.length > 0) {
           console.log(chalk.dim('\nBy Secret Scope:'));
-          const scopeLabels: Record<string, string> = {
-            run: 'Run-scope ephemeral',
-            user: 'User BYOK',
-            tenant: 'Workspace BYOK',
-            platform: 'Platform fallback',
-          };
-          for (const [scope, s] of scopes) {
-            const label = scopeLabels[scope] ?? scope;
-            const tag = chalk.dim(`(${scope})`);
-            console.log(`  ${fitColumn(label, 22)} ${tag.padEnd(12)} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
+          for (const [label, tag, s] of scopeRows) {
+            // Pad the raw `(tag)` string to a fixed visible width FIRST,
+            // THEN wrap in chalk.dim — `padEnd` measures the underlying
+            // string length, and chalk's escape sequences would distort
+            // that count if applied beforehand.
+            const tagPaddedRaw = `(${tag})`.padEnd(14);
+            const tagDim = chalk.dim(tagPaddedRaw);
+            console.log(`  ${fitColumn(label, 22)} ${tagDim} ${formatTokens(s.tokens)} tokens · ${formatCents(s.costCents)} · ${s.requests} req`);
           }
         }
       } catch (err) {

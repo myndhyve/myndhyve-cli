@@ -37,19 +37,55 @@ function getTodayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Coerce an untyped Firestore doc into a `DailyTokenUsageSummary` with
+ * defensive defaults. Architecture-review fix: replaces the prior
+ * `as unknown as` cast with a single narrow boundary that fills in
+ * missing fields rather than trusting Firestore's schema implicitly.
+ *
+ * Strategy: the CLI is a read-only consumer; if the doc is partially
+ * populated (early-write race, schema drift, manual Firestore edit),
+ * we render zeros where typed fields are missing rather than throwing
+ * deep in the formatter chain.
+ */
+function coerceDailyUsage(doc: unknown, userId: string, date: string): DailyTokenUsageSummary {
+  const d = (doc && typeof doc === 'object' ? (doc as Record<string, unknown>) : {});
+  const num = (k: string): number => {
+    const v = d[k];
+    return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  };
+  const breakdownProvider = (d.byProvider && typeof d.byProvider === 'object'
+    ? (d.byProvider as DailyTokenUsageSummary['byProvider'])
+    : {});
+  const breakdownCanvas = (d.byCanvasType && typeof d.byCanvasType === 'object'
+    ? (d.byCanvasType as DailyTokenUsageSummary['byCanvasType'])
+    : {});
+  return {
+    date: typeof d.date === 'string' ? d.date : date,
+    userId: typeof d.userId === 'string' ? d.userId : userId,
+    totalTokens: num('totalTokens'),
+    totalPromptTokens: num('totalPromptTokens'),
+    totalCompletionTokens: num('totalCompletionTokens'),
+    totalEstimatedCostUsd: num('totalEstimatedCostUsd'),
+    requestCount: num('requestCount'),
+    byProvider: breakdownProvider,
+    byCanvasType: breakdownCanvas,
+  };
+}
+
 export async function getTodayUsage(userId: string): Promise<DailyTokenUsageSummary | null> {
   const dateStr = getTodayDateStr();
   log.debug('Fetching today usage');
   const doc = await getDocument(`users/${userId}/token_usage`, dateStr);
   if (!doc) return null;
-  return doc as unknown as DailyTokenUsageSummary;
+  return coerceDailyUsage(doc, userId, dateStr);
 }
 
 export async function getUsageForDate(userId: string, date: string): Promise<DailyTokenUsageSummary | null> {
   log.debug('Fetching usage for date');
   const doc = await getDocument(`users/${userId}/token_usage`, date);
   if (!doc) return null;
-  return doc as unknown as DailyTokenUsageSummary;
+  return coerceDailyUsage(doc, userId, date);
 }
 
 // ─── Per-workspace aggregate (Closeout-3 C.3) ───────────────────────────────
