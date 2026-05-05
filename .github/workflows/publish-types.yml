@@ -1,0 +1,85 @@
+name: Publish @myndhyve/types (cross-repo)
+
+# **WORKAROUND WORKFLOW.** The canonical home for this workflow is
+# `myndhyve/myndhyve@.github/workflows/publish-types.yml` (commit
+# 596fb3cd). It lives here in the CLI repo because the main repo's
+# GitHub Actions are currently billing-blocked
+# (`feedback_skip_ci_cd_deploys` in repo memory).
+#
+# **Migration trigger:** when the main repo's billing is restored, this
+# file should be deleted and the canonical workflow re-tagged to publish
+# from there. Until then, this provides an unblocked path so the CLI
+# can ship.
+#
+# Trigger: `workflow_dispatch` with a version input. The workflow:
+#   1. Checks out the main repo (`myndhyve/myndhyve`) at tag
+#      `types-v{version}`. The tag MUST already exist on main repo —
+#      the canonical workflow assumes the same.
+#   2. Builds packages/types/ (tsc → dist/).
+#   3. Publishes to npm with provenance.
+#
+# Why workflow_dispatch instead of tag-trigger: tags pushed to this CLI
+# repo would conflict with the CLI's own `v*` publish trigger. Manual
+# dispatch keeps the surface explicit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Types package version to publish (no v prefix). Tag types-v{version} must exist on myndhyve/myndhyve.'
+        required: true
+        type: string
+        default: '1.0.0'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout main repo at types-v${{ inputs.version }}
+        uses: actions/checkout@v4
+        with:
+          repository: myndhyve/myndhyve
+          ref: types-v${{ inputs.version }}
+          # Cross-repo checkout requires a token that has access to the
+          # main repo. github.token from this CLI workflow CAN read main
+          # repo because both repos are in the same myndhyve org and
+          # checkout's default permission set covers public repos. If
+          # main repo were private, a fine-grained PAT would be needed.
+          token: ${{ github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: packages/types/package-lock.json
+
+      - name: Install workspace devDeps
+        run: npm ci --workspace=@myndhyve/types --include-workspace-root=false
+
+      - name: Type check
+        working-directory: packages/types
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: packages/types
+        run: npm run build
+
+      - name: Verify package.json version matches input
+        working-directory: packages/types
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ inputs.version }}" ]; then
+            echo "Error: packages/types/package.json version ($PKG_VERSION) != input (${{ inputs.version }})"
+            exit 1
+          fi
+          echo "Version verified: $PKG_VERSION"
+
+      - name: Publish to npm
+        working-directory: packages/types
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
