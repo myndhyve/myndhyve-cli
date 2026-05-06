@@ -6,7 +6,17 @@ import { RelayConfigSchema, type RelayConfig } from './types.js';
 
 export const DEFAULT_CONFIG: RelayConfig = RelayConfigSchema.parse({});
 
-export const CLI_VERSION = '0.1.0';
+// Build-time injection from tsup.config.ts (reads package.json at
+// config-load time and replaces this token via esbuild `define`).
+// Single source of truth: the npm `version` field. Replaces the
+// previous hardcoded constant that drifted to 0.1.0 while the
+// package shipped 0.4.0 (caught by post-publish smoke test
+// 2026-05-05). A runtime `require('../../package.json')` looks
+// tempting but breaks after bundling — `import.meta.url` lives in
+// `dist/`, so the relative path resolves outside the cli root.
+declare const __CLI_VERSION__: string;
+export const CLI_VERSION: string =
+  typeof __CLI_VERSION__ !== 'undefined' ? __CLI_VERSION__ : '0.0.0';
 
 export const DEFAULT_SERVER_URL =
   'https://us-central1-myndhyve.cloudfunctions.net/messagingRelayGateway';
@@ -44,7 +54,7 @@ export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__
 
 /**
  * Full version string for --version output.
- * Example: myndhyve-cli/0.1.0 darwin-arm64 node-v22.0.0 (abc1234 2026-02-17)
+ * Example: myndhyve-cli/0.4.0 darwin-arm64 node-v22.0.0 (abc1234 2026-02-17)
  */
 export const VERSION_STRING =
   `myndhyve-cli/${CLI_VERSION} ${process.platform}-${process.arch} node-${process.version} (${BUILD_COMMIT} ${BUILD_DATE})`;

@@ -8,7 +8,6 @@
 import { hostname, platform } from 'node:os';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
@@ -31,14 +30,12 @@ import { DEFAULT_IGNORE_PATTERNS } from './types.js';
 
 const log = createLogger('BridgeSession');
 
-const CLI_VERSION: string = (() => {
-  try {
-    const require = createRequire(import.meta.url);
-    return (require('../../package.json') as { version: string }).version;
-  } catch {
-    return '0.0.0';
-  }
-})();
+// Use the build-time-injected version from defaults.ts instead of a
+// runtime `require('../../package.json')`. The require approach silently
+// resolves the wrong path after bundling — `import.meta.url` lives in
+// `dist/` so two-`..` segments escape the cli root. Caught alongside the
+// defaults.ts version drift in post-publish smoke test 2026-05-05.
+import { CLI_VERSION } from '../config/defaults.js';
 
 // ============================================================================
 // LOCAL CONFIG (.myndhyve/bridge.json)

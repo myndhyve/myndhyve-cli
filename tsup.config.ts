@@ -1,5 +1,8 @@
 import { defineConfig } from 'tsup';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 function getGitCommit(): string {
   try {
@@ -7,6 +10,20 @@ function getGitCommit(): string {
   } catch {
     return 'unknown';
   }
+}
+
+// Read the package.json `version` at config-load time so the bundled
+// CLI carries the same version string that npm publishes. Previous
+// approach hard-coded `CLI_VERSION = '0.1.0'` in defaults.ts and
+// drifted to v0.4.0 (caught by post-publish smoke test 2026-05-05).
+// A runtime `require('../../package.json')` looks tempting but breaks
+// after bundling — `import.meta.url` lives in `dist/`, so the relative
+// path resolves outside the cli root.
+function getPackageVersion(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkgPath = resolve(here, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+  return pkg.version;
 }
 
 export default defineConfig({
@@ -17,19 +34,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   splitting: false,
-  // `@myndhyve/types` is a workspace-internal `file:` dependency that
-  // ships TypeScript source (no compiled JS in the package). Default
-  // tsup behavior leaves it as a runtime import, but Node can't load
-  // `.ts` files directly — `node dist/index.js` then crashes with
-  // ERR_UNKNOWN_FILE_EXTENSION. Inlining the package into the bundle
-  // is the correct call: the types package is purely declarative
-  // (constants + interfaces), tiny, and conceptually part of the
-  // CLI's own surface. Type-only imports were already invisible to
-  // the runtime bundle; this only matters for VALUE imports like
-  // `isRunErrorCode` / `RUN_ERROR_CODES`.
-  noExternal: ['@myndhyve/types'],
   define: {
     '__BUILD_COMMIT__': JSON.stringify(getGitCommit()),
     '__BUILD_DATE__': JSON.stringify(new Date().toISOString().slice(0, 10)),
+    '__CLI_VERSION__': JSON.stringify(getPackageVersion()),
   },
 });
