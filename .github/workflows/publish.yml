@@ -41,21 +41,23 @@ jobs:
           fi
           echo "Version verified: $PKG_VERSION"
 
-      # Upgrade npm before --provenance publish. Mirrors the fix the
-      # WOP repo's wop-publish.yml landed in commit e5a0935 ("npm i -g
-      # npm@latest before OIDC publishes"): the npm bundled with Node
-      # 20's setup-node was hitting an OIDC trusted-publisher 404 from
-      # the registry on PUT (after successful provenance signing). The
-      # latest npm resolves the OIDC handshake correctly. Once the
-      # `node-version: 20` line bumps to 22+ and ships a new-enough
-      # npm by default, this step can come out.
-      - name: Upgrade npm (OIDC trusted-publisher fix)
+      # OIDC trusted publishers require npm 11.5.1+; Node 20 ships
+      # 10.8.2. Without this, `npm publish` would fall back to the
+      # legacy token-auth path that returns 404 once the npm org has
+      # required trusted publishers (the failure mode that took down
+      # the v0.4.0 publish on 2026-05-05). Mirrors the WOP repo's
+      # wop-publish.yml — see commit e5a0935 there.
+      - name: Upgrade npm (OIDC trusted-publisher requirement)
         run: npm install -g npm@latest
 
-      - name: Publish to npm
+      # OIDC-authenticated publish — npm 11.5.1+ accepts the OIDC
+      # token from `permissions: id-token: write` automatically. No
+      # NODE_AUTH_TOKEN needed. The npmjs.com package settings must
+      # have a Trusted Publisher entry pointing at this repo +
+      # workflow file (same configuration as @myndhyve/wop).
+      # Trusted-publisher config: npmjs.com/package/@myndhyve/cli/access.
+      - name: Publish to npm (OIDC trusted publisher)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         run: gh release create "${{ github.ref_name }}" --generate-notes --title "${{ github.ref_name }}"
