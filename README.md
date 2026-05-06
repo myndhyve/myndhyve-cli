@@ -20,15 +20,25 @@ npm install -g @myndhyve/cli
 
 ## Development
 
-This package consumes wire-format types from `@myndhyve/types` (a workspace package in the main `myndhyve` repo). Until that package is published to npm, local development requires the main repo to be checked out as a sibling directory:
+This package consumes WOP wire-format types and helpers from
+[`@myndhyve/wop`](https://www.npmjs.com/package/@myndhyve/wop), the
+TypeScript SDK published from the open Workflow Orchestration Protocol
+spec corpus at [`github.com/myndhyve/wop`](https://github.com/myndhyve/wop).
+That package resolves from npm — `npm install` works from any clean
+checkout, no sibling-repo setup required.
 
-```
-~/dev/
-  myndhyve/         # main repo (contains packages/types)
-  myndhyve-cli/     # this repo
-```
+MyndHyve-engine-specific wire types (the wider 12-member
+`WorkflowRunStatus` emission union, `WorkflowDetail`, `WorkflowSummary`,
+trigger identifiers, etc.) live inline at `src/types/wire-format.ts` —
+they describe what the MyndHyve engine specifically emits and aren't
+part of the open WOP spec.
 
-The dependency in `package.json` resolves via `file:../myndhyve/packages/types`. CI checks out both repos before installing. Once `@myndhyve/types` publishes, the `file:` entry switches to a regular semver range and the sibling-checkout step in `.github/workflows/ci.yml` can be removed.
+```bash
+git clone https://github.com/myndhyve/myndhyve-cli.git
+cd myndhyve-cli
+npm install
+npm run typecheck && npm test
+```
 
 ## Quick Start
 

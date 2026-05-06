@@ -15,42 +15,35 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: myndhyve-cli
-
-      # Sibling checkout for the @myndhyve/types workspace package, which
-      # this repo currently consumes via `file:../myndhyve/packages/types`.
-      # Once the package publishes to npm, this step + the path layout
-      # below can be removed (Tier 0.3 follow-up).
-      - name: Checkout sibling main repo (@myndhyve/types source)
-        uses: actions/checkout@v4
-        with:
-          repository: myndhyve/myndhyve
-          path: myndhyve
-          ref: main
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-          cache-dependency-path: myndhyve-cli/package-lock.json
 
       - name: Install dependencies
-        working-directory: myndhyve-cli
         run: npm ci
 
       - name: Type check
-        working-directory: myndhyve-cli
         run: npm run typecheck
 
       - name: Run tests
-        working-directory: myndhyve-cli
         run: npm test
 
       - name: Build
-        working-directory: myndhyve-cli
         run: npm run build
+
+      # Publishability canary — closes the architect-review gap that
+      # caused d8f6b06 → v0.3.8 to fail at publish-time. `npm publish
+      # --dry-run` from a clean checkout (no sibling-repo trickery)
+      # validates that every dependency in package.json resolves from
+      # the public registry. If a future PR introduces another `file:`
+      # dep, an unfulfillable workspace dep, or a private-registry dep,
+      # this step fails on the introducing PR — not on the next
+      # release attempt.
+      - name: Publishability canary (npm publish --dry-run)
+        run: npm publish --dry-run
 
   smoke-test:
     needs: test
@@ -62,37 +55,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: myndhyve-cli
-
-      - name: Checkout sibling main repo (@myndhyve/types source)
-        uses: actions/checkout@v4
-        with:
-          repository: myndhyve/myndhyve
-          path: myndhyve
-          ref: main
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-          cache-dependency-path: myndhyve-cli/package-lock.json
 
       - name: Install dependencies
-        working-directory: myndhyve-cli
         run: npm ci
 
       - name: Build
-        working-directory: myndhyve-cli
         run: npm run build
 
       - name: Pack tarball
-        working-directory: myndhyve-cli
         run: npm pack
 
       - name: Install globally from tarball
-        working-directory: myndhyve-cli
         run: |
           npm install -g --prefix "$HOME/.local" ./myndhyve-cli-*.tgz
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -121,7 +100,11 @@ jobs:
         with:
           path: myndhyve-cli
 
-      - name: Checkout sibling main repo (emulator config + types)
+      # Sibling checkout for the main repo's Firebase emulator config
+      # (firebase.json + .emulator-fixtures/). The CLI itself no longer
+      # depends on a sibling checkout — only this integration job needs
+      # it for the emulator runtime artifacts.
+      - name: Checkout sibling main repo (emulator config)
         uses: actions/checkout@v4
         with:
           repository: myndhyve/myndhyve
