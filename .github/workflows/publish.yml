@@ -41,6 +41,17 @@ jobs:
           fi
           echo "Version verified: $PKG_VERSION"
 
+      # Upgrade npm before --provenance publish. Mirrors the fix the
+      # WOP repo's wop-publish.yml landed in commit e5a0935 ("npm i -g
+      # npm@latest before OIDC publishes"): the npm bundled with Node
+      # 20's setup-node was hitting an OIDC trusted-publisher 404 from
+      # the registry on PUT (after successful provenance signing). The
+      # latest npm resolves the OIDC handshake correctly. Once the
+      # `node-version: 20` line bumps to 22+ and ships a new-enough
+      # npm by default, this step can come out.
+      - name: Upgrade npm (OIDC trusted-publisher fix)
+        run: npm install -g npm@latest
+
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:
