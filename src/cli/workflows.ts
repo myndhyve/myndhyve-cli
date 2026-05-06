@@ -44,7 +44,7 @@ import {
 } from './helpers.js';
 import { ExitCode, printErrorResult } from '../utils/output.js';
 import { formatRunError } from '../utils/format.js';
-import { isTerminalRunStatus } from '@myndhyve/types';
+import { isTerminalRunStatus } from '@myndhyve/wop';
 import {
   WorkflowRuntimeClient,
   WorkflowRuntimeAuthError,
@@ -56,7 +56,7 @@ import {
 // CONSTANTS
 // ============================================================================
 
-// Sourced from the canonical engine union via `@myndhyve/types` so adding a
+// Sourced from the canonical engine union via `@myndhyve/wop` so adding a
 // new status server-side (e.g. `waiting-external`) makes it valid here too.
 const VALID_RUN_STATUSES: WorkflowRunStatus[] = [
   'pending',
@@ -420,7 +420,7 @@ function registerStatusCommand(workflows: Command): void {
         }
 
         if (run.error) {
-          // run.error is the structured wire shape from @myndhyve/types:
+          // run.error is the structured wire shape from @myndhyve/wop:
           // { code, message, nodeId? }. `formatRunError(... withHint: true)`
           // surfaces both the raw `[code] message (node)` line AND an
           // operator-actionable hint when the code is in the canonical
@@ -482,7 +482,7 @@ function registerStatusCommand(workflows: Command): void {
  *
  * Polls `getRun` on a configurable interval (default 3s) and exits
  * when the run reports a status in `TERMINAL_RUN_STATUSES` (from
- * `@myndhyve/types`). Exit codes:
+ * `@myndhyve/wop`). Exit codes:
  *   - 0 (SUCCESS) when the run completed
  *   - 1 (GENERAL_ERROR) when the run terminated in any non-completed
  *     terminal state (failed / cancelled / timed-out / interrupted)

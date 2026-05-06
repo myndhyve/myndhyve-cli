@@ -20,7 +20,7 @@ import {
   type WorkflowRunStatus,
   type WorkflowSummary,
   type WorkflowTriggerType,
-} from '@myndhyve/types';
+} from '../types/wire-format.js';
 import {
   getDocument,
   listDocuments,
@@ -34,7 +34,7 @@ import { createLogger } from '../utils/logger.js';
 const log = createLogger('WorkflowAPI');
 
 // ============================================================================
-// SHARED WIRE-FORMAT TYPES (re-exported from @myndhyve/types)
+// SHARED WIRE-FORMAT TYPES (sourced from src/types/wire-format.ts)
 // ============================================================================
 
 // Statuses, triggers, summaries, run shapes, approval info now come from the
@@ -53,7 +53,7 @@ export {
 };
 
 /**
- * @deprecated Use `NodeRunStateSummary` from `@myndhyve/types` instead. Alias
+ * @deprecated Use `NodeRunStateSummary` from `../types/wire-format` instead. Alias
  * kept for one release so external CLI extensions don't break instantly.
  */
 export type NodeRunState = NodeRunStateSummary;

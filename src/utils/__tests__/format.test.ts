@@ -5,7 +5,7 @@ import {
   formatRunError,
   __RUN_ERROR_HINTS__,
 } from '../format.js';
-import { RUN_ERROR_CODES } from '@myndhyve/types';
+import { RUN_ERROR_CODES } from '@myndhyve/wop';
 
 describe('formatTimeSince()', () => {
   it('returns "just now" for dates less than 1 minute ago', () => {

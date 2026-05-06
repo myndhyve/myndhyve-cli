@@ -4,7 +4,7 @@
  * Shared formatting functions used across CLI commands and services.
  */
 
-import { isRunErrorCode, type RunError } from '@myndhyve/types';
+import { isRunErrorCode, type RunError } from '@myndhyve/wop';
 
 /**
  * Format the time elapsed since a given date as a human-readable string.
@@ -159,7 +159,7 @@ export function formatRunError(
 
 /**
  * Test-only export so the suite can verify every code in
- * `RUN_ERROR_CODES` (from `@myndhyve/types`) has a hint entry. The
+ * `RUN_ERROR_CODES` (from `@myndhyve/wop`) has a hint entry. The
  * runtime helper {@link formatRunError} reads from this table; the
  * test asserts coverage so a future code addition without a hint is
  * caught at CI time.

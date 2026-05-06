@@ -1,6 +1,6 @@
 {
   "name": "@myndhyve/cli",
-  "version": "0.3.8",
+  "version": "0.4.0",
   "description": "MyndHyve CLI — Bridge messaging platforms, manage agents, and automate workflows",
   "type": "module",
   "main": "dist/index.js",
@@ -31,7 +31,7 @@
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@myndhyve/types": "file:../myndhyve/packages/types",
+    "@myndhyve/wop": "^1.1.1",
     "@whiskeysockets/baileys": "^6.7.21",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
